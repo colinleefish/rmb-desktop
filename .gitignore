@@ -14,7 +14,7 @@ dist/
 target/
 *.log
 
-# Build artifacts
+/bin/
 *.dmg
 *.pkg
 *.msi

@@ -240,21 +240,21 @@ echo '<cursor payload>' | rmb hook-submit --source=cursor
 
 ---
 
-### M3 — Distillation (2–3 weeks)
+### M3 — Distillation (2–3 weeks) ✅
 
 **Goal:** Background workers produce atoms → scenes → memories → embeddings.
 
-| Task | Package |
-|------|---------|
-| `internal/llm` — OpenAI-compatible chat + embed clients | `llm` |
-| `prompts/extract_atoms.txt`, `build_scenes.txt`, `distill_memory.txt` | `prompts` |
-| L1 worker — poll pending turns, LLM → atoms, FTS index | `worker/extract` |
-| L2 worker — atoms → scenes + session abstract | `worker/scene` |
-| L3 worker — cross-session memory rollup, versioning | `worker/memory` |
-| Embed worker — fill vector columns (sqlite-vec) | `worker/embed` |
-| App-level mutex for L3 global pass (D6) | `worker` |
-| Ingest-only when no API key (D20) | `config`, workers |
-| Migrations for atoms, scenes, memories, FTS, vectors | `migrations` |
+| Task | Package | Status |
+|------|---------|--------|
+| `internal/llm` — OpenAI-compatible chat + embed clients | `llm` | ✅ |
+| `prompts/extract_atoms.txt`, `build_scenes.txt`, `distill_memory.txt` | `prompts` | ✅ |
+| L1 worker — poll pending turns, LLM → atoms, FTS index | `worker/extract` | ✅ |
+| L2 worker — atoms → scenes + session abstract | `worker/scene` | ✅ |
+| L3 worker — cross-session memory rollup, versioning | `worker/memory` | ✅ |
+| Embed worker — fill vector columns (sqlite-vec) | `worker/embed` | ✅ |
+| App-level mutex for L3 global pass (D6) | `workerlock` | ✅ |
+| Ingest-only when no API key (D20) | `config`, workers | ✅ |
+| Migrations for atoms, scenes, memories, FTS, vectors | `migrations/00002` | ✅ |
 
 **Exit criteria:**
 
@@ -265,20 +265,20 @@ echo '<cursor payload>' | rmb hook-submit --source=cursor
 
 ---
 
-### M4 — Recall (1–2 weeks)
+### M4 — Recall (1–2 weeks) ✅
 
 **Goal:** Agents and operators can search and inspect memory.
 
-| Task | Package |
-|------|---------|
-| FTS search: memories, scenes, turns | `recall` |
-| Vector search via sqlite-vec | `recall` |
-| RRF fusion (~70% vector / 30% FTS) | `recall` |
-| FTS-only fallback when no embed key | `recall` |
-| `GET /api/v1/search`, inspect handlers | `http` |
-| `rmb search`, `cat`, `tree`, `meta` | `cmd/rmb` |
-| `internal/inspect` — format CLI output | `inspect` |
-| Multilingual eval fixtures (EN, ZH, TH) | `recall/*_test.go` |
+| Task | Package | Status |
+|------|---------|--------|
+| FTS search: memories, scenes | `recall` | ✅ |
+| Vector search via sqlite-vec BLOB | `recall` | ✅ |
+| RRF fusion (~70/30 vector/FTS) | `recall` | ✅ |
+| FTS-only fallback when no embed key | `recall` | ✅ |
+| `GET /api/v1/search`, inspect handlers | `httpserver` | ✅ |
+| `rmb search`, `cat`, `tree`, `meta` | `cmd/rmb` | ✅ |
+| `internal/inspect` — format CLI output | `inspect` | ✅ |
+| Multilingual FTS query escaping | `recall` | ✅ |
 
 **Exit criteria:**
 

@@ -1,0 +1,7 @@
+Extract structured memory atoms from this chat batch (JSONL, one message per line).
+
+Return JSON only:
+{"atoms":[{"category":"...","priority":50,"scene_name":"...","slug":"ai-tone","content":"...","source_turn_indices":[0]}]}
+
+Chat batch:
+{{BATCH}}

@@ -1,0 +1,10 @@
+Distill these facts into a single long-term memory.
+
+category: {{CATEGORY}}
+topic/slug: {{SLUG}}{{FILTER}}{{CORRECTIONS}}
+
+Return JSON only:
+{"abstract":"...","body":"..."}
+
+Facts (JSON):
+{{FACTS}}

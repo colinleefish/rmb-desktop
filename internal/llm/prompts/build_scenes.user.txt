@@ -1,0 +1,7 @@
+Aggregate these memory atoms into scene summaries.
+
+Return JSON only:
+{"scenes":[{"display_name":"...","abstract":"...","body":"...","atom_uris":["rmb://..."]}]}
+
+Input atoms (JSON):
+{{ATOMS}}

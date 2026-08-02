@@ -1,0 +1,4 @@
+Write a single session abstract from these scene abstracts.
+
+Scene abstracts:
+{{ABSTRACTS}}

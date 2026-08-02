@@ -1,0 +1,2 @@
+Keep ONLY durable first-person facts about the user (identity, location, role, devices, stable traits, health/taboos).
+DROP any fact that is about a third party, transient session/AI-mode state, or a momentary emotional reaction.

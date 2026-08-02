@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>me.remember.rmb</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/liguanghui/.rmb/bin/rmb-menubar</string>
+    </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>RMBD_PATH</key>
+        <string>/Users/liguanghui/.rmb/bin/rmbd-desktop</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/tmp/rmb-menubar.stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/rmb-menubar.stderr.log</string>
+</dict>
+</plist>

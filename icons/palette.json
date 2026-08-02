@@ -1,0 +1,21 @@
+{
+  "source": "https://colorhunt.co/palette/222831393e4600adb5eeeeee",
+  "colors": {
+    "dark": {
+      "hex": "#222831",
+      "role": "Primary dark — headings, sidebar logo, strong contrast surfaces"
+    },
+    "gray": {
+      "hex": "#393E46",
+      "role": "Secondary — body text, borders, muted UI chrome"
+    },
+    "accent": {
+      "hex": "#00ADB5",
+      "role": "Accent — active nav, primary buttons, highlights, links"
+    },
+    "light": {
+      "hex": "#EEEEEE",
+      "role": "Light — page background, subtle fills, text on dark"
+    }
+  }
+}

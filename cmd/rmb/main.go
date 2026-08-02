@@ -6,7 +6,11 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
+	"strings"
 
+	"github.com/colinleefish/rmb-desktop/internal/client"
+	"github.com/colinleefish/rmb-desktop/internal/config"
 	"github.com/colinleefish/rmb-desktop/internal/hook"
 )
 
@@ -23,6 +27,14 @@ func run() int {
 	switch os.Args[1] {
 	case "hook-submit":
 		return hookSubmit(os.Args[2:])
+	case "search":
+		return search(os.Args[2:])
+	case "cat":
+		return inspectCmd("cat", os.Args[2:])
+	case "tree":
+		return inspectCmd("tree", os.Args[2:])
+	case "meta":
+		return inspectCmd("meta", os.Args[2:])
 	case "version":
 		fmt.Println("rmb dev")
 		return 0
@@ -34,6 +46,14 @@ func run() int {
 		printUsage()
 		return 2
 	}
+}
+
+func apiClient() (*client.Client, error) {
+	cfg, err := config.LoadDefault()
+	if err != nil {
+		return nil, err
+	}
+	return client.FromConfig(cfg), nil
 }
 
 func hookSubmit(args []string) int {
@@ -66,11 +86,112 @@ func hookSubmit(args []string) int {
 	return 0
 }
 
+func search(args []string) int {
+	query, rest := parseQueryAndFlags(args)
+	if query == "" {
+		fmt.Fprintln(os.Stderr, `usage: rmb search "<query>" [--scope=memory,scene] [--k=n]`)
+		return 2
+	}
+	k, err := parseK(rest)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "search: %v\n", err)
+		return 2
+	}
+	scopes := parseScopes(rest)
+
+	cl, err := apiClient()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "search: %v\n", err)
+		return 1
+	}
+	matches, err := cl.Search(context.Background(), query, k, scopes)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "search: %v\n", err)
+		return 1
+	}
+	printMatches(matches)
+	return 0
+}
+
+func inspectCmd(kind string, args []string) int {
+	uri := strings.TrimSpace(strings.Join(args, " "))
+	if uri == "" {
+		fmt.Fprintf(os.Stderr, "usage: rmb %s <uri>\n", kind)
+		return 2
+	}
+	cl, err := apiClient()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s: %v\n", kind, err)
+		return 1
+	}
+	out, err := cl.Inspect(context.Background(), kind, uri)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s: %v\n", kind, err)
+		return 1
+	}
+	fmt.Print(out)
+	return 0
+}
+
+func printMatches(matches []client.Match) {
+	for i, m := range matches {
+		fmt.Printf("%2d. [%s] %s\n", i+1, m.Tier, m.URI)
+		if m.Snippet != "" {
+			fmt.Printf("    %s\n", m.Snippet)
+		}
+	}
+}
+
+func parseQueryAndFlags(args []string) (string, []string) {
+	var positional []string
+	var rest []string
+	for _, a := range args {
+		if strings.HasPrefix(a, "--") {
+			rest = append(rest, a)
+		} else {
+			positional = append(positional, a)
+		}
+	}
+	return strings.Join(positional, " "), rest
+}
+
+func parseK(args []string) (int, error) {
+	for _, a := range args {
+		if strings.HasPrefix(a, "--k=") {
+			return strconv.Atoi(strings.TrimPrefix(a, "--k="))
+		}
+	}
+	return 0, nil
+}
+
+func parseScopes(args []string) []string {
+	for _, a := range args {
+		if strings.HasPrefix(a, "--scope=") {
+			raw := strings.TrimPrefix(a, "--scope=")
+			if raw == "" {
+				return nil
+			}
+			var out []string
+			for _, s := range strings.Split(raw, ",") {
+				if s = strings.TrimSpace(s); s != "" {
+					out = append(out, s)
+				}
+			}
+			return out
+		}
+	}
+	return nil
+}
+
 func printUsage() {
 	fmt.Fprintf(os.Stderr, `rmb - local-first memory CLI
 
 Usage:
   rmb hook-submit --source=<cursor> [--url=http://127.0.0.1:19019]
+  rmb search "<query>" [--scope=memory,scene] [--k=n]
+  rmb cat <uri>
+  rmb tree <uri-prefix>
+  rmb meta <uri>
   rmb version
 
 `)

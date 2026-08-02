@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/colinleefish/rmb-desktop/internal/config"
 	"github.com/colinleefish/rmb-desktop/internal/db"
 	"github.com/colinleefish/rmb-desktop/internal/httpserver"
 )
@@ -19,7 +20,8 @@ func TestUpload_roundTrip(t *testing.T) {
 	}
 	defer database.Close()
 
-	srv := httpserver.New(database, nil)
+	cfg, _ := config.Default()
+	srv := httpserver.New(database, cfg, filepath.Join(t.TempDir(), "config.yaml"), nil)
 
 	body, _ := json.Marshal(map[string]any{
 		"messages": []map[string]string{

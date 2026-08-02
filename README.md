@@ -20,9 +20,18 @@ rmb (CLI)         →  hook-submit · search · setup · cat · tree · meta
 
 Stable IDs use a unified **`rmb://`** scheme (e.g. `rmb://profile`, `rmb://atoms/<uuid>`).
 
+## Quick start
+
+```bash
+make build
+make menubar-dev    # tray icon in menu bar
+```
+
+See [`menubar/README.md`](./menubar/README.md) for tray app details.
+
 ## Status
 
-Early bootstrap. See [`plan/`](./plan/) — [product plan](./plan/local-first-desktop.md) and [implementation plan](./plan/implementation.md).
+M0–M4 complete; menubar (M7 preview) scaffolded. **M5 web UI in progress** — browse API + Vite dashboard at `/ui/`.
 
 ## Planned layout
 

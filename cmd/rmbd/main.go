@@ -12,6 +12,7 @@ import (
 	"github.com/colinleefish/rmb-desktop/internal/config"
 	"github.com/colinleefish/rmb-desktop/internal/db"
 	"github.com/colinleefish/rmb-desktop/internal/httpserver"
+	"github.com/colinleefish/rmb-desktop/internal/worker"
 )
 
 func main() {
@@ -39,7 +40,13 @@ func serve(args []string) int {
 	configPath := fs.String("config", "", "path to config.yaml")
 	_ = fs.Parse(args)
 
-	cfg, err := config.Load(*configPath)
+	cfgFile, err := config.ResolvePath(*configPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "config path: %v\n", err)
+		return 1
+	}
+
+	cfg, err := config.Load(cfgFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "config: %v\n", err)
 		return 1
@@ -56,7 +63,12 @@ func serve(args []string) int {
 	defer stop()
 
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	if err := httpserver.ListenAndServe(ctx, cfg.Addr, database, log); err != nil {
+
+	runner := worker.NewRunner(cfg, database, log)
+	runner.Start(ctx)
+	defer runner.Wait()
+
+	if err := httpserver.ListenAndServe(ctx, cfg.Addr, database, cfg, cfgFile, log); err != nil {
 		fmt.Fprintf(os.Stderr, "serve: %v\n", err)
 		return 1
 	}

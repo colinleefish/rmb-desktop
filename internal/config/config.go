@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/colinleefish/rmb-desktop/internal/platform"
 	"gopkg.in/yaml.v3"
@@ -13,8 +14,48 @@ const DefaultAddr = "127.0.0.1:19019"
 
 // Config is the rmb-desktop client and daemon configuration.
 type Config struct {
-	Addr   string `yaml:"addr"`
-	DBPath string `yaml:"db_path"`
+	Addr     string         `yaml:"addr"`
+	DBPath   string         `yaml:"db_path"`
+	LLM      LLMConfig      `yaml:"llm"`
+	Embed    EmbedConfig    `yaml:"embed"`
+	Pipeline PipelineConfig `yaml:"pipeline"`
+}
+
+type LLMConfig struct {
+	APIBase string `yaml:"api_base"`
+	APIKey  string `yaml:"api_key"`
+	Model   string `yaml:"model"`
+}
+
+func (c LLMConfig) HasKey() bool {
+	return strings.TrimSpace(c.APIKey) != ""
+}
+
+type EmbedConfig struct {
+	APIBase    string `yaml:"api_base"`
+	APIKey     string `yaml:"api_key"`
+	Model      string `yaml:"model"`
+	Dimensions int    `yaml:"dimensions"`
+}
+
+func (c EmbedConfig) HasKey() bool {
+	return strings.TrimSpace(c.APIKey) != ""
+}
+
+type PipelineConfig struct {
+	L1PollInterval  time.Duration `yaml:"l1_poll_interval"`
+	L2PollInterval  time.Duration `yaml:"l2_poll_interval"`
+	L3PollInterval  time.Duration `yaml:"l3_poll_interval"`
+	EmbedPollInterval time.Duration `yaml:"embed_poll_interval"`
+	L1EveryN        int           `yaml:"l1_every_n"`
+	L1IdleSeconds   time.Duration `yaml:"l1_idle_seconds"`
+	L1Warmup        bool          `yaml:"l1_warmup"`
+	L2DelayAfterL1  time.Duration `yaml:"l2_delay_after_l1"`
+	L1MaxTurns      int           `yaml:"l1_max_turns_per_batch"`
+	L1MaxChars      int           `yaml:"l1_max_chars_per_batch"`
+	L2MaxAtoms      int           `yaml:"l2_max_atoms_per_batch"`
+	L3MaxAtoms      int           `yaml:"l3_max_atoms_per_batch"`
+	EmbedBatchSize  int           `yaml:"embed_batch_size"`
 }
 
 // Default returns configuration with platform defaults applied.
@@ -26,6 +67,30 @@ func Default() (Config, error) {
 	return Config{
 		Addr:   DefaultAddr,
 		DBPath: dbPath,
+		LLM: LLMConfig{
+			APIBase: "https://api.openai.com/v1",
+			Model:   "gpt-4o-mini",
+		},
+		Embed: EmbedConfig{
+			APIBase:    "https://api.openai.com/v1",
+			Model:      "text-embedding-3-small",
+			Dimensions: 1024,
+		},
+		Pipeline: PipelineConfig{
+			L1PollInterval:    15 * time.Second,
+			L2PollInterval:    15 * time.Second,
+			L3PollInterval:    5 * time.Minute,
+			EmbedPollInterval: 30 * time.Second,
+			L1EveryN:          8,
+			L1IdleSeconds:     10 * time.Minute,
+			L1Warmup:          true,
+			L2DelayAfterL1:    90 * time.Second,
+			L1MaxTurns:        8,
+			L1MaxChars:        24000,
+			L2MaxAtoms:        60,
+			L3MaxAtoms:        60,
+			EmbedBatchSize:    32,
+		},
 	}, nil
 }
 
@@ -59,6 +124,9 @@ func Load(path string) (Config, error) {
 		}
 		cfg.DBPath = dbPath
 	}
+	if cfg.Embed.Dimensions <= 0 {
+		cfg.Embed.Dimensions = 1024
+	}
 	return applyEnv(cfg), nil
 }
 
@@ -83,12 +151,35 @@ func (c Config) BaseURL() string {
 	return "http://" + addr
 }
 
+// DistillationEnabled reports whether LLM workers should run (D20: ingest-only without key).
+func (c Config) DistillationEnabled() bool {
+	return c.LLM.HasKey()
+}
+
 func applyEnv(cfg Config) Config {
 	if v := strings.TrimSpace(os.Getenv("RMB_ADDR")); v != "" {
 		cfg.Addr = v
 	}
 	if v := strings.TrimSpace(os.Getenv("RMB_DB_PATH")); v != "" {
 		cfg.DBPath = v
+	}
+	if v := strings.TrimSpace(os.Getenv("RMB_LLM_API_KEY")); v != "" {
+		cfg.LLM.APIKey = v
+	}
+	if v := strings.TrimSpace(os.Getenv("RMB_LLM_API_BASE")); v != "" {
+		cfg.LLM.APIBase = v
+	}
+	if v := strings.TrimSpace(os.Getenv("RMB_LLM_MODEL")); v != "" {
+		cfg.LLM.Model = v
+	}
+	if v := strings.TrimSpace(os.Getenv("RMB_EMBED_API_KEY")); v != "" {
+		cfg.Embed.APIKey = v
+	}
+	if v := strings.TrimSpace(os.Getenv("RMB_EMBED_API_BASE")); v != "" {
+		cfg.Embed.APIBase = v
+	}
+	if v := strings.TrimSpace(os.Getenv("RMB_EMBED_MODEL")); v != "" {
+		cfg.Embed.Model = v
 	}
 	return cfg
 }

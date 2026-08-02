@@ -20,6 +20,7 @@ type Message struct {
 // UploadInput is the service-layer upload request.
 type UploadInput struct {
 	SessionKey string
+	Source     string
 	Messages   []Message
 }
 
@@ -43,6 +44,7 @@ func NewService(db *sql.DB) *Service {
 // Upload inserts or creates a session and appends a turn.
 func (s *Service) Upload(ctx context.Context, in UploadInput) (UploadResult, error) {
 	sessionKey := strings.ToLower(strings.TrimSpace(in.SessionKey))
+	source := strings.ToLower(strings.TrimSpace(in.Source))
 	if sessionKey == "" {
 		return UploadResult{}, fmt.Errorf("session key required")
 	}
@@ -66,9 +68,9 @@ func (s *Service) Upload(ctx context.Context, in UploadInput) (UploadResult, err
 	if err == sql.ErrNoRows {
 		sessionID = uuid.NewString()
 		_, err = tx.ExecContext(ctx, `
-			INSERT INTO sessions (id, session_key, created_at, updated_at)
-			VALUES (?, ?, ?, ?)`,
-			sessionID, sessionKey, nowMS, nowMS,
+			INSERT INTO sessions (id, session_key, source, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?)`,
+			sessionID, sessionKey, nullIfEmpty(source), nowMS, nowMS,
 		)
 		if err != nil {
 			return UploadResult{}, fmt.Errorf("insert session: %w", err)
@@ -84,14 +86,24 @@ func (s *Service) Upload(ctx context.Context, in UploadInput) (UploadResult, err
 	} else if err != nil {
 		return UploadResult{}, fmt.Errorf("lookup session: %w", err)
 	} else {
-		_, err = tx.ExecContext(ctx,
-			`UPDATE sessions SET updated_at = ? WHERE id = ?`, nowMS, sessionID,
-		)
+		if source != "" {
+			_, err = tx.ExecContext(ctx,
+				`UPDATE sessions SET updated_at = ?, source = ? WHERE id = ?`, nowMS, source, sessionID,
+			)
+		} else {
+			_, err = tx.ExecContext(ctx,
+				`UPDATE sessions SET updated_at = ? WHERE id = ?`, nowMS, sessionID,
+			)
+		}
 		if err != nil {
 			return UploadResult{}, fmt.Errorf("touch session: %w", err)
 		}
 		_, err = tx.ExecContext(ctx, `
-			UPDATE pipeline_state SET l1_status = 'pending', updated_at = ? WHERE session_id = ?`,
+			UPDATE pipeline_state SET
+				l1_status = 'pending',
+				l1_turns_since_advanced = l1_turns_since_advanced + 1,
+				updated_at = ?
+			WHERE session_id = ?`,
 			nowMS, sessionID,
 		)
 		if err != nil {
@@ -124,4 +136,11 @@ func (s *Service) Upload(ctx context.Context, in UploadInput) (UploadResult, err
 		TurnURI:   "rmb://turns/" + turnID,
 		CreatedAt: now,
 	}, nil
+}
+
+func nullIfEmpty(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
 }

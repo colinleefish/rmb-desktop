@@ -60,16 +60,23 @@ func Submit(ctx context.Context, in SubmitInput) error {
 			return logf("skip", "not a cursor payload")
 		}
 		sessionKey, messages, reason, err = ParseCursorPayload(in.StdinJSON)
+	case "cc", "claude":
+		source = "cc"
+		if !IsClaudePayload(in.StdinJSON) {
+			return logf("skip", "not a claude payload")
+		}
+		sessionKey, messages, reason, err = ParseClaudePayload(in.StdinJSON)
 	default:
-		return fmt.Errorf("hook-submit: unsupported source %q (v1: cursor)", source)
+		return fmt.Errorf("hook-submit: unsupported source %q (cursor, cc)", source)
 	}
 	if err != nil {
 		return logf("skip", err.Error())
 	}
 
 	body := struct {
+		Source   string            `json:"source"`
 		Messages []session.Message `json:"messages"`
-	}{Messages: toSessionMessages(messages)}
+	}{Source: source, Messages: toSessionMessages(messages)}
 
 	payload, err := json.Marshal(body)
 	if err != nil {

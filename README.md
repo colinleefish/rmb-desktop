@@ -22,7 +22,7 @@ Stable IDs use a unified **`rmb://`** scheme (e.g. `rmb://profile`, `rmb://atoms
 
 ## Status
 
-Early bootstrap. See [`plan/`](./plan/) for the product plan.
+Early bootstrap. See [`plan/`](./plan/) — [product plan](./plan/local-first-desktop.md) and [implementation plan](./plan/implementation.md).
 
 ## Planned layout
 

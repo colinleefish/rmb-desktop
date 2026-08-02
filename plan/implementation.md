@@ -185,11 +185,11 @@ Bind **`127.0.0.1:19019`** only.
 
 **Spike outcomes to record:**
 
-- [ ] sqlite-vec CGO cross-compile OK for darwin/arm64, linux/amd64?
-- [ ] goose vs golang-migrate — pick **goose**
+- [x] sqlite-vec CGO works on darwin/arm64 (linux CI pending)
+- [x] goose — selected
 - [ ] Default embed model for docs: **BGE-M3** or **multilingual-e5-large**
 
-**Exit criteria:** spike doc in `plan/spike-results.md` (create after M0); no blockers for M1.
+**Exit criteria:** ✅ `plan/spike-results.md`; no blockers for M1.
 
 ---
 
@@ -426,13 +426,13 @@ Parallelizing UI (M5) with backend work can compress to **~14–16 weeks**.
 
 ## First week checklist (start here)
 
-- [ ] `go mod init github.com/colinleefish/rmb-desktop`
-- [ ] M0 spike: sqlite-vec + FTS5 + RRF in `cmd/spike/` or `internal/spike/`
-- [ ] M0 spike: Cursor hook payload sample + parser test
-- [ ] Write `migrations/00001_baseline.sql` draft on paper (sessions + turns only)
-- [ ] `cmd/rmbd/main.go` — `serve` prints "listening on 127.0.0.1:19019"
-- [ ] `cmd/rmb/main.go` — `hook-submit` stub POSTs to rmbd
-- [ ] `.github/workflows/ci.yml` — go test on push
+- [x] `go mod init github.com/colinleefish/rmb-desktop`
+- [x] M0 spike: sqlite-vec + FTS5 + RRF in `internal/spike/`
+- [x] M0 spike: Cursor hook payload sample + parser test
+- [x] `migrations/00001_baseline.sql` — sessions + turns
+- [x] `cmd/rmbd` — `serve` on `127.0.0.1:19019`
+- [x] `cmd/rmb` — `hook-submit` POSTs to rmbd
+- [x] `.github/workflows/ci.yml` — CGO + `sqlite_fts5` tests
 
 ---
 

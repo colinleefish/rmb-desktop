@@ -34,7 +34,7 @@ func (s *Service) Search(ctx context.Context, embed QueryEmbedder, query string,
 		scopes = DefaultScopes
 	}
 
-	wantMemory, wantScene := false, false
+	wantMemory, wantScene, wantSkill := false, false, false
 	for _, sc := range scopes {
 		switch sc {
 		case "memory":
@@ -42,13 +42,13 @@ func (s *Service) Search(ctx context.Context, embed QueryEmbedder, query string,
 		case "scene":
 			wantScene = true
 		case "skill":
-			// skills deferred post-M4 schema
+			wantSkill = true
 		default:
 			return nil, fmt.Errorf("invalid scope %q", sc)
 		}
 	}
-	if !wantMemory && !wantScene {
-		wantMemory, wantScene = true, true
+	if !wantMemory && !wantScene && !wantSkill {
+		wantMemory, wantScene, wantSkill = true, true, true
 	}
 
 	perList := k * 2
@@ -119,6 +119,24 @@ func (s *Service) Search(ctx context.Context, embed QueryEmbedder, query string,
 		}
 		if hasVector {
 			vec, err := VectorScenes(ctx, s.DB, queryVec, perList)
+			if err != nil {
+				return nil, err
+			}
+			fuseTier(vec, fts)
+		} else {
+			for _, m := range fts {
+				merged = append(merged, tierHit{match: m, score: m.Rank})
+			}
+		}
+	}
+
+	if wantSkill {
+		fts, err := FTSSkills(ctx, s.DB, query, perList)
+		if err != nil {
+			return nil, err
+		}
+		if hasVector {
+			vec, err := VectorSkills(ctx, s.DB, queryVec, perList)
 			if err != nil {
 				return nil, err
 			}

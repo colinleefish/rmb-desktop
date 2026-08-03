@@ -72,6 +72,25 @@ func FTSScenes(ctx context.Context, db *sql.DB, query string, k int) ([]Match, e
 	return scanFTSMatches(rows, "scenes")
 }
 
+func FTSSkills(ctx context.Context, db *sql.DB, query string, k int) ([]Match, error) {
+	if k <= 0 {
+		k = 5
+	}
+	rows, err := db.QueryContext(ctx, `
+		SELECT s.uri,
+		       COALESCE(substr(s.description, 1, 160), '') AS snippet
+		FROM skills s
+		INNER JOIN skills_fts fts ON fts.rowid = s.rowid
+		WHERE skills_fts MATCH ? AND s.superseded_at IS NULL
+		ORDER BY bm25(skills_fts)
+		LIMIT ?`, EscapeFTSQuery(query), k)
+	if err != nil {
+		return nil, fmt.Errorf("fts skills: %w", err)
+	}
+	defer rows.Close()
+	return scanFTSMatches(rows, "skills")
+}
+
 func scanFTSMatches(rows *sql.Rows, tier string) ([]Match, error) {
 	var out []Match
 	rank := 1.0

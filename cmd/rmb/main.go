@@ -35,6 +35,10 @@ func run() int {
 		return inspectCmd("tree", os.Args[2:])
 	case "meta":
 		return inspectCmd("meta", os.Args[2:])
+	case "skill":
+		return skillCmd(os.Args[2:])
+	case "setup":
+		return setupCmd(os.Args[2:])
 	case "version":
 		fmt.Println("rmb dev")
 		return 0
@@ -89,7 +93,7 @@ func hookSubmit(args []string) int {
 func search(args []string) int {
 	query, rest := parseQueryAndFlags(args)
 	if query == "" {
-		fmt.Fprintln(os.Stderr, `usage: rmb search "<query>" [--scope=memory,scene] [--k=n]`)
+		fmt.Fprintf(os.Stderr, `usage: rmb search "<query>" [--scope=memory,scene,skill] [--k=n]`)
 		return 2
 	}
 	k, err := parseK(rest)
@@ -188,10 +192,16 @@ func printUsage() {
 
 Usage:
   rmb hook-submit --source=<cursor> [--url=http://127.0.0.1:19019]
-  rmb search "<query>" [--scope=memory,scene] [--k=n]
+  rmb search "<query>" [--scope=memory,scene,skill] [--k=n]
   rmb cat <uri>
   rmb tree <uri-prefix>
   rmb meta <uri>
+  rmb skill ls
+  rmb skill put <name> [--dir=<path>]
+  rmb skill pull <name> [--out=<dir>]
+  rmb skill pull --all [--out=<base>]
+  rmb setup status [--json] [--agent=<name>]
+  rmb setup --agent=<name> [--dry-run] [--apply=<ids>]
   rmb version
 
 `)

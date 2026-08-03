@@ -6,7 +6,7 @@
     <string>me.remember.rmb</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/liguanghui/.rmb/bin/rmb-menubar</string>
+        <string>/Users/liguanghui/.rmb/bin/rmb-app</string>
     </array>
     <key>EnvironmentVariables</key>
     <dict>
@@ -18,8 +18,8 @@
     <key>KeepAlive</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>/tmp/rmb-menubar.stdout.log</string>
+    <string>/tmp/rmb-app.stdout.log</string>
     <key>StandardErrorPath</key>
-    <string>/tmp/rmb-menubar.stderr.log</string>
+    <string>/tmp/rmb-app.stderr.log</string>
 </dict>
 </plist>

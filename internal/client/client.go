@@ -97,6 +97,113 @@ func (c *Client) Inspect(ctx context.Context, kind, uri string) (string, error) 
 	return string(body), nil
 }
 
+// SkillFile is one file in a skill bundle upload.
+type SkillFile struct {
+	Path    string `json:"path"`
+	Content string `json:"content"`
+}
+
+// SkillSummary is tier-1 catalog metadata.
+type SkillSummary struct {
+	URI         string   `json:"uri"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Tags        []string `json:"tags"`
+	Slug        string   `json:"slug"`
+}
+
+// PutSkillResult is returned after uploading a skill bundle.
+type PutSkillResult struct {
+	URI     string `json:"uri"`
+	Version int    `json:"version"`
+	NoOp    bool   `json:"no_op"`
+}
+
+func (c *Client) ListSkills(ctx context.Context) ([]SkillSummary, error) {
+	endpoint := c.baseURL + "/api/v1/browse/skills?limit=500&offset=0"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("list skills: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode != http.StatusOK {
+		return nil, apiError("browse/skills", resp.StatusCode, body)
+	}
+	var out struct {
+		Items []SkillSummary `json:"items"`
+	}
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, fmt.Errorf("decode skills response: %w", err)
+	}
+	return out.Items, nil
+}
+
+func (c *Client) GetSkill(ctx context.Context, slug string) (skillDetail, error) {
+	endpoint := c.baseURL + "/api/v1/browse/skills/" + url.PathEscape(slug)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return skillDetail{}, err
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return skillDetail{}, fmt.Errorf("get skill: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
+	if resp.StatusCode != http.StatusOK {
+		return skillDetail{}, apiError("browse/skills/"+slug, resp.StatusCode, body)
+	}
+	var out skillDetail
+	if err := json.Unmarshal(body, &out); err != nil {
+		return skillDetail{}, fmt.Errorf("decode skill detail: %w", err)
+	}
+	return out, nil
+}
+
+type skillDetail struct {
+	Skill struct {
+		URI  string `json:"uri"`
+		Slug string `json:"slug"`
+		Name string `json:"name"`
+	} `json:"skill"`
+	Files map[string]string `json:"files"`
+}
+
+func (c *Client) PutSkill(ctx context.Context, slug string, files []SkillFile) (PutSkillResult, error) {
+	payload, err := json.Marshal(map[string]any{"files": files})
+	if err != nil {
+		return PutSkillResult{}, err
+	}
+	endpoint := c.baseURL + "/api/v1/skills/" + url.PathEscape(slug)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, endpoint, strings.NewReader(string(payload)))
+	if err != nil {
+		return PutSkillResult{}, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return PutSkillResult{}, fmt.Errorf("put skill: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode != http.StatusOK {
+		return PutSkillResult{}, apiError("skills/"+slug, resp.StatusCode, body)
+	}
+	var out PutSkillResult
+	if err := json.Unmarshal(body, &out); err != nil {
+		return PutSkillResult{}, fmt.Errorf("decode put skill response: %w", err)
+	}
+	return out, nil
+}
+
 func apiError(path string, status int, body []byte) error {
 	var e struct {
 		Error string `json:"error"`

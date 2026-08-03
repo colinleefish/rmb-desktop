@@ -66,6 +66,7 @@ func (w *Worker) runOneCycle(ctx context.Context) {
 		{"atoms", w.embedAtoms},
 		{"scenes", w.embedScenes},
 		{"memories", w.embedMemories},
+		{"skills", w.embedSkills},
 	} {
 		n, err := tier.fn(ctx)
 		if err != nil {
@@ -121,6 +122,19 @@ func (w *Worker) embedMemories(ctx context.Context) (int, error) {
 	}
 	defer rows.Close()
 	return w.scanAndEmbed(ctx, rows, "memories")
+}
+
+func (w *Worker) embedSkills(ctx context.Context) (int, error) {
+	rows, err := w.db.QueryContext(ctx, `
+		SELECT s.id, COALESCE(NULLIF(TRIM(s.fts_text), ''), s.name) AS text
+		FROM skills s
+		WHERE s.embedding IS NULL AND s.superseded_at IS NULL
+		ORDER BY s.created_at LIMIT ?`, w.batchSize())
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+	return w.scanAndEmbed(ctx, rows, "skills")
 }
 
 func (w *Worker) scanAndEmbed(ctx context.Context, rows *sql.Rows, table string) (int, error) {

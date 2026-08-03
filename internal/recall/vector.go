@@ -49,6 +49,20 @@ func VectorScenes(ctx context.Context, db *sql.DB, queryVec []float32, k int) ([
 	return rankVectors(rows, queryVec, k, "scenes")
 }
 
+func VectorSkills(ctx context.Context, db *sql.DB, queryVec []float32, k int) ([]Match, error) {
+	rows, err := db.QueryContext(ctx, `
+		SELECT uri,
+		       COALESCE(substr(description, 1, 160), ''),
+		       embedding
+		FROM skills
+		WHERE superseded_at IS NULL AND embedding IS NOT NULL`)
+	if err != nil {
+		return nil, fmt.Errorf("vector skills: %w", err)
+	}
+	defer rows.Close()
+	return rankVectors(rows, queryVec, k, "skills")
+}
+
 func rankVectors(rows *sql.Rows, queryVec []float32, k int, tier string) ([]Match, error) {
 	if k <= 0 {
 		k = 5

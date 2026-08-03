@@ -8,15 +8,15 @@ Thumbs.db
 *.swp
 *.swo
 
-# Node / Tauri (menubar/)
+# Node / Tauri (app/)
 node_modules/
 dist/
 target/
 *.log
 
 /bin/
-menubar/node_modules/
-menubar/src-tauri/target/
+app/node_modules/
+app/src-tauri/target/
 *.dmg
 *.pkg
 *.msi

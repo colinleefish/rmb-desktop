@@ -17,5 +17,40 @@
       "hex": "#EEEEEE",
       "role": "Light — page background, subtle fills, text on dark"
     }
+  },
+  "variants": {
+    "pyramid-gray-accent": {
+      "file": "pyramid-gray-accent.svg",
+      "background": "gray",
+      "bars": "accent"
+    },
+    "pyramid-dark-light": {
+      "file": "pyramid-dark-light.svg",
+      "background": "dark",
+      "bars": "light"
+    },
+    "pyramid-dark-accent": {
+      "file": "pyramid-dark-accent.svg",
+      "background": "dark",
+      "bars": "accent",
+      "active": true,
+      "role": "web,app-bundle"
+    },
+    "pyramid-tray": {
+      "file": "pyramid-tray.svg",
+      "background": "none",
+      "bars": "template-black",
+      "role": "app-tray"
+    },
+    "pyramid-gray-light": {
+      "file": "pyramid-gray-light.svg",
+      "background": "gray",
+      "bars": "light"
+    },
+    "pyramid-accent-light": {
+      "file": "pyramid-accent-light.svg",
+      "background": "accent",
+      "bars": "light"
+    }
   }
 }

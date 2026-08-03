@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/colinleefish/rmb-desktop/internal/db"
+	"github.com/colinleefish/rmb-desktop/internal/skill"
 	"github.com/colinleefish/rmb-desktop/internal/uri"
 )
 
@@ -40,6 +41,7 @@ func (s *Service) Overview(ctx context.Context) (Overview, error) {
 		{&out.Counts.Scenes, `SELECT COUNT(*) FROM scenes`},
 		{&out.Counts.PipelineStates, `SELECT COUNT(*) FROM pipeline_state`},
 		{&out.Counts.Corrections, `SELECT COUNT(*) FROM corrections WHERE retracted_at IS NULL`},
+		{&out.Counts.Skills, `SELECT COUNT(*) FROM skills WHERE superseded_at IS NULL`},
 	}
 	for _, t := range tables {
 		if err := s.db.QueryRowContext(ctx, t.sql).Scan(t.dest); err != nil {
@@ -51,7 +53,50 @@ func (s *Service) Overview(ctx context.Context) (Overview, error) {
 	).Scan(&out.Counts.Memories); err != nil {
 		return Overview{}, fmt.Errorf("count memories: %w", err)
 	}
+	memStats, err := s.memoryCategoryOverview(ctx)
+	if err != nil {
+		return Overview{}, err
+	}
+	out.MemoryByCategory = memStats
 	return out, nil
+}
+
+func (s *Service) memoryCategoryOverview(ctx context.Context) (MemoryCategoryOverview, error) {
+	var stats MemoryCategoryOverview
+	if err := s.db.QueryRowContext(ctx, `
+		SELECT COALESCE(version, 0)
+		FROM memories
+		WHERE category = 'profile' AND superseded_at IS NULL
+		LIMIT 1`,
+	).Scan(&stats.ProfileVersion); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return MemoryCategoryOverview{}, fmt.Errorf("profile version: %w", err)
+	}
+
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT category, COUNT(*)
+		FROM memories
+		WHERE superseded_at IS NULL AND category != 'profile'
+		GROUP BY category`)
+	if err != nil {
+		return MemoryCategoryOverview{}, fmt.Errorf("memory categories: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var category string
+		var count int64
+		if err := rows.Scan(&category, &count); err != nil {
+			return MemoryCategoryOverview{}, err
+		}
+		switch category {
+		case "events":
+			stats.Events = count
+		case "preferences":
+			stats.Preferences = count
+		case "entities":
+			stats.Entities = count
+		}
+	}
+	return stats, rows.Err()
 }
 
 func (s *Service) ListSessions(ctx context.Context, p ListParams) (Page[SessionRow], error) {
@@ -403,6 +448,73 @@ func (s *Service) ListPipelineStates(ctx context.Context, p ListParams) (Page[Pi
 
 func (s *Service) ListTasks(_ context.Context, p ListParams) (Page[map[string]any], error) {
 	return pageOf([]map[string]any{}, 0, clampLimit(p.Limit), p.Offset), nil
+}
+
+func (s *Service) ListSkills(ctx context.Context, p ListParams) (Page[SkillRow], error) {
+	limit := clampLimit(p.Limit)
+	where, args := skillListWhere(p)
+	order := sortClause(map[string]string{
+		"updated": "updated_at", "name": "name", "version": "version",
+	}, "updated", p.Sort, p.Order)
+
+	var total int64
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM skills`+where, args...).Scan(&total); err != nil {
+		return Page[SkillRow]{}, err
+	}
+
+	query := `
+		SELECT slug, name, description, tags, uri, version, updated_at
+		FROM skills` + where + `
+		ORDER BY ` + order + `
+		LIMIT ? OFFSET ?`
+	listArgs := append(append([]any{}, args...), limit, p.Offset)
+	rows, err := s.db.QueryContext(ctx, query, listArgs...)
+	if err != nil {
+		return Page[SkillRow]{}, err
+	}
+	defer rows.Close()
+
+	var items []SkillRow
+	for rows.Next() {
+		item, err := scanSkill(rows)
+		if err != nil {
+			return Page[SkillRow]{}, err
+		}
+		items = append(items, item)
+	}
+	return pageOf(items, total, limit, p.Offset), rows.Err()
+}
+
+func (s *Service) GetSkill(ctx context.Context, slug string) (skill.Detail, error) {
+	return skill.GetDetail(ctx, s.db, slug)
+}
+
+func scanSkill(rows *sql.Rows) (SkillRow, error) {
+	var row SkillRow
+	var tagsRaw string
+	var updatedMS int64
+	if err := rows.Scan(&row.Slug, &row.Name, &row.Description, &tagsRaw, &row.URI, &row.Version, &updatedMS); err != nil {
+		return SkillRow{}, err
+	}
+	tags, err := db.UnmarshalStringArray(tagsRaw)
+	if err != nil {
+		return SkillRow{}, err
+	}
+	row.Tags = tags
+	row.UpdatedAt = formatMS(updatedMS)
+	return row, nil
+}
+
+func skillListWhere(p ListParams) (string, []any) {
+	conds := []string{"superseded_at IS NULL"}
+	var args []any
+	if qWhere, qArgs := searchWhere(p.Query, []string{
+		"name", "description", "slug", "uri",
+	}); qWhere != "" {
+		conds = append(conds, strings.TrimPrefix(qWhere, " WHERE "))
+		args = append(args, qArgs...)
+	}
+	return " WHERE " + strings.Join(conds, " AND "), args
 }
 
 func (s *Service) listAtoms(ctx context.Context, p ListParams, sessionID string) (Page[AtomJSON], error) {

@@ -9,4 +9,4 @@ type Match struct {
 }
 
 // DefaultScopes is used when no --scope flag is provided.
-var DefaultScopes = []string{"memory", "scene"}
+var DefaultScopes = []string{"memory", "scene", "skill"}

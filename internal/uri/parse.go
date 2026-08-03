@@ -61,6 +61,10 @@ func Parse(raw string) (URI, error) {
 		}
 	}
 
+	if err := validateShape(scope, segments); err != nil {
+		return URI{}, err
+	}
+
 	return URI{Scope: scope, Segments: segments, Container: container}, nil
 }
 
@@ -126,4 +130,24 @@ func validateScope(scope string) error {
 	default:
 		return fmt.Errorf("%w: unknown scope %q", ErrInvalidURI, scope)
 	}
+}
+
+func validateShape(scope string, segments []string) error {
+	switch scope {
+	case ScopeProfile, ScopeAgent:
+		if len(segments) != 0 {
+			return fmt.Errorf("%w: %s is a singleton", ErrInvalidURI, scope)
+		}
+	case ScopeSkills:
+		if len(segments) == 0 {
+			return nil
+		}
+		if err := ValidateSkillName(segments[0]); err != nil {
+			return err
+		}
+		if len(segments)-1 > MaxSkillPathDepth {
+			return fmt.Errorf("%w: skill path too deep", ErrInvalidURI)
+		}
+	}
+	return nil
 }

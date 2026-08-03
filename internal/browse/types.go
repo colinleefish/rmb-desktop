@@ -13,6 +13,15 @@ type Overview struct {
 		Corrections    int64 `json:"corrections"`
 		Skills         int64 `json:"skills"`
 	} `json:"counts"`
+	MemoryByCategory MemoryCategoryOverview `json:"memory_by_category"`
+}
+
+// MemoryCategoryOverview is per-category memory stats for the sidebar.
+type MemoryCategoryOverview struct {
+	ProfileVersion int   `json:"profile_version"`
+	Events         int64 `json:"events"`
+	Preferences    int64 `json:"preferences"`
+	Entities       int64 `json:"entities"`
 }
 
 // SessionRow is one row in the sessions table view.
@@ -115,6 +124,17 @@ type SessionDetail struct {
 	PipelineState *PipelineStateJSON `json:"pipeline_state"`
 	Atoms         []AtomJSON         `json:"atoms"`
 	Scenes        []SceneJSON        `json:"scenes"`
+}
+
+// SkillRow is one row in the skills catalog.
+type SkillRow struct {
+	Slug        string   `json:"slug"`
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Tags        []string `json:"tags"`
+	URI         string   `json:"uri"`
+	Version     int      `json:"version"`
+	UpdatedAt   string   `json:"updated_at"`
 }
 
 // ListParams carries pagination and search for browse lists.

@@ -103,6 +103,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/browse/atoms", s.handleBrowseAtoms)
 	s.mux.HandleFunc("GET /api/v1/browse/scenes", s.handleBrowseScenes)
 	s.mux.HandleFunc("GET /api/v1/browse/memories", s.handleBrowseMemories)
+	s.mux.HandleFunc("GET /api/v1/browse/skills", s.handleBrowseSkills)
+	s.mux.HandleFunc("GET /api/v1/browse/skills/{slug}", s.handleBrowseSkill)
+	s.mux.HandleFunc("PUT /api/v1/skills/{slug}", s.handlePutSkill)
 	s.mux.HandleFunc("GET /api/v1/browse/pipeline-state", s.handleBrowsePipeline)
 	s.mux.HandleFunc("GET /api/v1/browse/tasks", s.handleBrowseTasks)
 	s.mux.HandleFunc("GET /api/v1/corrections", s.handleListCorrections)
@@ -110,6 +113,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("DELETE /api/v1/corrections", s.handleRetractCorrection)
 	s.mux.HandleFunc("GET /api/v1/config", s.handleGetConfig)
 	s.mux.HandleFunc("PUT /api/v1/config", s.handlePutConfig)
+	s.mux.HandleFunc("GET /api/v1/setup/status", s.handleSetupStatus)
+	s.mux.HandleFunc("GET /api/v1/setup/{agent}/preview", s.handleSetupPreview)
+	s.mux.HandleFunc("POST /api/v1/setup/{agent}/apply", s.handleSetupApply)
 }
 
 func (s *Server) handleHealthz(w http.ResponseWriter, r *http.Request) {

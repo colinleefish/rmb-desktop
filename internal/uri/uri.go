@@ -9,14 +9,15 @@ import (
 )
 
 const (
-	Scheme        = "rmb"
-	MaxSegment    = 50
-	ScopeAtoms    = "atoms"
-	ScopeScenes   = "scenes"
-	ScopeProfile  = "profile"
-	ScopePrefs    = "preferences"
-	ScopeEntities = "entities"
-	ScopeEvents   = "events"
+	Scheme            = "rmb"
+	MaxSegment        = 50
+	MaxSkillPathDepth = 8
+	ScopeAtoms        = "atoms"
+	ScopeScenes       = "scenes"
+	ScopeProfile      = "profile"
+	ScopePrefs        = "preferences"
+	ScopeEntities     = "entities"
+	ScopeEvents       = "events"
 )
 
 var (
@@ -24,9 +25,11 @@ var (
 	uuidSegment   = regexp.MustCompile(
 		`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`,
 	)
+	skillNamePattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$`)
 	reservedSlug = map[string]struct{}{
 		"atoms": {}, "scenes": {}, "profile": {}, "preferences": {},
 		"entities": {}, "events": {}, "sessions": {}, "turns": {},
+		"skills": {}, "agent": {}, "corrections": {},
 	}
 )
 
@@ -48,6 +51,39 @@ func BuildMemory(category, segment string) string {
 
 func BuildCorrection(id string) string {
 	return Scheme + "://" + ScopeCorrections + "/" + strings.ToLower(id)
+}
+
+// BuildSkill returns rmb://skills/<name> with optional path segments.
+func BuildSkill(name string, parts ...string) string {
+	var b strings.Builder
+	b.WriteString(Scheme)
+	b.WriteString("://")
+	b.WriteString(ScopeSkills)
+	b.WriteByte('/')
+	b.WriteString(name)
+	for _, p := range parts {
+		b.WriteByte('/')
+		b.WriteString(p)
+	}
+	return b.String()
+}
+
+// ValidateSkillName checks Agent Skills name constraints (lowercase [a-z0-9-], 1-64 chars).
+func ValidateSkillName(name string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return fmt.Errorf("%w: empty skill name", ErrInvalidURI)
+	}
+	if len(name) > 64 {
+		return fmt.Errorf("%w: skill name too long", ErrInvalidURI)
+	}
+	if strings.Contains(name, "--") {
+		return fmt.Errorf("%w: skill name cannot contain consecutive hyphens", ErrInvalidURI)
+	}
+	if !skillNamePattern.MatchString(name) {
+		return fmt.Errorf("%w: invalid skill name %q", ErrInvalidURI, name)
+	}
+	return nil
 }
 
 func ParseAtomID(raw string) (string, error) {

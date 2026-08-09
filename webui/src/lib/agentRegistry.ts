@@ -1,24 +1,17 @@
-export type IntegrationAgentId =
-  | "cursor"
-  | "claude-code"
-  | "codex"
-  | "opencode"
-  | "pi";
+export type { IntegrationAgentId } from "../integrations/types";
+export {
+  INTEGRATIONS,
+  getIntegration,
+  isIntegrationAgentId,
+} from "../integrations/registry";
 
-export type AgentRegistryEntry = {
-  id: IntegrationAgentId;
-  label: string;
-  logo: string;
-};
+import { INTEGRATIONS } from "../integrations/registry";
 
-export const AGENT_REGISTRY: AgentRegistryEntry[] = [
-  { id: "cursor", label: "Cursor", logo: "cursor.svg" },
-  { id: "claude-code", label: "Claude Code", logo: "claude-code.svg" },
-  { id: "codex", label: "Codex", logo: "codex.svg" },
-  { id: "opencode", label: "OpenCode", logo: "opencode.svg" },
-  { id: "pi", label: "Pi", logo: "pi.png" },
-];
+/** @deprecated Use INTEGRATIONS from integrations/registry */
+export const AGENT_REGISTRY = INTEGRATIONS.map(({ id, label, logo }) => ({
+  id,
+  label,
+  logo,
+}));
 
-export function isIntegrationAgentId(value: string | null): value is IntegrationAgentId {
-  return AGENT_REGISTRY.some((a) => a.id === value);
-}
+export type AgentRegistryEntry = (typeof AGENT_REGISTRY)[number];

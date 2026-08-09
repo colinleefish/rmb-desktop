@@ -18,37 +18,41 @@ import (
 	"github.com/colinleefish/rmb-desktop/internal/inspect"
 	"github.com/colinleefish/rmb-desktop/internal/llm"
 	"github.com/colinleefish/rmb-desktop/internal/recall"
+	"github.com/colinleefish/rmb-desktop/internal/recallstats"
 	"github.com/colinleefish/rmb-desktop/internal/session"
 )
 
 // Server is the rmbd HTTP API.
 type Server struct {
-	db      *sql.DB
-	log     *slog.Logger
-	upload  *session.Service
-	recall  *recall.Service
-	inspect *inspect.Service
-	browse  *browse.Service
+	db          *sql.DB
+	log         *slog.Logger
+	upload      *session.Service
+	recall      *recall.Service
+	recallStats *recallstats.Service
+	inspect     *inspect.Service
+	browse      *browse.Service
 	corrections *correction.Service
-	embed   *llm.EmbeddingClient
-	configPath string
-	mux     *http.ServeMux
+	embed       *llm.EmbeddingClient
+	configPath  string
+	mux         *http.ServeMux
 }
 
 func New(database *sql.DB, cfg config.Config, configPath string, log *slog.Logger) *Server {
 	if log == nil {
 		log = slog.Default()
 	}
+	recallStatsSvc := recallstats.NewService(database)
 	s := &Server{
-		db:      database,
-		log:     log,
-		upload:  session.NewService(database),
-		recall:  recall.NewService(database),
-		inspect: inspect.NewService(database),
-		browse:  browse.NewService(database),
+		db:          database,
+		log:         log,
+		upload:      session.NewService(database),
+		recall:      recall.NewService(database),
+		recallStats: recallStatsSvc,
+		inspect:     inspect.NewService(database),
+		browse:      browse.NewService(database, recallStatsSvc),
 		corrections: correction.NewService(database),
-		configPath: configPath,
-		mux:     http.NewServeMux(),
+		configPath:  configPath,
+		mux:         http.NewServeMux(),
 	}
 	if cfg.Embed.HasKey() {
 		if embedClient, err := llm.NewEmbeddingClient(cfg.Embed); err == nil {

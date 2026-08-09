@@ -1,6 +1,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod bootstrap;
 mod daemon;
 
 use daemon::{DaemonManager, dashboard_url, health_ok};
@@ -45,8 +46,11 @@ fn main() {
         })
         .setup({
             let daemon = Arc::clone(&daemon);
-            move |app| {
-                let handle = app.handle();
+            move |_app| {
+                if let Err(err) = bootstrap::ensure_installed() {
+                    eprintln!("bootstrap: {err}");
+                }
+                let handle = _app.handle();
                 spawn_health_poller(handle, daemon);
                 Ok(())
             }

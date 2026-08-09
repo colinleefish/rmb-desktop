@@ -57,6 +57,13 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	if s.recallStats != nil && len(matches) > 0 {
+		uris := make([]string, len(matches))
+		for i, m := range matches {
+			uris[i] = m.URI
+		}
+		s.recallStats.RecordSearchAsync(uris)
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": matches})
 }
 
@@ -83,5 +90,14 @@ func (s *Server) handleInspect(w http.ResponseWriter, r *http.Request, kind stri
 	if err != nil {
 		s.log.Error("inspect failed", "kind", kind, "uri", rawURI, "err", err)
 		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if s.recallStats != nil {
+		switch kind {
+		case "cat":
+			s.recallStats.RecordCatAsync(rawURI)
+		case "meta":
+			s.recallStats.RecordMetaAsync(rawURI)
+		}
 	}
 }

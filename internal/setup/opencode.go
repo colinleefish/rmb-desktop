@@ -25,7 +25,7 @@ func previewOpenCode(def agentDef) (AgentState, error) {
 		return AgentState{}, err
 	}
 	proposedHooks, _ := mergeOpenCodeHooksYAML(currentHooks, cmd)
-	hookConfigured := strings.Contains(currentHooks, "rmb hook-submit") || strings.Contains(currentHooks, "rmb-hook-dual")
+	hookConfigured := strings.Contains(currentHooks, "rmb hook-submit")
 
 	currentRecall, recallExists, err := readFile(recallPath)
 	if err != nil {
@@ -107,13 +107,13 @@ func applyOpenCode(artifactID string) error {
 }
 
 func mergeOpenCodeHooksYAML(current, cmd string) (string, bool) {
-	if strings.Contains(current, "rmb hook-submit") || strings.Contains(current, "rmb-hook-dual") {
+	if strings.Contains(current, "rmb hook-submit") {
 		if strings.Contains(current, cmd) {
 			return current, true
 		}
 		lines := strings.Split(current, "\n")
 		for i, line := range lines {
-			if strings.Contains(line, "rmb hook-submit") || strings.Contains(line, "rmb-hook-dual") {
+			if strings.Contains(line, "rmb hook-submit") {
 				indent := strings.Repeat(" ", len(line)-len(strings.TrimLeft(line, " ")))
 				lines[i] = indent + `- bash: "` + cmd + `"`
 				return strings.Join(lines, "\n") + "\n", true

@@ -1,48 +1,26 @@
-import type { IntegrationAgentId } from "./agentRegistry";
-import { isIntegrationAgentId } from "./agentRegistry";
+export type SettingsSection = "general" | "models" | "advanced";
 
-export type SettingsSection =
-  | "general"
-  | "llm"
-  | "embed"
-  | "pipeline"
-  | "integrations"
-  | "language";
-
-export function parseSettingsPath(pathname: string): {
-  section: SettingsSection;
-  agentId: IntegrationAgentId;
-} {
+export function parseSettingsPath(pathname: string): { section: SettingsSection } {
   const rest = pathname.replace(/^\/settings\/?/, "");
   if (!rest) {
-    return { section: "general", agentId: "cursor" };
+    return { section: "general" };
   }
-  if (rest === "integrations") {
-    return { section: "integrations", agentId: "cursor" };
+  if (rest === "llm" || rest === "embed") {
+    return { section: "models" };
   }
-  if (rest.startsWith("integrations/")) {
-    const raw = rest.slice("integrations/".length);
-    return {
-      section: "integrations",
-      agentId: isIntegrationAgentId(raw) ? raw : "cursor",
-    };
+  if (rest === "pipeline") {
+    return { section: "advanced" };
   }
-  const sections: SettingsSection[] = [
-    "general",
-    "llm",
-    "embed",
-    "pipeline",
-    "language",
-  ];
+  if (rest === "language") {
+    return { section: "general" };
+  }
+  const sections: SettingsSection[] = ["general", "models", "advanced"];
   if (sections.includes(rest as SettingsSection)) {
-    return { section: rest as SettingsSection, agentId: "cursor" };
+    return { section: rest as SettingsSection };
   }
-  return { section: "general", agentId: "cursor" };
+  return { section: "general" };
 }
 
-export function settingsPath(section: SettingsSection, agentId?: IntegrationAgentId): string {
-  if (section === "integrations") {
-    return `/settings/integrations/${agentId ?? "cursor"}`;
-  }
+export function settingsPath(section: SettingsSection): string {
   return `/settings/${section}`;
 }

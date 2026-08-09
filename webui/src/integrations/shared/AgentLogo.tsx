@@ -1,11 +1,9 @@
-import type { AgentRegistryEntry } from "../../lib/agentRegistry";
-
 export function AgentLogo({
-  agent,
+  logo,
   inactive = false,
   size = 16,
 }: {
-  agent: Pick<AgentRegistryEntry, "logo" | "label">;
+  logo: string;
   inactive?: boolean;
   size?: number;
 }) {
@@ -21,7 +19,7 @@ export function AgentLogo({
       aria-hidden
     >
       <img
-        src={`${import.meta.env.BASE_URL}agents/${agent.logo}`}
+        src={logo}
         alt=""
         width={size}
         height={size}

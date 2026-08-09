@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
-import { AgentLogo } from "../agents/AgentLogo";
-import { AgentInactivePanel } from "../agents/AgentInactivePanel";
-import { AgentSetupPanel } from "../agents/AgentSetupPanel";
-import { AgentStatusIndicator } from "../agents/AgentStatusIndicator";
-import { AGENT_REGISTRY, type IntegrationAgentId } from "../../lib/agentRegistry";
+import { AgentLogo } from "../../integrations/shared/AgentLogo";
+import { AgentInactivePanel } from "../../integrations/shared/AgentInactivePanel";
+import { AgentStatusIndicator } from "../../integrations/shared/AgentStatusIndicator";
+import {
+  getIntegration,
+  INTEGRATIONS,
+} from "../../integrations/registry";
+import type { IntegrationAgentId } from "../../integrations/types";
 import type { AgentSetupState } from "../../lib/agentSetupTypes";
 import { fetchAgentPreview, fetchSetupStatus } from "../../lib/setupApi";
 import { useI18n } from "../../i18n";
@@ -20,6 +23,8 @@ export function IntegrationSettingsPanel({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [agent, setAgent] = useState<AgentSetupState | null>(null);
+
+  const integration = getIntegration(agentId);
 
   const loadAgents = useCallback(async () => {
     setLoading(true);
@@ -52,8 +57,6 @@ export function IntegrationSettingsPanel({
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load agent"));
   }, [agentId, agents]);
 
-  const registry = AGENT_REGISTRY.find((a) => a.id === agentId);
-
   async function selectAgent(id: IntegrationAgentId) {
     onAgentChange(id);
     try {
@@ -77,16 +80,18 @@ export function IntegrationSettingsPanel({
     return <p className="text-sm text-red-600">{error}</p>;
   }
 
-  if (!agent || !registry) return null;
+  if (!agent || !integration) return null;
+
+  const { SetupPanel } = integration;
+  const sidebarHeading =
+    "px-2 pb-2 text-[11px] font-semibold uppercase tracking-wide text-rmb-gray/60";
 
   return (
     <div className="flex min-h-[32rem] gap-8">
       <aside className="w-48 shrink-0">
-        <p className="px-2 pb-2 text-[11px] font-semibold uppercase tracking-wide text-rmb-gray/60">
-          {t.agents.agentSidebarLabel}
-        </p>
+        <p className={sidebarHeading}>{t.agents.agentSidebarLabel}</p>
         <ul className="space-y-0.5">
-          {AGENT_REGISTRY.map((entry) => {
+          {INTEGRATIONS.map((entry) => {
             const meta = agents.find((a) => a.id === entry.id);
             const active = agentId === entry.id;
             const detected = meta?.detected ?? false;
@@ -106,7 +111,7 @@ export function IntegrationSettingsPanel({
                           : "text-rmb-gray/45 hover:bg-rmb-light/60 hover:text-rmb-gray/70",
                   ].join(" ")}
                 >
-                  <AgentLogo agent={entry} inactive={!detected} size={18} />
+                  <AgentLogo logo={entry.logo} inactive={!detected} size={18} />
                   <span className="min-w-0 flex-1 truncate">{entry.label}</span>
                   {meta && <AgentStatusIndicator agent={meta} />}
                 </button>
@@ -116,17 +121,22 @@ export function IntegrationSettingsPanel({
         </ul>
       </aside>
 
-      <div className="min-w-0 flex-1 space-y-6">
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <div className="flex items-center gap-3">
-          <AgentLogo agent={registry} inactive={!agent.detected} size={28} />
-          <h2 className="text-lg font-semibold text-rmb-dark">{registry.label}</h2>
+      <div className="min-w-0 flex-1">
+        {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
+        <p className={`${sidebarHeading} invisible`} aria-hidden>
+          {t.agents.agentSidebarLabel}
+        </p>
+        <div className="flex items-center gap-3 px-2 py-2">
+          <AgentLogo logo={integration.logo} inactive={!agent.detected} size={28} />
+          <h2 className="text-lg font-semibold text-rmb-dark">{integration.label}</h2>
         </div>
-        {agent.detected ? (
-          <AgentSetupPanel agent={agent} onAgentUpdated={handleAgentUpdated} />
-        ) : (
-          <AgentInactivePanel agent={agent} />
-        )}
+        <div className="mt-6">
+          {agent.detected ? (
+            <SetupPanel agent={agent} onAgentUpdated={handleAgentUpdated} />
+          ) : (
+            <AgentInactivePanel agent={agent} />
+          )}
+        </div>
       </div>
     </div>
   );

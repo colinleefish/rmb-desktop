@@ -1,18 +1,22 @@
-.PHONY: test build build-all run-rmbd run-hook tidy app-dev app-build app-icons webui-dev webui-build icons-sync
+.PHONY: test build build-all run-rmbd run-hook tidy app-dev app-build app-icons webui-dev webui-build webui-embed-check icons-sync prepare-sidecars
 
 GO_TAGS := sqlite_fts5
+EMBED_INDEX := internal/http/static/web/index.html
 
 ICON_SRC := icons/pyramid-dark-accent.svg
 TRAY_ICON_SRC := icons/pyramid-tray.svg
 
-test:
+test: webui-embed-check
 	CGO_ENABLED=1 go test -tags "$(GO_TAGS)" ./...
 
-build:
+build: webui-embed-check
 	CGO_ENABLED=1 go build -tags "$(GO_TAGS)" -o bin/rmbd ./cmd/rmbd
 	CGO_ENABLED=1 go build -tags "$(GO_TAGS)" -o bin/rmb ./cmd/rmb
 
 build-all: webui-build build
+
+webui-embed-check:
+	@test -f $(EMBED_INDEX) || (echo "Missing $(EMBED_INDEX). Run: make webui-build  (or make build-all)" >&2; exit 1)
 
 webui-dev:
 	cd webui && npm run dev
@@ -32,13 +36,19 @@ run-rmbd:
 tidy:
 	go mod tidy
 
-app-dev:
+prepare-sidecars: build
+	bash scripts/prepare-sidecars.sh
+
+app-dev: prepare-sidecars
 	cd app && RMBD_PATH=$(CURDIR)/bin/rmbd npm run dev
 
-app-build: app-icons
+DMG_BUNDLE := app/src-tauri/target/release/bundle/dmg/RMB Desktop_0.1.0_aarch64.dmg
+
+app-build: app-icons prepare-sidecars
 	cd app && npm run build
+	bash scripts/finish-dmg.sh "$(DMG_BUNDLE)"
 
 app-icons:
-	qlmanage -t -s 1024 -o /tmp $(ICON_SRC)
-	cd app && npx tauri icon /tmp/$$(basename $(ICON_SRC)).png -o src-tauri/icons
+	cd app && npx @resvg/resvg-js-cli ../$(ICON_SRC) /tmp/rmb-app-icon.png --fit-width 1024 --fit-height 1024
+	cd app && npx tauri icon /tmp/rmb-app-icon.png -o src-tauri/icons
 	cd app && npx @resvg/resvg-js-cli ../$(TRAY_ICON_SRC) src-tauri/icons/tray-icon.png --fit-width 52 --fit-height 52

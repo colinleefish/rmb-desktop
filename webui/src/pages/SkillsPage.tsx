@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Wand2 } from "lucide-react";
 import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
+import { RecallStatsLabel } from "../components/RecallStatsLabel";
 import { pageSkills } from "../lib/api";
 import { formatDateTime } from "../lib/format";
 import type { SkillRow } from "../lib/types";
@@ -81,6 +82,7 @@ export function SkillsPage() {
               <tr>
                 <th className="px-4 py-3 font-medium">{t.skills.colSkill}</th>
                 <th className="px-4 py-3 font-medium">{t.skills.colRevision}</th>
+                <th className="px-4 py-3 font-medium">{t.skills.colRecall}</th>
                 <th className="px-4 py-3 font-medium">{t.skills.colUpdated}</th>
               </tr>
             </thead>
@@ -118,6 +120,9 @@ export function SkillsPage() {
                     <div className="text-[11px] text-rmb-gray">
                       {row.version > 1 ? `${row.version} revisions` : "original"}
                     </div>
+                  </td>
+                  <td className="px-4 py-3 align-top">
+                    <RecallStatsLabel stats={row.recall_stats} />
                   </td>
                   <td className="px-4 py-3 align-top text-rmb-gray">
                     {formatDateTime(row.updated_at)}

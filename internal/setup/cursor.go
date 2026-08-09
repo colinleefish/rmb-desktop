@@ -39,14 +39,14 @@ func previewCursor(def agentDef) (AgentState, error) {
 	}
 
 	rulesCurrent := ""
-	rulesProposed, _ := mergeRecallMarkdown(rulesCurrent)
+	rulesProposed := CursorRecallRule()
 
 	artifacts := []Artifact{
 		artifactFromRaw(
 			"hooks",
 			"Conversation capture",
 			hooksPath,
-			"Runs rmb hook-submit when an agent conversation ends.",
+			"",
 			currentHooks,
 			proposedHooks,
 			currentHooksPretty,
@@ -59,13 +59,13 @@ func previewCursor(def agentDef) (AgentState, error) {
 		artifactFromStrings(
 			"user_rules",
 			"Recall instructions",
-			"Cursor Settings → Rules",
-			"Teaches the agent to run rmb search and cat at session start.",
+			"Customize → Rules",
+			"",
 			rulesCurrent,
 			rulesProposed,
 			false,
 			ApplyCopyOnly,
-			[]string{"Cursor stores user rules internally — preview only, copy to paste into Settings → Rules."},
+			nil,
 			"markdown",
 		),
 	}

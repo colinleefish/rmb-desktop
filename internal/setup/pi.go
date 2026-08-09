@@ -25,7 +25,7 @@ func previewPi(def agentDef) (AgentState, error) {
 		return AgentState{}, err
 	}
 	proposedScript, _ := mergePiHookScript(currentScript, cmd)
-	hookConfigured := strings.Contains(currentScript, "hook-submit") || strings.Contains(currentScript, "rmb-hook-dual")
+	hookConfigured := strings.Contains(currentScript, "hook-submit")
 
 	currentMD, mdExists, err := readFile(agentsPath)
 	if err != nil {

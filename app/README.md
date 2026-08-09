@@ -26,7 +26,17 @@ The app uses `ActivationPolicy::Accessory` — no Dock icon (for now).
 cd app && npm run build
 ```
 
-Output: `app/src-tauri/target/release/bundle/macos/rmb.app`
+Output: `app/src-tauri/target/release/bundle/macos/RMB.app`
+
+On first launch, the app copies bundled `rmb` and `rmbd` sidecars into
+`~/.rmb/bin/` (`rmb` and `rmbd-desktop`). Agent setup writes hook commands
+against that stable path — no manual CLI install step after drag-and-drop.
+
+Sidecar staging (before `tauri build`):
+
+```bash
+make prepare-sidecars   # bin/rmb + bin/rmbd → app/src-tauri/binaries/*-<target-triple>
+```
 
 ## Environment
 

@@ -4,47 +4,66 @@ import "strings"
 
 const recallStart = "<!-- rmb:recall:start -->"
 const recallEnd = "<!-- rmb:recall:end -->"
+const recallMarkdownHeading = "# RMB memory"
 
+func recallInstructionBody() string {
+	return `ALWAYS RUN ` + "`rmb`" + ` cli at the start of each conversation.
+Search before asking the user. Follow rmb://agent for recall rules.`
+}
+
+// CursorRecallRule is the canonical recall text for Cursor rules (copy-only).
+func CursorRecallRule() string {
+	return `---
+description: Use of rmb command line 
+alwaysApply: true
+---
+` + recallInstructionBody() + `
+`
+}
+
+// recallBlock is appended to agent markdown files (CLAUDE.md, AGENTS.md, etc.).
 func recallBlock() string {
-	return recallStart + `
-ALWAYS RUN ` + "`rmb`" + ` cli at the start of each conversation.
-Search before asking the user. Follow rmb://agent for recall rules.
-` + recallEnd
+	return recallMarkdownHeading + `
+
+` + recallInstructionBody() + `
+`
+}
+
+func hasRecallBlock(content string) bool {
+	if strings.Contains(content, recallStart) && strings.Contains(content, recallEnd) {
+		return true
+	}
+	return strings.Contains(content, recallMarkdownHeading) &&
+		strings.Contains(content, "ALWAYS RUN `rmb` cli")
 }
 
 func mergeRecallMarkdown(current string) (proposed string, change ChangeType) {
-	block := strings.TrimSpace(recallBlock())
+	block := recallBlock()
 	cur := strings.TrimRight(current, "\n")
 	if cur == "" {
-		return block + "\n", ChangeCreate
+		return block, ChangeCreate
+	}
+	if hasRecallBlock(cur) {
+		return ensureTrailingNewline(cur), ChangeUnchanged
 	}
 	if strings.Contains(cur, recallStart) && strings.Contains(cur, recallEnd) {
 		before, _, ok := strings.Cut(cur, recallStart)
 		if !ok {
-			return cur + "\n\n" + block + "\n", ChangeAppend
+			return ensureTrailingNewline(cur + "\n\n" + block), ChangeAppend
 		}
 		_, after, ok := strings.Cut(cur, recallEnd)
 		if !ok {
-			return cur + "\n\n" + block + "\n", ChangeAppend
+			return ensureTrailingNewline(cur + "\n\n" + block), ChangeAppend
 		}
 		proposed = strings.TrimRight(before, "\n") + "\n\n" + block + strings.TrimLeft(after, "\n")
-		if !strings.HasSuffix(proposed, "\n") {
-			proposed += "\n"
-		}
-		if proposed == cur+"\n" || proposed == cur {
-			return cur, ChangeUnchanged
-		}
-		return proposed, ChangeModify
+		return ensureTrailingNewline(proposed), ChangeModify
 	}
-	if strings.TrimSpace(cur) == strings.TrimSpace(block) {
-		return cur, ChangeUnchanged
-	}
-	if strings.Contains(cur, "rmb://agent") || strings.Contains(cur, "ALWAYS RUN `rmb`") {
-		return cur + "\n\n" + block + "\n", ChangeAppend
-	}
-	return cur + "\n\n" + block + "\n", ChangeAppend
+	return ensureTrailingNewline(cur + "\n\n" + block), ChangeAppend
 }
 
-func hasRecallBlock(content string) bool {
-	return strings.Contains(content, recallStart) || strings.Contains(content, "rmb://agent")
+func ensureTrailingNewline(s string) string {
+	if strings.HasSuffix(s, "\n") {
+		return s
+	}
+	return s + "\n"
 }

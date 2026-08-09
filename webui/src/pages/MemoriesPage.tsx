@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
 import { MemoryCorrections } from "../components/MemoryCorrections";
+import { RecallStatsLabel } from "../components/RecallStatsLabel";
 import { Modal } from "../components/Modal";
 import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { pageMemories } from "../lib/api";
@@ -48,6 +49,8 @@ function MemoryDetailModal({
       )}
       <p className="mt-6 text-xs text-rmb-gray">
         v{memory.version} · {formatDateTime(memory.updated_at)}
+        {" · "}
+        <RecallStatsLabel stats={memory.recall_stats} />
       </p>
       <MemoryCorrections memoryURI={memory.uri} />
     </Modal>
@@ -70,6 +73,8 @@ function ProfileMemoryView({ memory }: { memory: MemoryRow }) {
       )}
       <p className="mt-6 text-xs text-rmb-gray">
         v{memory.version} · {formatDateTime(memory.updated_at)}
+        {" · "}
+        <RecallStatsLabel stats={memory.recall_stats} />
       </p>
       <MemoryCorrections memoryURI={memory.uri} />
     </article>
@@ -147,6 +152,7 @@ function MemoryListView({
               <col className="w-[34%]" />
               <col />
               <col className="w-16" />
+              <col className="w-24" />
               <col className="w-40" />
             </colgroup>
             <thead className="border-b border-rmb-gray/15 bg-rmb-light text-rmb-gray">
@@ -154,6 +160,7 @@ function MemoryListView({
                 <th className="px-4 py-3 font-medium">{t.memories.colTitle}</th>
                 <th className="px-4 py-3 font-medium">{t.memories.colAbstract}</th>
                 <th className="px-4 py-3 font-medium">{t.memories.colVersion}</th>
+                <th className="px-4 py-3 font-medium">{t.memories.colRecall}</th>
                 <th className="px-4 py-3 font-medium">{t.memories.colUpdated}</th>
               </tr>
             </thead>
@@ -192,6 +199,9 @@ function MemoryListView({
                   </td>
                   <td className="px-4 align-middle tabular-nums text-rmb-gray">
                     v{memory.version}
+                  </td>
+                  <td className="px-4 align-middle">
+                    <RecallStatsLabel stats={memory.recall_stats} />
                   </td>
                   <td className="px-4 align-middle text-xs text-rmb-gray">
                     {formatDateTime(memory.updated_at)}

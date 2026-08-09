@@ -17,6 +17,7 @@ target/
 /bin/
 app/node_modules/
 app/src-tauri/target/
+app/src-tauri/binaries/
 *.dmg
 *.pkg
 *.msi
@@ -26,3 +27,8 @@ app/src-tauri/target/
 # Local env
 .env
 .env.*
+
+# Embedded webui (Vite dist → go:embed). Source: webui/
+internal/http/static/web/*
+!internal/http/static/web/.gitkeep
+!internal/http/static/web/README.md

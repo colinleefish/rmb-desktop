@@ -3,6 +3,7 @@ import type { ComponentType } from "react";
 import {
   LayoutDashboard,
   MessagesSquare,
+  Plug,
   Settings,
   Sparkles,
   Wand2,
@@ -30,6 +31,7 @@ type NavItem = {
   countKey?: keyof OverviewCounts;
   end?: boolean;
   disabled?: boolean;
+  activePrefix?: string;
   children?: NavChild[];
 };
 
@@ -113,6 +115,7 @@ function SidebarNavItem({
   soonLabel: string;
 }) {
   const Icon = item.icon;
+  const location = useLocation();
 
   if (item.disabled) {
     return (
@@ -125,7 +128,6 @@ function SidebarNavItem({
   }
 
   if (item.children?.length) {
-    const location = useLocation();
     const sectionActive = item.children.some((child) => location.pathname === child.to);
 
     return (
@@ -150,15 +152,24 @@ function SidebarNavItem({
   }
 
   return (
-    <NavLink to={item.to} end={item.end} className={({ isActive }) => navLinkClass(isActive)}>
-      {({ isActive }) => (
+    <NavLink
+      to={item.to}
+      end={item.end}
+      className={({ isActive }) =>
+        navLinkClass(isActive || (item.activePrefix ? location.pathname.startsWith(item.activePrefix) : false))
+      }
+    >
+      {({ isActive }) => {
+        const highlighted =
+          isActive || (item.activePrefix ? location.pathname.startsWith(item.activePrefix) : false);
+        return (
         <>
           <Icon className="size-4 shrink-0" />
           <span className="flex-1">{item.label}</span>
           {item.countKey && counts && (
             <span
               className={
-                isActive
+                highlighted
                   ? "rounded bg-rmb-dark/30 px-1.5 py-0.5 text-[10px] tabular-nums text-white"
                   : "rounded bg-rmb-light px-1.5 py-0.5 text-[10px] tabular-nums text-rmb-gray"
               }
@@ -167,7 +178,8 @@ function SidebarNavItem({
             </span>
           )}
         </>
-      )}
+        );
+      }}
     </NavLink>
   );
 }
@@ -226,6 +238,17 @@ export function Sidebar() {
         },
       ],
     },
+    {
+      label: t.nav.integrationGroup,
+      items: [
+        {
+          to: "/integrations/cursor",
+          label: t.nav.agentIntegrations,
+          icon: Plug,
+          activePrefix: "/integrations",
+        },
+      ],
+    },
   ];
 
   return (
@@ -240,7 +263,9 @@ export function Sidebar() {
         />
         <div className="leading-tight">
           <div className="text-sm font-semibold text-rmb-dark">{t.appName}</div>
-          <div className="text-xs text-rmb-gray">{t.appSubtitle}</div>
+          {t.appSubtitle ? (
+            <div className="text-xs text-rmb-gray">{t.appSubtitle}</div>
+          ) : null}
         </div>
       </div>
 

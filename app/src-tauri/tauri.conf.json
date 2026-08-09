@@ -7,7 +7,7 @@
     "distDir": "../dist"
   },
   "package": {
-    "productName": "rmb",
+    "productName": "RMB Desktop",
     "version": "0.1.0"
   },
   "tauri": {
@@ -21,7 +21,10 @@
       "deb": {
         "depends": []
       },
-      "externalBin": [],
+      "externalBin": [
+        "binaries/rmb",
+        "binaries/rmbd"
+      ],
       "icon": [
         "icons/32x32.png",
         "icons/128x128.png",

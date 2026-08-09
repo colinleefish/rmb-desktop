@@ -4,6 +4,10 @@ import type {
   ChangeType,
   SetupArtifact,
 } from "./agentSetupTypes";
+import * as mock from "./setupApiMock";
+import { isSetupMocked } from "./setupMock";
+
+export { isSetupMocked } from "./setupMock";
 
 const API = "/api/v1";
 
@@ -92,6 +96,7 @@ async function setupPost<T>(path: string, payload: unknown): Promise<T> {
 }
 
 export async function fetchSetupStatus(): Promise<AgentSetupState[]> {
+  if (isSetupMocked()) return mock.fetchSetupStatus();
   const status = await setupGet<ApiStatusResponse>("/setup/status");
   const agents = await Promise.all(
     status.agents.map(async (summary) => {
@@ -105,6 +110,7 @@ export async function fetchSetupStatus(): Promise<AgentSetupState[]> {
 }
 
 export async function fetchAgentPreview(agentId: string): Promise<AgentSetupState> {
+  if (isSetupMocked()) return mock.fetchAgentPreview(agentId);
   const preview = await setupGet<{ agent: ApiAgent }>(
     `/setup/${encodeURIComponent(agentId)}/preview`,
   );
@@ -115,6 +121,7 @@ export async function applySetupArtifact(
   agentId: string,
   artifactId: string,
 ): Promise<AgentSetupState> {
+  if (isSetupMocked()) return mock.applySetupArtifact(agentId, artifactId);
   const res = await setupPost<{ agent: ApiAgent }>(
     `/setup/${encodeURIComponent(agentId)}/apply`,
     { artifacts: [artifactId] },

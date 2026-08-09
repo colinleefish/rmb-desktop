@@ -65,13 +65,44 @@ func TestMergeClaudeSettingsPreservesEnv(t *testing.T) {
 	}
 }
 
+func TestCursorRecallRuleFormat(t *testing.T) {
+	rule := CursorRecallRule()
+	if !strings.Contains(rule, "description: Use of rmb command line") {
+		t.Fatalf("missing description frontmatter: %s", rule)
+	}
+	if !strings.Contains(rule, "alwaysApply: true") {
+		t.Fatalf("missing alwaysApply: %s", rule)
+	}
+	if !strings.Contains(rule, "ALWAYS RUN `rmb` cli") {
+		t.Fatalf("missing recall body: %s", rule)
+	}
+}
+
 func TestMergeRecallMarkdownAppendsBlock(t *testing.T) {
 	proposed, change := mergeRecallMarkdown("# Notes\n")
 	if change != ChangeAppend {
 		t.Fatalf("expected append, got %s", change)
 	}
-	if !strings.Contains(proposed, recallStart) {
-		t.Fatalf("missing recall block: %s", proposed)
+	if !strings.Contains(proposed, recallMarkdownHeading) {
+		t.Fatalf("missing recall heading: %s", proposed)
+	}
+	if !strings.Contains(proposed, "ALWAYS RUN `rmb` cli") {
+		t.Fatalf("missing recall body: %s", proposed)
+	}
+}
+
+func TestMergeRecallMarkdownUnchangedWhenBlockPresent(t *testing.T) {
+	current := "# Notes\n\n" + recallBlock()
+	proposed, change := mergeRecallMarkdown(current)
+	if change != ChangeUnchanged {
+		t.Fatalf("expected unchanged, got %s\nproposed=%s", change, proposed)
+	}
+}
+
+func TestHasRecallBlockLegacyMarkers(t *testing.T) {
+	legacy := "# x\n\n" + recallStart + "\nold\n" + recallEnd
+	if !hasRecallBlock(legacy) {
+		t.Fatal("expected legacy markers to count as configured")
 	}
 }
 
@@ -79,17 +110,17 @@ func TestMergeCursorHooksPreservesExistingRMBHook(t *testing.T) {
 	current := `{
   "version": 1,
   "hooks": {
-    "stop": [{"command": "/home/user/.rmb/bin/rmb-hook-dual cursor", "timeout": 15}]
+    "stop": [{"command": "/usr/local/bin/rmb hook-submit --source=cursor", "timeout": 15}]
   }
 }`
-	proposed, configured, err := mergeCursorHooks(current, "/bin/rmb hook-submit --source=cursor")
+	proposed, configured, err := mergeCursorHooks(current, "/usr/local/bin/rmb hook-submit --source=cursor")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !configured {
 		t.Fatal("expected configured")
 	}
-	if !strings.Contains(proposed, "rmb-hook-dual cursor") {
+	if !strings.Contains(proposed, "hook-submit --source=cursor") {
 		t.Fatalf("should preserve existing hook command: %s", proposed)
 	}
 	if changeTypeForJSON(current, proposed, true) != ChangeUnchanged {
@@ -114,7 +145,7 @@ func TestMergeRecallMarkdownIdempotent(t *testing.T) {
 	if change != ChangeUnchanged && change != ChangeModify {
 		t.Fatalf("expected unchanged/modify, got %s", change)
 	}
-	if !strings.Contains(second, recallStart) {
+	if !strings.Contains(second, recallMarkdownHeading) {
 		t.Fatalf("missing recall block: %s", second)
 	}
 }

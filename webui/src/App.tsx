@@ -6,6 +6,8 @@ import { SessionDetailPage } from "./pages/SessionDetailPage";
 import { SessionsPage } from "./pages/SessionsPage";
 import { SkillsPage } from "./pages/SkillsPage";
 import { SkillDetailPage } from "./pages/SkillDetailPage";
+import { IntegrationsPage } from "./pages/IntegrationsPage";
+import { RedirectSettingsIntegrations } from "./pages/RedirectSettingsIntegrations";
 import { SettingsPage } from "./pages/SettingsPage";
 
 export default function App() {
@@ -20,8 +22,8 @@ export default function App() {
           <Route path="memories/:category" element={<MemoriesPage />} />
           <Route path="skills" element={<SkillsPage />} />
           <Route path="skills/:slug" element={<SkillDetailPage />} />
-          <Route path="integrations/cursor" element={<Navigate to="/settings/integrations/cursor" replace />} />
-          <Route path="integrations/claude-code" element={<Navigate to="/settings/integrations/claude-code" replace />} />
+          <Route path="integrations/*" element={<IntegrationsPage />} />
+          <Route path="settings/integrations/*" element={<RedirectSettingsIntegrations />} />
           <Route path="settings/*" element={<SettingsPage />} />
         </Route>
       </Routes>

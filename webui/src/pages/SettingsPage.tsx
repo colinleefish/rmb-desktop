@@ -3,14 +3,15 @@ import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { getConfig, putConfig } from "../lib/api";
 import type { ConfigUpdateRequest, ConfigView } from "../lib/types";
 import { useI18n } from "../i18n";
-import { IntegrationSettingsPanel } from "../components/settings/IntegrationSettingsPanel";
+import { DEFAULT_PIPELINE } from "../lib/pipelineDefaults";
+import { durationToSeconds, secondsToDuration } from "../lib/pipelineDuration";
 import { parseSettingsPath, settingsPath, type SettingsSection } from "../lib/settingsRoutes";
 
 export function SettingsPage() {
   const { t, lang, setLang } = useI18n();
   const location = useLocation();
   const navigate = useNavigate();
-  const { section: tab, agentId } = parseSettingsPath(location.pathname);
+  const { section: tab } = parseSettingsPath(location.pathname);
 
   const [config, setConfig] = useState<ConfigView | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -43,6 +44,9 @@ export function SettingsPage() {
   }, []);
 
   if (location.pathname === "/settings" || location.pathname === "/settings/") {
+    return <Navigate to="/settings/general" replace />;
+  }
+  if (location.pathname === "/settings/language") {
     return <Navigate to="/settings/general" replace />;
   }
 
@@ -81,20 +85,15 @@ export function SettingsPage() {
 
   const tabs: { id: SettingsSection; label: string }[] = [
     { id: "general", label: t.settings.tabs.general },
-    { id: "llm", label: t.settings.tabs.llm },
-    { id: "embed", label: t.settings.tabs.embed },
-    { id: "pipeline", label: t.settings.tabs.pipeline },
-    { id: "integrations", label: t.settings.tabs.integrations },
-    { id: "language", label: t.settings.tabs.language },
+    { id: "models", label: t.settings.tabs.models },
+    { id: "advanced", label: t.settings.tabs.advanced },
   ];
 
   function selectTab(next: SettingsSection) {
-    navigate(settingsPath(next, agentId), { replace: true });
+    navigate(settingsPath(next), { replace: true });
   }
 
-  const needsConfig = tab !== "integrations" && tab !== "language";
-
-  if (needsConfig && (!config || !pipeline)) {
+  if (!config || !pipeline) {
     return <p className="text-rmb-gray">{t.common.loading}</p>;
   }
 
@@ -122,7 +121,8 @@ export function SettingsPage() {
         ))}
       </div>
 
-      <div>
+      <div className="overflow-hidden rounded-xl border border-rmb-gray/35 bg-white shadow-sm">
+        <div className="p-6">
         {tab === "general" && config && pipeline && (
           <div className="space-y-4 max-w-xl">
             <Field label={t.settings.general.addr} value={addr} onChange={setAddr} />
@@ -136,63 +136,79 @@ export function SettingsPage() {
                   : t.settings.general.distillationOff}
               </p>
             </div>
-          </div>
-        )}
-
-        {tab === "llm" && config && (
-          <div className="space-y-4 max-w-xl">
-            <Field label={t.settings.llm.apiBase} value={llmBase} onChange={setLlmBase} />
-            <Field label={t.settings.llm.model} value={llmModel} onChange={setLlmModel} />
-            <div>
-              <label className="block text-sm font-medium text-rmb-gray">{t.settings.llm.apiKey}</label>
-              {config.llm.api_key_set && (
-                <p className="mt-1 text-xs text-emerald-600">{t.settings.llm.apiKeySet}</p>
-              )}
-              <input
-                type="password"
-                value={llmKey}
-                onChange={(e) => setLlmKey(e.target.value)}
-                placeholder={t.settings.llm.apiKeyPlaceholder}
-                className="mt-1 w-full rounded-md border border-rmb-gray/20 px-3 py-2 text-sm"
-              />
+            <div className="border-t border-rmb-gray/15 pt-4">
+              <label className="block text-sm font-medium text-rmb-gray">
+                {t.settings.language.label}
+              </label>
+              <select
+                value={lang}
+                onChange={(e) => setLang(e.target.value as "en" | "zh")}
+                className="mt-1 w-full max-w-xs rounded-md border border-rmb-gray/20 px-3 py-2 text-sm"
+              >
+                <option value="en">{t.settings.language.en}</option>
+                <option value="zh">{t.settings.language.zh}</option>
+              </select>
             </div>
           </div>
         )}
 
-        {tab === "embed" && config && (
-          <div className="space-y-4 max-w-xl">
-            <Field label={t.settings.embed.apiBase} value={embedBase} onChange={setEmbedBase} />
-            <Field label={t.settings.embed.model} value={embedModel} onChange={setEmbedModel} />
-            <Field
-              label={t.settings.embed.dimensions}
-              value={String(embedDims)}
-              onChange={(v) => setEmbedDims(Number(v) || 1024)}
-            />
-            <div>
-              <label className="block text-sm font-medium text-rmb-gray">{t.settings.embed.apiKey}</label>
-              {config.embed.api_key_set && (
-                <p className="mt-1 text-xs text-emerald-600">{t.settings.embed.apiKeySet}</p>
-              )}
-              <input
-                type="password"
-                value={embedKey}
-                onChange={(e) => setEmbedKey(e.target.value)}
-                placeholder={t.settings.embed.apiKeyPlaceholder}
-                className="mt-1 w-full rounded-md border border-rmb-gray/20 px-3 py-2 text-sm"
+        {tab === "models" && config && (
+          <div className="max-w-xl space-y-8">
+            <p className="text-sm text-rmb-gray">{t.settings.models.intro}</p>
+            <section className="space-y-4">
+              <h3 className="text-sm font-semibold text-rmb-dark">{t.settings.models.llm}</h3>
+              <Field label={t.settings.llm.apiBase} value={llmBase} onChange={setLlmBase} />
+              <Field label={t.settings.llm.model} value={llmModel} onChange={setLlmModel} />
+              <div>
+                <label className="block text-sm font-medium text-rmb-gray">{t.settings.llm.apiKey}</label>
+                {config.llm.api_key_set && (
+                  <p className="mt-1 text-xs text-emerald-600">{t.settings.llm.apiKeySet}</p>
+                )}
+                <input
+                  type="password"
+                  value={llmKey}
+                  onChange={(e) => setLlmKey(e.target.value)}
+                  placeholder={t.settings.llm.apiKeyPlaceholder}
+                  className="mt-1 w-full rounded-md border border-rmb-gray/20 px-3 py-2 text-sm"
+                />
+              </div>
+            </section>
+
+            <section className="space-y-4 border-t border-rmb-gray/15 pt-8">
+              <h3 className="text-sm font-semibold text-rmb-dark">{t.settings.models.embed}</h3>
+              <Field label={t.settings.embed.apiBase} value={embedBase} onChange={setEmbedBase} />
+              <Field label={t.settings.embed.model} value={embedModel} onChange={setEmbedModel} />
+              <Field
+                label={t.settings.embed.dimensions}
+                value={String(embedDims)}
+                onChange={(v) => setEmbedDims(Number(v) || 1024)}
               />
-            </div>
+              <div>
+                <label className="block text-sm font-medium text-rmb-gray">{t.settings.embed.apiKey}</label>
+                {config.embed.api_key_set && (
+                  <p className="mt-1 text-xs text-emerald-600">{t.settings.embed.apiKeySet}</p>
+                )}
+                <input
+                  type="password"
+                  value={embedKey}
+                  onChange={(e) => setEmbedKey(e.target.value)}
+                  placeholder={t.settings.embed.apiKeyPlaceholder}
+                  className="mt-1 w-full rounded-md border border-rmb-gray/20 px-3 py-2 text-sm"
+                />
+              </div>
+            </section>
           </div>
         )}
 
-        {tab === "pipeline" && pipeline && (
-          <div className="space-y-4 max-w-xl">
-            <p className="text-sm text-rmb-gray">{t.settings.pipeline.intro}</p>
-            <PipelineField label={t.settings.pipeline.l1Poll} field="l1_poll_interval" pipeline={pipeline} setPipeline={setPipeline} />
-            <PipelineField label={t.settings.pipeline.l2Poll} field="l2_poll_interval" pipeline={pipeline} setPipeline={setPipeline} />
-            <PipelineField label={t.settings.pipeline.l3Poll} field="l3_poll_interval" pipeline={pipeline} setPipeline={setPipeline} />
-            <PipelineField label={t.settings.pipeline.embedPoll} field="embed_poll_interval" pipeline={pipeline} setPipeline={setPipeline} />
-            <PipelineField label={t.settings.pipeline.l1Idle} field="l1_idle_seconds" pipeline={pipeline} setPipeline={setPipeline} />
-            <PipelineField label={t.settings.pipeline.l2Delay} field="l2_delay_after_l1" pipeline={pipeline} setPipeline={setPipeline} />
+        {tab === "advanced" && pipeline && (
+          <div className="max-w-xl space-y-4">
+            <p className="text-sm text-rmb-gray">{t.settings.advanced.pipelineIntro}</p>
+            <PipelineSecondsField label={t.settings.pipeline.l1Poll} field="l1_poll_interval" pipeline={pipeline} setPipeline={setPipeline} />
+            <PipelineSecondsField label={t.settings.pipeline.l2Poll} field="l2_poll_interval" pipeline={pipeline} setPipeline={setPipeline} />
+            <PipelineSecondsField label={t.settings.pipeline.l3Poll} field="l3_poll_interval" pipeline={pipeline} setPipeline={setPipeline} />
+            <PipelineSecondsField label={t.settings.pipeline.embedPoll} field="embed_poll_interval" pipeline={pipeline} setPipeline={setPipeline} />
+            <PipelineSecondsField label={t.settings.pipeline.l1Idle} field="l1_idle_seconds" pipeline={pipeline} setPipeline={setPipeline} />
+            <PipelineSecondsField label={t.settings.pipeline.l2Delay} field="l2_delay_after_l1" pipeline={pipeline} setPipeline={setPipeline} />
             <PipelineNumField label={t.settings.pipeline.l1EveryN} field="l1_every_n" pipeline={pipeline} setPipeline={setPipeline} />
             <PipelineNumField label={t.settings.pipeline.l1MaxTurns} field="l1_max_turns_per_batch" pipeline={pipeline} setPipeline={setPipeline} />
             <PipelineNumField label={t.settings.pipeline.l1MaxChars} field="l1_max_chars_per_batch" pipeline={pipeline} setPipeline={setPipeline} />
@@ -207,48 +223,32 @@ export function SettingsPage() {
               />
               {t.settings.pipeline.l1Warmup}
             </label>
-          </div>
-        )}
-
-        {tab === "integrations" && (
-          <IntegrationSettingsPanel
-            agentId={agentId}
-            onAgentChange={(id) => navigate(settingsPath("integrations", id), { replace: true })}
-          />
-        )}
-
-        {tab === "language" && (
-          <div className="max-w-xs space-y-2">
-            <label className="block text-sm font-medium text-rmb-gray">
-              {t.settings.language.label}
-            </label>
-            <select
-              value={lang}
-              onChange={(e) => setLang(e.target.value as "en" | "zh")}
-              className="w-full rounded-md border border-rmb-gray/20 px-3 py-2 text-sm"
+            <button
+              type="button"
+              onClick={() => setPipeline({ ...DEFAULT_PIPELINE })}
+              className="rounded-md border border-rmb-gray/20 bg-white px-3 py-1.5 text-sm font-medium text-rmb-dark hover:bg-rmb-light"
             >
-              <option value="en">{t.settings.language.en}</option>
-              <option value="zh">{t.settings.language.zh}</option>
-            </select>
+              {t.settings.advanced.reset}
+            </button>
           </div>
         )}
-      </div>
 
-      {tab !== "language" && tab !== "integrations" && (
-        <div className="flex items-center gap-4">
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="rounded-md bg-rmb-accent px-4 py-2 text-sm font-medium text-white hover:bg-rmb-accent/90 disabled:opacity-50"
-          >
-            {saving ? t.settings.saving : t.settings.save}
-          </button>
-          {message && <p className="text-sm text-emerald-600">{t.settings.saved}</p>}
-          {message && <p className="text-sm text-rmb-gray">{t.settings.restartHint}</p>}
-          {error && <p className="text-sm text-red-600">{error}</p>}
         </div>
-      )}
+
+        <div className="flex items-center gap-4 border-t border-rmb-gray/15 bg-rmb-light/30 px-6 py-4">
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="rounded-md bg-rmb-accent px-4 py-2 text-sm font-medium text-white hover:bg-rmb-accent/90 disabled:opacity-50"
+            >
+              {saving ? t.settings.saving : t.settings.save}
+            </button>
+            {message && <p className="text-sm text-emerald-600">{t.settings.saved}</p>}
+            {message && <p className="text-sm text-rmb-gray">{t.settings.restartHint}</p>}
+            {error && <p className="text-sm text-red-600">{error}</p>}
+          </div>
+      </div>
     </div>
   );
 }
@@ -257,15 +257,21 @@ function Field({
   label,
   value,
   onChange,
+  type = "text",
+  min,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
+  type?: "text" | "number";
+  min?: number;
 }) {
   return (
     <div>
       <label className="block text-sm font-medium text-rmb-gray">{label}</label>
       <input
+        type={type}
+        min={min}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="mt-1 w-full rounded-md border border-rmb-gray/20 px-3 py-2 text-sm"
@@ -283,7 +289,7 @@ function ReadOnly({ label, value }: { label: string; value: string }) {
   );
 }
 
-function PipelineField({
+function PipelineSecondsField({
   label,
   field,
   pipeline,
@@ -294,13 +300,18 @@ function PipelineField({
   pipeline: ConfigView["pipeline"];
   setPipeline: (p: ConfigView["pipeline"]) => void;
 }) {
-  const value = String(pipeline[field]);
-  if (typeof pipeline[field] === "boolean") return null;
+  const raw = pipeline[field];
+  if (typeof raw !== "string") return null;
+  const seconds = durationToSeconds(raw);
   return (
     <Field
       label={label}
-      value={value}
-      onChange={(v) => setPipeline({ ...pipeline, [field]: v })}
+      value={String(seconds)}
+      onChange={(v) =>
+        setPipeline({ ...pipeline, [field]: secondsToDuration(Number(v) || 0) })
+      }
+      type="number"
+      min={0}
     />
   );
 }

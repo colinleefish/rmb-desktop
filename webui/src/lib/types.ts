@@ -76,6 +76,17 @@ export interface AtomRow {
   uri?: string;
 }
 
+export interface RecallStats {
+  uri?: string;
+  search_count: number;
+  cat_count: number;
+  meta_count: number;
+  last_searched_at?: string | null;
+  last_cated_at?: string | null;
+  last_metaed_at?: string | null;
+  updated_at?: string;
+}
+
 export interface SceneRow {
   id: string;
   session_id: string;
@@ -86,6 +97,7 @@ export interface SceneRow {
   created_at: string;
   updated_at: string;
   uri?: string;
+  recall_stats?: RecallStats | null;
 }
 
 export interface MemoryRow {
@@ -100,6 +112,7 @@ export interface MemoryRow {
   source_correction_uris: string[];
   created_at: string;
   updated_at: string;
+  recall_stats?: RecallStats | null;
 }
 
 export interface CorrectionRow {
@@ -130,6 +143,7 @@ export interface SkillRow {
   uri: string;
   version: number;
   updated_at: string;
+  recall_stats?: RecallStats | null;
 }
 
 export interface SkillFileNode {

@@ -31,20 +31,7 @@ func RMBPath() (string, error) {
 	return "", os.ErrNotExist
 }
 
-func hookDualPath() (string, bool) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", false
-	}
-	path := filepath.Join(home, ".rmb", "bin", "rmb-hook-dual")
-	st, err := os.Stat(path)
-	return path, err == nil && !st.IsDir()
-}
-
 func hookCommand(source string) (string, error) {
-	if dual, ok := hookDualPath(); ok {
-		return dual + " " + source, nil
-	}
 	bin, err := RMBPath()
 	if err != nil {
 		return "", err
@@ -54,5 +41,5 @@ func hookCommand(source string) (string, error) {
 
 func isRMBHookCommand(cmd string) bool {
 	c := strings.ToLower(strings.TrimSpace(cmd))
-	return strings.Contains(c, "rmb hook-submit") || strings.Contains(c, "rmb-hook-dual")
+	return strings.Contains(c, "rmb hook-submit")
 }

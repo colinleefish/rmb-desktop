@@ -2,6 +2,8 @@ use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::Mutex;
 
+use crate::bootstrap;
+
 const DEFAULT_BASE_URL: &str = "http://127.0.0.1:19019";
 
 pub struct DaemonManager {
@@ -100,10 +102,17 @@ fn find_rmbd_binary() -> PathBuf {
         }
     }
 
+    if let Some(path) = bootstrap::installed_daemon_path() {
+        if path.exists() {
+            return path;
+        }
+    }
+
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
             for candidate in [
                 dir.join("rmbd"),
+                dir.join("rmbd-desktop"),
                 dir.join("../rmbd"),
                 dir.join("../../../bin/rmbd"),
                 dir.join("../../../../bin/rmbd"),

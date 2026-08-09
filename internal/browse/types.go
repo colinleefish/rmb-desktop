@@ -93,6 +93,19 @@ type SceneJSON struct {
 	CreatedAt   string   `json:"created_at"`
 	UpdatedAt   string   `json:"updated_at"`
 	URI         string   `json:"uri,omitempty"`
+	RecallStats *RecallStats `json:"recall_stats,omitempty"`
+}
+
+// RecallStats holds per-URI recall counters.
+type RecallStats struct {
+	URI            string  `json:"uri"`
+	SearchCount    int64   `json:"search_count"`
+	CatCount       int64   `json:"cat_count"`
+	MetaCount      int64   `json:"meta_count"`
+	LastSearchedAt *string `json:"last_searched_at,omitempty"`
+	LastCatedAt    *string `json:"last_cated_at,omitempty"`
+	LastMetaedAt   *string `json:"last_metaed_at,omitempty"`
+	UpdatedAt      string  `json:"updated_at"`
 }
 
 // MemoryJSON is an active L3 memory row.
@@ -108,6 +121,7 @@ type MemoryJSON struct {
 	SourceCorrectionURIs []string `json:"source_correction_uris"`
 	CreatedAt            string   `json:"created_at"`
 	UpdatedAt            string   `json:"updated_at"`
+	RecallStats          *RecallStats `json:"recall_stats,omitempty"`
 }
 
 // PipelineStateRow joins pipeline state with session key.
@@ -135,6 +149,7 @@ type SkillRow struct {
 	URI         string   `json:"uri"`
 	Version     int      `json:"version"`
 	UpdatedAt   string   `json:"updated_at"`
+	RecallStats *RecallStats `json:"recall_stats,omitempty"`
 }
 
 // ListParams carries pagination and search for browse lists.

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/colinleefish/rmb-desktop/internal/db"
+	"github.com/colinleefish/rmb-desktop/internal/recallstats"
 	"github.com/colinleefish/rmb-desktop/internal/skill"
 	"github.com/colinleefish/rmb-desktop/internal/uri"
 )
@@ -22,11 +23,12 @@ var errNotFound = errors.New("not found")
 
 // Service implements dashboard browse queries over SQLite.
 type Service struct {
-	db *sql.DB
+	db          *sql.DB
+	recallStats *recallstats.Service
 }
 
-func NewService(database *sql.DB) *Service {
-	return &Service{db: database}
+func NewService(database *sql.DB, recallStats *recallstats.Service) *Service {
+	return &Service{db: database, recallStats: recallStats}
 }
 
 func (s *Service) Overview(ctx context.Context) (Overview, error) {
@@ -385,7 +387,13 @@ func (s *Service) ListMemories(ctx context.Context, p ListParams) (Page[MemoryJS
 		}
 		items = append(items, item)
 	}
-	return pageOf(items, total, limit, p.Offset), rows.Err()
+	if err := rows.Err(); err != nil {
+		return Page[MemoryJSON]{}, err
+	}
+	if err := s.attachMemoryRecallStats(ctx, items); err != nil {
+		return Page[MemoryJSON]{}, err
+	}
+	return pageOf(items, total, limit, p.Offset), nil
 }
 
 func (s *Service) ListPipelineStates(ctx context.Context, p ListParams) (Page[PipelineStateRow], error) {
@@ -482,7 +490,13 @@ func (s *Service) ListSkills(ctx context.Context, p ListParams) (Page[SkillRow],
 		}
 		items = append(items, item)
 	}
-	return pageOf(items, total, limit, p.Offset), rows.Err()
+	if err := rows.Err(); err != nil {
+		return Page[SkillRow]{}, err
+	}
+	if err := s.attachSkillRecallStats(ctx, items); err != nil {
+		return Page[SkillRow]{}, err
+	}
+	return pageOf(items, total, limit, p.Offset), nil
 }
 
 func (s *Service) GetSkill(ctx context.Context, slug string) (skill.Detail, error) {
@@ -613,7 +627,13 @@ func (s *Service) listScenes(ctx context.Context, p ListParams, sessionID string
 		}
 		items = append(items, item)
 	}
-	return pageOf(items, total, limit, p.Offset), rows.Err()
+	if err := rows.Err(); err != nil {
+		return Page[SceneJSON]{}, err
+	}
+	if err := s.attachSceneRecallStats(ctx, items); err != nil {
+		return Page[SceneJSON]{}, err
+	}
+	return pageOf(items, total, limit, p.Offset), nil
 }
 
 func (s *Service) listScenesForSession(ctx context.Context, sessionID string) ([]SceneJSON, error) {
@@ -855,6 +875,75 @@ func pageOf[T any](items []T, total int64, limit, offset int) Page[T] {
 		items = []T{}
 	}
 	return Page[T]{Items: items, Total: total, Limit: limit, Offset: offset}
+}
+
+func (s *Service) attachMemoryRecallStats(ctx context.Context, items []MemoryJSON) error {
+	uris := make([]string, 0, len(items))
+	for _, item := range items {
+		uris = append(uris, item.URI)
+	}
+	statsByURI, err := s.recallStatsBatch(ctx, uris)
+	if err != nil {
+		return err
+	}
+	for i := range items {
+		items[i].RecallStats = toBrowseRecallStats(statsByURI, items[i].URI)
+	}
+	return nil
+}
+
+func (s *Service) attachSceneRecallStats(ctx context.Context, items []SceneJSON) error {
+	uris := make([]string, 0, len(items))
+	for _, item := range items {
+		uris = append(uris, item.URI)
+	}
+	statsByURI, err := s.recallStatsBatch(ctx, uris)
+	if err != nil {
+		return err
+	}
+	for i := range items {
+		items[i].RecallStats = toBrowseRecallStats(statsByURI, items[i].URI)
+	}
+	return nil
+}
+
+func (s *Service) attachSkillRecallStats(ctx context.Context, items []SkillRow) error {
+	uris := make([]string, 0, len(items))
+	for _, item := range items {
+		uris = append(uris, item.URI)
+	}
+	statsByURI, err := s.recallStatsBatch(ctx, uris)
+	if err != nil {
+		return err
+	}
+	for i := range items {
+		items[i].RecallStats = toBrowseRecallStats(statsByURI, items[i].URI)
+	}
+	return nil
+}
+
+func (s *Service) recallStatsBatch(ctx context.Context, uris []string) (map[string]recallstats.Stats, error) {
+	if s.recallStats == nil || len(uris) == 0 {
+		return map[string]recallstats.Stats{}, nil
+	}
+	return s.recallStats.BatchGet(ctx, uris)
+}
+
+func toBrowseRecallStats(statsByURI map[string]recallstats.Stats, uri string) *RecallStats {
+	st, ok := statsByURI[uri]
+	if !ok {
+		return nil
+	}
+	return &RecallStats{
+		URI:            st.URI,
+		SearchCount:    st.SearchCount,
+		CatCount:       st.CatCount,
+		MetaCount:      st.MetaCount,
+		LastSearchedAt: st.LastSearchedAt,
+		LastCatedAt:    st.LastCatedAt,
+		LastMetaedAt:   st.LastMetaedAt,
+		UpdatedAt:      st.UpdatedAt,
+	}
 }
 
 func nonNilSlice[T any](items []T) []T {

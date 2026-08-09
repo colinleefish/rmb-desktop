@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { RecallStatsLabel } from "../components/RecallStatsLabel";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { getSession } from "../lib/api";
 import type { AtomRow, SceneRow, SessionDetail, TurnRow } from "../lib/types";
@@ -146,9 +147,12 @@ function ScenesTab({ scenes }: { scenes: SceneRow[] }) {
     <div className="space-y-3">
       {scenes.map((scene) => (
         <article key={scene.id} className="rounded-lg border border-rmb-gray/15 bg-white p-4">
-          <h3 className="text-sm font-medium text-rmb-dark">
-            {scene.display_name ?? scene.id}
-          </h3>
+          <div className="flex items-start justify-between gap-3">
+            <h3 className="text-sm font-medium text-rmb-dark">
+              {scene.display_name ?? scene.id}
+            </h3>
+            <RecallStatsLabel stats={scene.recall_stats} />
+          </div>
           {scene.abstract && (
             <p className="mt-1 text-sm text-rmb-gray">{scene.abstract}</p>
           )}

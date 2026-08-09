@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Check, Copy, FileCode2, Rows2, SplitSquareHorizontal } from "lucide-react";
-import type { ChangeType, SetupArtifact } from "../../lib/agentSetupTypes";
+import type { SetupArtifact } from "../../lib/agentSetupTypes";
 import { useI18n } from "../../i18n";
 
 type DiffLine = {
@@ -29,20 +29,6 @@ function computeDiff(current: string, proposed: string): DiffLine[] {
     }
   }
   return lines;
-}
-
-function changeTypeBadge(changeType: ChangeType, labels: Record<ChangeType, string>) {
-  const styles: Record<ChangeType, string> = {
-    create: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-    modify: "bg-amber-50 text-amber-800 ring-amber-200",
-    append: "bg-sky-50 text-sky-800 ring-sky-200",
-    unchanged: "bg-rmb-light text-rmb-gray ring-rmb-gray/20",
-  };
-  return (
-    <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ${styles[changeType]}`}>
-      {labels[changeType]}
-    </span>
-  );
 }
 
 function lineClass(kind: DiffLine["kind"]) {
@@ -146,11 +132,13 @@ function SideBySideDiff({
 
 export function ConfigDiffReview({
   artifact,
+  title,
   applied,
   applying = false,
   onApply,
 }: {
   artifact: SetupArtifact;
+  title?: string;
   applied: boolean;
   applying?: boolean;
   onApply: () => void;
@@ -175,16 +163,13 @@ export function ConfigDiffReview({
     setTimeout(() => setCopied(false), 2000);
   }
 
-  const effectiveChangeType: ChangeType = applied ? "unchanged" : artifact.changeType;
-
   return (
-    <div className="overflow-hidden rounded-xl border border-rmb-gray/20 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-rmb-gray/35 bg-white shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-rmb-gray/10 px-5 py-4">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <FileCode2 className="size-4 shrink-0 stroke-rmb-accent" />
-            <h3 className="text-sm font-semibold text-rmb-dark">{artifact.title}</h3>
-            {changeTypeBadge(effectiveChangeType, t.agents.changeType)}
+            <h3 className="text-sm font-semibold text-rmb-dark">{title ?? artifact.title}</h3>
             {applied && (
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-emerald-200">
                 <Check className="size-3" />
@@ -193,7 +178,6 @@ export function ConfigDiffReview({
             )}
           </div>
           <p className="mt-1 font-mono text-xs text-rmb-gray">{artifact.path}</p>
-          <p className="mt-2 text-sm text-rmb-gray">{artifact.description}</p>
         </div>
         <div className="flex items-center gap-1 rounded-lg border border-rmb-gray/15 bg-rmb-light/50 p-0.5">
           <button
@@ -263,7 +247,7 @@ export function ConfigDiffReview({
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-end gap-2 border-t border-rmb-gray/10 bg-rmb-light/30 px-5 py-3">
+      <div className="flex flex-wrap items-center justify-start gap-2 border-t border-rmb-gray/15 bg-rmb-light/30 px-5 py-3">
         {artifact.applyMode === "copy_only" ? (
           <button
             type="button"

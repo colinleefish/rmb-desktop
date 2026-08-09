@@ -92,8 +92,7 @@ func codexHookConfigured(current string) bool {
 	if err := json.Unmarshal([]byte(current), &root); err != nil {
 		return false
 	}
-	stop, _ := root["Stop"].([]any)
-	for _, item := range stop {
+	for _, item := range codexStopGroups(root) {
 		m, ok := item.(map[string]any)
 		if !ok {
 			continue
@@ -148,6 +147,18 @@ func applyCodex(artifactID string) error {
 	}
 }
 
+func codexStopGroups(root map[string]any) []any {
+	if hooks, ok := root["hooks"].(map[string]any); ok {
+		if stop, ok := hooks["Stop"].([]any); ok {
+			return stop
+		}
+	}
+	if stop, ok := root["Stop"].([]any); ok {
+		return stop
+	}
+	return nil
+}
+
 func mergeCodexHooks(current, cmd string) (string, bool, error) {
 	root := map[string]any{}
 	if strings.TrimSpace(current) != "" {
@@ -156,7 +167,22 @@ func mergeCodexHooks(current, cmd string) (string, bool, error) {
 		}
 	}
 
-	stop, _ := root["Stop"].([]any)
+	hooks, _ := root["hooks"].(map[string]any)
+	if hooks == nil {
+		hooks = map[string]any{}
+		root["hooks"] = hooks
+	}
+
+	// Migrate legacy top-level Stop into hooks.Stop.
+	if legacy, ok := root["Stop"].([]any); ok && len(legacy) > 0 {
+		existing, _ := hooks["Stop"].([]any)
+		if len(existing) == 0 {
+			hooks["Stop"] = legacy
+		}
+		delete(root, "Stop")
+	}
+
+	stop, _ := hooks["Stop"].([]any)
 	var kept []any
 	configured := false
 	for _, item := range stop {
@@ -176,8 +202,9 @@ func mergeCodexHooks(current, cmd string) (string, bool, error) {
 			command, _ := hm["command"].(string)
 			if isRMBHookCommand(command) {
 				configured = true
-				if _, ok := hm["type"]; !ok {
-					hm["type"] = "command"
+				hm["type"] = "command"
+				if _, ok := hm["timeout"]; !ok {
+					hm["timeout"] = 15
 				}
 				innerKept = append(innerKept, hm)
 				continue
@@ -188,6 +215,7 @@ func mergeCodexHooks(current, cmd string) (string, bool, error) {
 			innerKept = []any{map[string]any{
 				"type":    "command",
 				"command": cmd,
+				"timeout": 15,
 			}}
 			configured = true
 		}
@@ -200,12 +228,13 @@ func mergeCodexHooks(current, cmd string) (string, bool, error) {
 				map[string]any{
 					"type":    "command",
 					"command": cmd,
+					"timeout": 15,
 				},
 			},
 		})
 		configured = true
 	}
-	root["Stop"] = kept
+	hooks["Stop"] = kept
 
 	out, err := json.MarshalIndent(root, "", "  ")
 	if err != nil {

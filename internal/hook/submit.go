@@ -66,8 +66,23 @@ func Submit(ctx context.Context, in SubmitInput) error {
 			return logf("skip", "not a claude payload")
 		}
 		sessionKey, messages, reason, err = ParseClaudePayload(in.StdinJSON)
+	case "codex":
+		if !IsCodexPayload(in.StdinJSON) {
+			return logf("skip", "not a codex payload")
+		}
+		sessionKey, messages, reason, err = ParseCodexPayload(in.StdinJSON)
+	case "opencode":
+		if !IsOpenCodePayload(in.StdinJSON) {
+			return logf("skip", "not an opencode payload")
+		}
+		sessionKey, messages, reason, err = ParseOpenCodePayload(in.StdinJSON)
+	case "pi":
+		if !IsPiPayload(in.StdinJSON) {
+			return logf("skip", "not a pi payload")
+		}
+		sessionKey, messages, reason, err = ParsePiPayload(in.StdinJSON)
 	default:
-		return fmt.Errorf("hook-submit: unsupported source %q (cursor, cc)", source)
+		return fmt.Errorf("hook-submit: unsupported source %q (cursor, cc, codex, opencode, pi)", source)
 	}
 	if err != nil {
 		return logf("skip", err.Error())

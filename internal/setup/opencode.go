@@ -5,27 +5,31 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/colinleefish/rmb-desktop/internal/setup/integrations"
 )
 
-func opencodePaths() (hooksPath, recallPath string) {
+func opencodePaths() (pluginPath, recallPath, legacyHooksPath string) {
 	home, _ := os.UserHomeDir()
 	configBase := filepath.Join(home, ".config", "opencode")
-	return filepath.Join(configBase, "hook", "hooks.yaml"), filepath.Join(configBase, "agents", "rmb-recall.md")
+	return filepath.Join(configBase, "plugin", "rmb-hook.ts"),
+		filepath.Join(configBase, "agents", "rmb-recall.md"),
+		filepath.Join(configBase, "hook", "hooks.yaml")
 }
 
 func previewOpenCode(def agentDef) (AgentState, error) {
-	hooksPath, recallPath := opencodePaths()
-	cmd, err := hookCommand(def.HookSource)
+	pluginPath, recallPath, legacyHooksPath := opencodePaths()
+
+	proposedPlugin, err := renderedOpenCodePlugin()
 	if err != nil {
 		return AgentState{}, err
 	}
 
-	currentHooks, hooksExists, err := readFile(hooksPath)
+	currentPlugin, pluginExists, err := readFile(pluginPath)
 	if err != nil {
 		return AgentState{}, err
 	}
-	proposedHooks, _ := mergeOpenCodeHooksYAML(currentHooks, cmd)
-	hookConfigured := strings.Contains(currentHooks, "rmb hook-submit")
+	hookConfigured := integrations.IsRMBOpenCodePlugin(currentPlugin)
 
 	currentRecall, recallExists, err := readFile(recallPath)
 	if err != nil {
@@ -36,18 +40,23 @@ func previewOpenCode(def agentDef) (AgentState, error) {
 		proposedRecall = "# rmb recall\n\n" + proposedRecall
 	}
 
+	warnings := []string{
+		"Restart OpenCode after applying so the plugin reloads from ~/.config/opencode/plugin/.",
+	}
+	if legacyHooks, legacyExists, legacyErr := readFile(legacyHooksPath); legacyErr == nil && legacyExists && strings.Contains(legacyHooks, "rmb hook-submit") {
+		warnings = append(warnings, "An older shell-hook config exists at ~/.config/opencode/hook/hooks.yaml — you can delete it manually.")
+	}
+
 	artifacts := []Artifact{
-		artifactFromStrings(
-			"hooks",
+		artifactReplaceFile(
+			"plugin",
 			"Conversation capture",
-			hooksPath,
-			"Adds a session-end hook that submits conversation turns to rmbd.",
-			currentHooks,
-			proposedHooks,
-			hooksExists,
-			ApplyWrite,
-			[]string{"OpenCode hook event names may vary by version — verify session end fires after chats."},
-			"markdown",
+			pluginPath,
+			"Installs an in-process TypeScript plugin that submits turns to rmbd when OpenCode goes idle.",
+			currentPlugin,
+			proposedPlugin,
+			pluginExists,
+			warnings,
 		),
 		artifactFromStrings(
 			"recall_md",
@@ -76,21 +85,15 @@ func previewOpenCode(def agentDef) (AgentState, error) {
 }
 
 func applyOpenCode(artifactID string) error {
-	hooksPath, recallPath := opencodePaths()
-	def, _ := agentDefByID(AgentOpenCode)
-	cmd, err := hookCommand(def.HookSource)
-	if err != nil {
-		return err
-	}
+	pluginPath, recallPath, _ := opencodePaths()
 
 	switch artifactID {
-	case "hooks":
-		current, _, err := readFile(hooksPath)
+	case "plugin":
+		proposed, err := renderedOpenCodePlugin()
 		if err != nil {
 			return err
 		}
-		proposed, _ := mergeOpenCodeHooksYAML(current, cmd)
-		return writeFileWithBackup(hooksPath, proposed)
+		return writeFileWithBackup(pluginPath, proposed)
 	case "recall_md":
 		current, _, err := readFile(recallPath)
 		if err != nil {
@@ -106,31 +109,10 @@ func applyOpenCode(artifactID string) error {
 	}
 }
 
-func mergeOpenCodeHooksYAML(current, cmd string) (string, bool) {
-	if strings.Contains(current, "rmb hook-submit") {
-		if strings.Contains(current, cmd) {
-			return current, true
-		}
-		lines := strings.Split(current, "\n")
-		for i, line := range lines {
-			if strings.Contains(line, "rmb hook-submit") {
-				indent := strings.Repeat(" ", len(line)-len(strings.TrimLeft(line, " ")))
-				lines[i] = indent + `- bash: "` + cmd + `"`
-				return strings.Join(lines, "\n") + "\n", true
-			}
-		}
+func renderedOpenCodePlugin() (string, error) {
+	bin, err := RMBPath()
+	if err != nil {
+		return "", err
 	}
-	block := `hooks:
-  - id: rmb-submit
-    event: session.end
-    actions:
-      - bash: "` + cmd + `"
-`
-	if strings.TrimSpace(current) == "" {
-		return block, true
-	}
-	if strings.Contains(current, "rmb-submit") {
-		return current, true
-	}
-	return strings.TrimRight(current, "\n") + "\n\n" + block, true
+	return integrations.RenderOpenCodePlugin(bin)
 }

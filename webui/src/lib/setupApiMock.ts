@@ -1,7 +1,7 @@
 import { MOCK_AGENTS } from "./agentSetupMock";
 import type { AgentSetupState } from "./agentSetupTypes";
 
-const HOOK_ARTIFACTS = new Set(["hooks", "settings"]);
+const HOOK_ARTIFACTS = new Set(["hooks", "settings", "plugin", "extension"]);
 const RECALL_ARTIFACTS = new Set(["user_rules", "claude_md", "agents_md"]);
 
 let agents: AgentSetupState[] = structuredClone(MOCK_AGENTS);

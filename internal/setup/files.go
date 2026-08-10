@@ -123,9 +123,16 @@ func artifactFromStrings(id, title, path, desc, current, proposed string, exists
 		Proposed:    proposed,
 		ChangeType:  change,
 		ApplyMode:   apply,
+		DisplayMode: DisplayDiff,
 		Warnings:    warnings,
 		Language:    lang,
 	}
+}
+
+func artifactReplaceFile(id, title, path, desc, current, proposed string, exists bool, warnings []string) Artifact {
+	a := artifactFromStrings(id, title, path, desc, current, proposed, exists, ApplyWrite, warnings, "typescript")
+	a.DisplayMode = DisplayReplace
+	return a
 }
 
 func artifactFromRaw(id, title, path, desc, rawCurrent, rawProposed, displayCurrent, displayProposed string, exists bool, apply ApplyMode, warnings []string, lang string) Artifact {
@@ -143,6 +150,7 @@ func artifactFromRaw(id, title, path, desc, rawCurrent, rawProposed, displayCurr
 		Proposed:    displayProposed,
 		ChangeType:  change,
 		ApplyMode:   apply,
+		DisplayMode: DisplayDiff,
 		Warnings:    warnings,
 		Language:    lang,
 	}

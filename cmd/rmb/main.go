@@ -14,14 +14,15 @@ import (
 	"github.com/colinleefish/rmb-desktop/internal/hook"
 )
 
+const cliVersion = "0.1.0"
+
 func main() {
 	os.Exit(run())
 }
 
 func run() int {
 	if len(os.Args) < 2 {
-		printUsage()
-		return 2
+		return printBootstrap()
 	}
 
 	switch os.Args[1] {
@@ -40,11 +41,10 @@ func run() int {
 	case "setup":
 		return setupCmd(os.Args[2:])
 	case "version":
-		fmt.Println("rmb dev")
+		fmt.Println(cliVersion)
 		return 0
 	case "help", "-h", "--help":
-		printUsage()
-		return 0
+		return printBootstrap()
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command: %s\n", os.Args[1])
 		printUsage()
@@ -188,9 +188,11 @@ func parseScopes(args []string) []string {
 }
 
 func printUsage() {
-	fmt.Fprintf(os.Stderr, `rmb - local-first memory CLI
+	fmt.Fprint(os.Stderr, usageText())
+}
 
-Usage:
+func usageText() string {
+	return `Usage:
   rmb hook-submit --source=<cursor> [--url=http://127.0.0.1:19019]
   rmb search "<query>" [--scope=memory,scene,skill] [--k=n]
   rmb cat <uri>
@@ -204,5 +206,5 @@ Usage:
   rmb setup --agent=<name> [--dry-run] [--apply=<ids>]
   rmb version
 
-`)
+`
 }

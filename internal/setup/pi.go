@@ -5,27 +5,31 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/colinleefish/rmb-desktop/internal/setup/integrations"
 )
 
-func piPaths() (hookScriptPath, agentsPath string) {
+func piPaths() (extensionPath, agentsPath, legacyHookScriptPath string) {
 	home, _ := os.UserHomeDir()
 	base := filepath.Join(home, ".pi", "agent")
-	return filepath.Join(base, "hooks", "rmb-stop.sh"), filepath.Join(base, "AGENTS.md")
+	return filepath.Join(base, "extensions", "rmb-hook.ts"),
+		filepath.Join(base, "AGENTS.md"),
+		filepath.Join(base, "hooks", "rmb-stop.sh")
 }
 
 func previewPi(def agentDef) (AgentState, error) {
-	hookScriptPath, agentsPath := piPaths()
-	cmd, err := hookCommand(def.HookSource)
+	extensionPath, agentsPath, legacyHookScriptPath := piPaths()
+
+	proposedExtension, err := renderedPiExtension()
 	if err != nil {
 		return AgentState{}, err
 	}
 
-	currentScript, scriptExists, err := readFile(hookScriptPath)
+	currentExtension, extensionExists, err := readFile(extensionPath)
 	if err != nil {
 		return AgentState{}, err
 	}
-	proposedScript, _ := mergePiHookScript(currentScript, cmd)
-	hookConfigured := strings.Contains(currentScript, "hook-submit")
+	hookConfigured := integrations.IsRMBPiExtension(currentExtension)
 
 	currentMD, mdExists, err := readFile(agentsPath)
 	if err != nil {
@@ -33,18 +37,23 @@ func previewPi(def agentDef) (AgentState, error) {
 	}
 	proposedMD, _ := mergeRecallMarkdown(currentMD)
 
+	warnings := []string{
+		"Restart Pi after applying so the extension reloads from ~/.pi/agent/extensions/.",
+	}
+	if legacyScript, legacyExists, legacyErr := readFile(legacyHookScriptPath); legacyErr == nil && legacyExists && strings.Contains(legacyScript, "hook-submit") {
+		warnings = append(warnings, "An older shell hook exists at ~/.pi/agent/hooks/rmb-stop.sh — you can delete it manually.")
+	}
+
 	artifacts := []Artifact{
-		artifactFromStrings(
-			"hook_script",
+		artifactReplaceFile(
+			"extension",
 			"Conversation capture",
-			hookScriptPath,
-			"Shell hook script Pi can run at session end.",
-			currentScript,
-			proposedScript,
-			scriptExists,
-			ApplyWrite,
-			[]string{"Enable this hook in Pi agent settings if hooks are not auto-discovered."},
-			"markdown",
+			extensionPath,
+			"Installs a Pi extension that submits turns to rmbd on agent_settled.",
+			currentExtension,
+			proposedExtension,
+			extensionExists,
+			warnings,
 		),
 		artifactFromStrings(
 			"agents_md",
@@ -73,24 +82,15 @@ func previewPi(def agentDef) (AgentState, error) {
 }
 
 func applyPi(artifactID string) error {
-	hookScriptPath, agentsPath := piPaths()
-	def, _ := agentDefByID(AgentPi)
-	cmd, err := hookCommand(def.HookSource)
-	if err != nil {
-		return err
-	}
+	extensionPath, agentsPath, _ := piPaths()
 
 	switch artifactID {
-	case "hook_script":
-		current, _, err := readFile(hookScriptPath)
+	case "extension":
+		proposed, err := renderedPiExtension()
 		if err != nil {
 			return err
 		}
-		proposed, _ := mergePiHookScript(current, cmd)
-		if err := writeFileWithBackup(hookScriptPath, proposed); err != nil {
-			return err
-		}
-		return os.Chmod(hookScriptPath, 0o755)
+		return writeFileWithBackup(extensionPath, proposed)
 	case "agents_md":
 		current, _, err := readFile(agentsPath)
 		if err != nil {
@@ -103,19 +103,10 @@ func applyPi(artifactID string) error {
 	}
 }
 
-func mergePiHookScript(current, cmd string) (string, bool) {
-	script := "#!/usr/bin/env bash\nset -euo pipefail\n" + cmd + "\n"
-	if strings.TrimSpace(current) == "" {
-		return script, true
+func renderedPiExtension() (string, error) {
+	bin, err := RMBPath()
+	if err != nil {
+		return "", err
 	}
-	if strings.Contains(current, "rmb hook-submit") || strings.Contains(current, "hook-submit --source=pi") {
-		lines := strings.Split(current, "\n")
-		for i, line := range lines {
-			if strings.Contains(line, "hook-submit") {
-				lines[i] = cmd
-				return strings.Join(lines, "\n") + "\n", true
-			}
-		}
-	}
-	return script, strings.Contains(current, "hook-submit")
+	return integrations.RenderPiExtension(bin)
 }

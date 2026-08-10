@@ -37,8 +37,8 @@ Current production: `https://rmb.colinleefish.com`
 - Dual-submit hooks send sessions here **and** to local `rmbd` (`127.0.0.1:19019`)
 - No planned migration off this domain for the hosted service
 
-## DNS / deploy (re-mem-ber.me, when ready)
+## DNS / deploy (re-mem-ber.me)
 
 - Point `A` / `AAAA` at hosting (can be static host or CDN; separate from rmb API server)
 - Caddy (or similar) for automatic TLS
-- Static site or lightweight framework for landing + download links
+- Static site in separate repo [`rmb-website`](https://github.com/colinleefish/rmb-website) — landing page + download links

@@ -18,19 +18,28 @@ const (
 	ApplyCopyOnly  ApplyMode = "copy_only"
 )
 
+// DisplayMode controls how the integration UI presents an artifact.
+type DisplayMode string
+
+const (
+	DisplayDiff     DisplayMode = "diff"
+	DisplayReplace  DisplayMode = "replace"
+)
+
 // Artifact is one file or config target shown in the integration UI.
 type Artifact struct {
-	ID          string     `json:"id"`
-	Title       string     `json:"title"`
-	Path        string     `json:"path"`
-	Description string     `json:"description"`
-	Exists      bool       `json:"exists"`
-	Current     string     `json:"current"`
-	Proposed    string     `json:"proposed"`
-	ChangeType  ChangeType `json:"change_type"`
-	ApplyMode   ApplyMode  `json:"apply_mode"`
-	Warnings    []string   `json:"warnings"`
-	Language    string     `json:"language"`
+	ID          string      `json:"id"`
+	Title       string      `json:"title"`
+	Path        string      `json:"path"`
+	Description string      `json:"description"`
+	Exists      bool        `json:"exists"`
+	Current     string      `json:"current"`
+	Proposed    string      `json:"proposed"`
+	ChangeType  ChangeType  `json:"change_type"`
+	ApplyMode   ApplyMode   `json:"apply_mode"`
+	DisplayMode DisplayMode `json:"display_mode"`
+	Warnings    []string    `json:"warnings"`
+	Language    string      `json:"language"`
 }
 
 // AgentState is the preview payload for one coding agent.

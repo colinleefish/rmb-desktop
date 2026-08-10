@@ -1,5 +1,6 @@
 export type ChangeType = "create" | "modify" | "append" | "unchanged";
 export type ApplyMode = "write" | "copy_only";
+export type DisplayMode = "diff" | "replace";
 export type ArtifactStatus = "pending" | "applied" | "unchanged";
 
 export type SetupArtifact = {
@@ -12,8 +13,9 @@ export type SetupArtifact = {
   proposed: string;
   changeType: ChangeType;
   applyMode: ApplyMode;
+  displayMode: DisplayMode;
   warnings: string[];
-  language: "json" | "markdown";
+  language: "json" | "markdown" | "typescript";
 };
 
 export type AgentSetupState = {

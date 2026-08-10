@@ -200,6 +200,16 @@ export const translations = {
       clickToEnlarge: "Click to enlarge",
       cursorRulesGuideAlt:
         "Cursor sidebar Customize, Rules tab, and New button highlighted, with the rmb recall rule in the editor",
+      opencode: {
+        captureTitle: "Install capture plugin",
+        captureHint:
+          "Installs a TypeScript plugin to ~/.config/opencode/plugin/. Restart OpenCode after applying.",
+      },
+      pi: {
+        captureTitle: "Install capture extension",
+        captureHint:
+          "Installs a TypeScript extension to ~/.pi/agent/extensions/. Restart Pi after applying.",
+      },
       fullyConnected: "Fully connected",
       setupIncomplete: "Setup incomplete",
       lastHook: "Last hook",
@@ -208,6 +218,15 @@ export const translations = {
         modify: "Will modify",
         append: "Will append",
         unchanged: "No changes",
+      },
+      fileReplace: {
+        willCreate: "Will create file",
+        willReplace: "Will replace file",
+        upToDate: "Up to date",
+        previewFile: "Preview file",
+        hidePreview: "Hide preview",
+        installFile: "Install file",
+        replaceFile: "Replace file",
       },
       status: {
         configured: "configured",
@@ -513,6 +532,16 @@ export const translations = {
         "在 Cursor 的 Agents 窗口中（不是 IDE 设置窗口）：Customize → Rules → + New，粘贴上方规则后保存。",
       clickToEnlarge: "点击放大",
       cursorRulesGuideAlt: "Cursor 侧边栏 Customize、Rules 标签和 New 按钮高亮，编辑器中显示 rmb 召回规则",
+      opencode: {
+        captureTitle: "安装采集插件",
+        captureHint:
+          "将 TypeScript 插件安装到 ~/.config/opencode/plugin/。应用后请重启 OpenCode。",
+      },
+      pi: {
+        captureTitle: "安装采集扩展",
+        captureHint:
+          "将 TypeScript 扩展安装到 ~/.pi/agent/extensions/。应用后请重启 Pi。",
+      },
       fullyConnected: "已完全连接",
       setupIncomplete: "设置未完成",
       lastHook: "上次 hook",
@@ -521,6 +550,15 @@ export const translations = {
         modify: "将修改",
         append: "将追加",
         unchanged: "无变更",
+      },
+      fileReplace: {
+        willCreate: "将创建文件",
+        willReplace: "将替换文件",
+        upToDate: "已是最新",
+        previewFile: "预览文件",
+        hidePreview: "收起预览",
+        installFile: "安装文件",
+        replaceFile: "替换文件",
       },
       status: {
         configured: "已配置",

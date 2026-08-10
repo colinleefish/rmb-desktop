@@ -2,6 +2,7 @@ import type {
   AgentSetupState,
   ApplyMode,
   ChangeType,
+  DisplayMode,
   SetupArtifact,
 } from "./agentSetupTypes";
 import * as mock from "./setupApiMock";
@@ -21,8 +22,9 @@ type ApiArtifact = {
   proposed: string;
   change_type: ChangeType;
   apply_mode: ApplyMode;
+  display_mode?: DisplayMode;
   warnings: string[];
-  language: "json" | "markdown";
+  language: "json" | "markdown" | "typescript";
 };
 
 type ApiAgent = {
@@ -56,6 +58,7 @@ function mapArtifact(a: ApiArtifact): SetupArtifact {
     proposed: a.proposed,
     changeType: a.change_type,
     applyMode: a.apply_mode,
+    displayMode: a.display_mode ?? "diff",
     warnings: a.warnings ?? [],
     language: a.language,
   };

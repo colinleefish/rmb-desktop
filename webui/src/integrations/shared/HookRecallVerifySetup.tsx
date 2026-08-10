@@ -5,6 +5,7 @@ import type { IntegrationSetupPanelProps } from "../types";
 import type { SetupArtifact } from "../../lib/agentSetupTypes";
 import { useI18n } from "../../i18n";
 import { ConfigDiffReview } from "./ConfigDiffReview";
+import { FileReplaceReview } from "./FileReplaceReview";
 import { RecallRuleCopy } from "./RecallRuleCopy";
 import { SetupGuideStep } from "./SetupGuideStep";
 import { useArtifactApply } from "./useArtifactApply";
@@ -21,9 +22,13 @@ export function HookRecallVerifySetup({
   onAgentUpdated,
   sessionSource,
   renderRecall,
+  captureHint,
+  captureTitle,
 }: IntegrationSetupPanelProps & {
   sessionSource: string;
   renderRecall?: (props: RecallStepRenderProps) => ReactNode;
+  captureHint?: string;
+  captureTitle?: string;
 }) {
   const { t } = useI18n();
   const {
@@ -59,6 +64,9 @@ export function HookRecallVerifySetup({
 
   const recallRenderer = renderRecall ?? defaultRecallStep;
 
+  const CaptureReview =
+    hookArtifact.displayMode === "replace" ? FileReplaceReview : ConfigDiffReview;
+
   return (
     <div className="relative ml-2 pl-10">
       {error && <p className="mb-6 text-sm text-red-600">{error}</p>}
@@ -67,13 +75,15 @@ export function HookRecallVerifySetup({
         <div className="space-y-4">
           <div>
             <h3 className="text-sm font-semibold text-rmb-dark">
-              {t.agents.conversationCapture}
+              {captureTitle ?? t.agents.conversationCapture}
             </h3>
-            <p className="mt-1 text-sm text-rmb-gray">{t.agents.conversationCaptureHint}</p>
+            <p className="mt-1 text-sm text-rmb-gray">
+              {captureHint ?? t.agents.conversationCaptureHint}
+            </p>
           </div>
-          <ConfigDiffReview
+          <CaptureReview
             artifact={hookArtifact}
-            title={t.agents.conversationCapture}
+            title={captureTitle ?? t.agents.conversationCapture}
             applied={hookApplied}
             applying={applyingId === hookArtifact.id}
             onApply={() => void applyArtifact(hookArtifact.id)}

@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 const INSTALL_DIR: &str = ".rmb/bin";
 const CLI_NAME: &str = "rmb";
+const APP_CLI_NAME: &str = "rmb-app";
 const DAEMON_NAME: &str = "rmbd-desktop";
 
 pub fn ensure_installed() -> Result<(), String> {
@@ -17,6 +18,13 @@ pub fn ensure_installed() -> Result<(), String> {
     if needs_refresh(&cli_dst, &daemon_dst)? {
         install_sidecar("rmb", &cli_dst)?;
         install_sidecar("rmbd", &daemon_dst)?;
+        let app_dst = install_dir.join(APP_CLI_NAME);
+        install_sidecar("rmb", &app_dst)?;
+    } else {
+        let app_dst = install_dir.join(APP_CLI_NAME);
+        if !app_dst.exists() && cli_dst.is_file() {
+            install_sidecar("rmb", &app_dst)?;
+        }
     }
 
     Ok(())

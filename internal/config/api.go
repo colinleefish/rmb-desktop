@@ -20,6 +20,7 @@ type View struct {
 	LLM                  LLMView        `json:"llm"`
 	Embed                EmbedView      `json:"embed"`
 	Pipeline             PipelineView   `json:"pipeline"`
+	LaunchAtLogin        bool           `json:"launch_at_login"`
 	DistillationEnabled  bool           `json:"distillation_enabled"`
 }
 
@@ -54,10 +55,11 @@ type PipelineView struct {
 
 // UpdateRequest is the PUT body from the settings page.
 type UpdateRequest struct {
-	Addr     *string           `json:"addr,omitempty"`
-	LLM      *LLMUpdate        `json:"llm,omitempty"`
-	Embed    *EmbedUpdate      `json:"embed,omitempty"`
-	Pipeline *PipelineUpdate   `json:"pipeline,omitempty"`
+	Addr          *string           `json:"addr,omitempty"`
+	LLM           *LLMUpdate        `json:"llm,omitempty"`
+	Embed         *EmbedUpdate      `json:"embed,omitempty"`
+	Pipeline      *PipelineUpdate   `json:"pipeline,omitempty"`
+	LaunchAtLogin *bool             `json:"launch_at_login,omitempty"`
 }
 
 type LLMUpdate struct {
@@ -107,6 +109,7 @@ func ToView(cfg Config, configPath string) View {
 			Dimensions: cfg.Embed.Dimensions,
 		},
 		Pipeline: pipelineToView(cfg.Pipeline),
+		LaunchAtLogin: cfg.LaunchAtLogin,
 	}
 }
 
@@ -164,6 +167,9 @@ func ApplyUpdate(cfg Config, req UpdateRequest) (Config, error) {
 		if err != nil {
 			return Config{}, err
 		}
+	}
+	if req.LaunchAtLogin != nil {
+		cfg.LaunchAtLogin = *req.LaunchAtLogin
 	}
 	return cfg, nil
 }

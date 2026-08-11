@@ -14,11 +14,12 @@ const DefaultAddr = "127.0.0.1:19019"
 
 // Config is the rmb-desktop client and daemon configuration.
 type Config struct {
-	Addr     string         `yaml:"addr"`
-	DBPath   string         `yaml:"db_path"`
-	LLM      LLMConfig      `yaml:"llm"`
-	Embed    EmbedConfig    `yaml:"embed"`
-	Pipeline PipelineConfig `yaml:"pipeline"`
+	Addr          string         `yaml:"addr"`
+	DBPath        string         `yaml:"db_path"`
+	LLM           LLMConfig      `yaml:"llm"`
+	Embed         EmbedConfig    `yaml:"embed"`
+	Pipeline      PipelineConfig `yaml:"pipeline"`
+	LaunchAtLogin bool           `yaml:"launch_at_login"`
 }
 
 type LLMConfig struct {

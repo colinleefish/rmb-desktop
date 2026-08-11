@@ -4,6 +4,7 @@ import { getConfig, putConfig } from "../lib/api";
 import type { ConfigUpdateRequest, ConfigView } from "../lib/types";
 import { useI18n } from "../i18n";
 import { LanguageSelect } from "../components/LanguageSelect";
+import { SelectMenu } from "../components/SelectMenu";
 import { EmbedDimensionsSelect } from "../components/EmbedDimensionsSelect";
 import { DEFAULT_PIPELINE } from "../lib/pipelineDefaults";
 import {
@@ -34,6 +35,7 @@ export function SettingsPage() {
   const [embedModel, setEmbedModel] = useState("");
   const [embedDims, setEmbedDims] = useState<EmbedDimension>(DEFAULT_EMBED_DIMENSION);
   const [pipeline, setPipeline] = useState<ConfigView["pipeline"] | null>(null);
+  const [launchAtLoginSaving, setLaunchAtLoginSaving] = useState(false);
 
   useEffect(() => {
     getConfig()
@@ -100,6 +102,22 @@ export function SettingsPage() {
     navigate(settingsPath(next), { replace: true });
   }
 
+  async function handleLaunchAtLoginChange(enabled: boolean) {
+    if (!config) return;
+    setLaunchAtLoginSaving(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await putConfig({ launch_at_login: enabled });
+      setConfig(res.config);
+      setMessage(res.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLaunchAtLoginSaving(false);
+    }
+  }
+
   if (!config || !pipeline) {
     return <p className="text-rmb-gray">{t.common.loading}</p>;
   }
@@ -142,6 +160,27 @@ export function SettingsPage() {
                   ? t.settings.general.distillationOn
                   : t.settings.general.distillationOff}
               </p>
+            </div>
+            <div className="border-t border-rmb-gray/15 pt-4">
+              <label id="settings-launch-at-login-label" className="block text-sm font-medium text-rmb-gray">
+                {t.settings.general.launchAtLogin}
+              </label>
+              <div className="mt-1 max-w-xs">
+                <SelectMenu
+                  id="settings-launch-at-login"
+                  labelId="settings-launch-at-login-label"
+                  value={config.launch_at_login ? "enabled" : "disabled"}
+                  disabled={launchAtLoginSaving}
+                  onChange={(next) => {
+                    void handleLaunchAtLoginChange(next === "enabled");
+                  }}
+                  options={[
+                    { value: "enabled", label: t.settings.general.launchAtLoginEnabled },
+                    { value: "disabled", label: t.settings.general.launchAtLoginDisabled },
+                  ]}
+                />
+              </div>
+              <p className="mt-1.5 text-xs text-rmb-gray">{t.settings.general.launchAtLoginHint}</p>
             </div>
             <div className="border-t border-rmb-gray/15 pt-4">
               <label id="settings-language-label" className="block text-sm font-medium text-rmb-gray">

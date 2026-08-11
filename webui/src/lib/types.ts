@@ -193,6 +193,7 @@ export interface ConfigView {
   db_path: string;
   config_path: string;
   distillation_enabled: boolean;
+  launch_at_login: boolean;
   llm: {
     api_base: string;
     api_key_set: boolean;
@@ -223,6 +224,7 @@ export interface ConfigView {
 
 export interface ConfigUpdateRequest {
   addr?: string;
+  launch_at_login?: boolean;
   llm?: {
     api_base?: string;
     api_key?: string;

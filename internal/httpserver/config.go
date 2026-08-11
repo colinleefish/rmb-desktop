@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/colinleefish/rmb-desktop/internal/config"
+	"github.com/colinleefish/rmb-desktop/internal/launchatlogin"
 	"github.com/colinleefish/rmb-desktop/internal/llm"
 )
 
@@ -193,6 +194,10 @@ func (s *Server) handlePutConfig(w http.ResponseWriter, r *http.Request) {
 	updated, err := config.ApplyUpdate(cfg, req)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := launchatlogin.Set(updated.LaunchAtLogin); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	if err := config.Save(s.configPath, updated); err != nil {

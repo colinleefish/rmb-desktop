@@ -12,6 +12,7 @@ import (
 	"github.com/colinleefish/rmb-desktop/internal/config"
 	"github.com/colinleefish/rmb-desktop/internal/db"
 	"github.com/colinleefish/rmb-desktop/internal/httpserver"
+	"github.com/colinleefish/rmb-desktop/internal/launchatlogin"
 	"github.com/colinleefish/rmb-desktop/internal/worker"
 )
 
@@ -63,6 +64,12 @@ func serve(args []string) int {
 	defer stop()
 
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
+	if cfg.LaunchAtLogin {
+		if err := launchatlogin.Set(true); err != nil {
+			log.Warn("launch at login sync failed", "err", err)
+		}
+	}
 
 	runner := worker.NewRunner(cfg, database, log)
 	runner.Start(ctx)

@@ -12,12 +12,14 @@ export function SelectMenu<T extends string | number>({
   options,
   id,
   labelId,
+  disabled = false,
 }: {
   value: T;
   onChange: (next: T) => void;
   options: SelectMenuOption<T>[];
   id?: string;
   labelId?: string;
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -54,8 +56,14 @@ export function SelectMenu<T extends string | number>({
         id={id}
         aria-haspopup="listbox"
         aria-expanded={open}
-        onClick={() => setOpen((prev) => !prev)}
-        className="rmb-language-select flex w-full items-center justify-between gap-3 rounded border border-[#dadce0] bg-white px-3 py-[7px] text-left text-rmb-dark shadow-sm transition hover:border-[#bdc1c6] focus:border-rmb-accent focus:outline-none focus:ring-1 focus:ring-rmb-accent/40"
+        onClick={() => !disabled && setOpen((prev) => !prev)}
+        disabled={disabled}
+        className={[
+          "rmb-language-select flex w-full items-center justify-between gap-3 rounded border border-[#dadce0] bg-white px-3 py-[7px] text-left text-rmb-dark shadow-sm transition focus:border-rmb-accent focus:outline-none focus:ring-1 focus:ring-rmb-accent/40",
+          disabled
+            ? "cursor-not-allowed opacity-50"
+            : "hover:border-[#bdc1c6]",
+        ].join(" ")}
       >
         <span className="min-w-0 truncate">{current.label}</span>
         <ChevronDown

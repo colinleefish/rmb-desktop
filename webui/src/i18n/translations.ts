@@ -281,6 +281,11 @@ export const translations = {
         distillation: "Distillation",
         distillationOn: "Enabled (LLM key set)",
         distillationOff: "Disabled — ingest only until LLM key is set",
+        launchAtLogin: "Launch at login",
+        launchAtLoginEnabled: "Enabled",
+        launchAtLoginDisabled: "Disabled",
+        launchAtLoginHint:
+          "When enabled, RMB Desktop starts automatically when you log in to macOS.",
       },
       llm: {
         apiBase: "API base URL",
@@ -677,6 +682,10 @@ export const translations = {
         distillation: "蒸馏",
         distillationOn: "已启用（已配置 LLM 密钥）",
         distillationOff: "已禁用 — 配置 LLM 密钥前仅采集",
+        launchAtLogin: "随系统启动",
+        launchAtLoginEnabled: "启用",
+        launchAtLoginDisabled: "禁用",
+        launchAtLoginHint: "启用后，登录 macOS 时会自动启动 RMB Desktop。",
       },
       llm: {
         apiBase: "API 地址",

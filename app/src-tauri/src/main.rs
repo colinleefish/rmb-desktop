@@ -92,12 +92,17 @@ fn on_tray_event(app: &AppHandle, event: SystemTrayEvent, daemon: &Arc<DaemonMan
 
 fn spawn_health_poller(app: AppHandle, daemon: Arc<DaemonManager>) {
     thread::spawn(move || loop {
+        if !health_ok(&daemon::base_url()) {
+            if let Err(err) = daemon.ensure_running() {
+                eprintln!("ensure rmbd: {err}");
+            }
+        }
         refresh_menu(&app, &daemon);
         thread::sleep(Duration::from_secs(5));
     });
 }
 
-fn refresh_menu(app: &AppHandle, daemon: &DaemonManager) {
+fn refresh_menu(app: &AppHandle, _daemon: &DaemonManager) {
     let tray = app.tray_handle();
     let healthy = health_ok(&daemon::base_url());
 

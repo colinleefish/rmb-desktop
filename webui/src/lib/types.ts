@@ -197,11 +197,13 @@ export interface ConfigView {
   llm: {
     api_base: string;
     api_key_set: boolean;
+    api_key_suffix?: string;
     model: string;
   };
   embed: {
     api_base: string;
     api_key_set: boolean;
+    api_key_suffix?: string;
     model: string;
     dimensions: number;
   };

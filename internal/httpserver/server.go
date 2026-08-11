@@ -118,6 +118,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("DELETE /api/v1/corrections", s.handleRetractCorrection)
 	s.mux.HandleFunc("GET /api/v1/config", s.handleGetConfig)
 	s.mux.HandleFunc("PUT /api/v1/config", s.handlePutConfig)
+	s.mux.HandleFunc("POST /api/v1/system/restart", s.handleRestart)
 	s.mux.HandleFunc("POST /api/v1/config/test", s.handlePostConfigTest)
 	s.mux.HandleFunc("POST /api/v1/config/test/llm", s.handlePostConfigTestLLM)
 	s.mux.HandleFunc("POST /api/v1/config/test/embed", s.handlePostConfigTestEmbed)

@@ -25,16 +25,18 @@ type View struct {
 }
 
 type LLMView struct {
-	APIBase   string `json:"api_base"`
-	APIKeySet bool   `json:"api_key_set"`
-	Model     string `json:"model"`
+	APIBase      string `json:"api_base"`
+	APIKeySet    bool   `json:"api_key_set"`
+	APIKeySuffix string `json:"api_key_suffix,omitempty"`
+	Model        string `json:"model"`
 }
 
 type EmbedView struct {
-	APIBase    string `json:"api_base"`
-	APIKeySet  bool   `json:"api_key_set"`
-	Model      string `json:"model"`
-	Dimensions int    `json:"dimensions"`
+	APIBase      string `json:"api_base"`
+	APIKeySet    bool   `json:"api_key_set"`
+	APIKeySuffix string `json:"api_key_suffix,omitempty"`
+	Model        string `json:"model"`
+	Dimensions   int    `json:"dimensions"`
 }
 
 type PipelineView struct {
@@ -98,15 +100,17 @@ func ToView(cfg Config, configPath string) View {
 		ConfigPath:          configPath,
 		DistillationEnabled: cfg.DistillationEnabled(),
 		LLM: LLMView{
-			APIBase:   cfg.LLM.APIBase,
-			APIKeySet: cfg.LLM.HasKey(),
-			Model:     cfg.LLM.Model,
+			APIBase:      cfg.LLM.APIBase,
+			APIKeySet:    cfg.LLM.HasKey(),
+			APIKeySuffix: keySuffix(cfg.LLM.APIKey),
+			Model:        cfg.LLM.Model,
 		},
 		Embed: EmbedView{
-			APIBase:    cfg.Embed.APIBase,
-			APIKeySet:  cfg.Embed.HasKey(),
-			Model:      cfg.Embed.Model,
-			Dimensions: cfg.Embed.Dimensions,
+			APIBase:      cfg.Embed.APIBase,
+			APIKeySet:    cfg.Embed.HasKey(),
+			APIKeySuffix: keySuffix(cfg.Embed.APIKey),
+			Model:        cfg.Embed.Model,
+			Dimensions:   cfg.Embed.Dimensions,
 		},
 		Pipeline: pipelineToView(cfg.Pipeline),
 		LaunchAtLogin: cfg.LaunchAtLogin,
@@ -258,4 +262,12 @@ func ResolvePath(explicit string) (string, error) {
 		return explicit, nil
 	}
 	return platform.ConfigPath()
+}
+
+func keySuffix(key string) string {
+	key = strings.TrimSpace(key)
+	if len(key) < 2 {
+		return ""
+	}
+	return key[len(key)-2:]
 }

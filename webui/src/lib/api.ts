@@ -65,8 +65,57 @@ export function getVersion(): Promise<{ version: string; commit: string }> {
 
 export function putConfig(
   update: ConfigUpdateRequest,
-): Promise<{ ok: boolean; message: string; config: ConfigView }> {
+): Promise<{ ok: boolean; reembed_started: boolean; config: ConfigView }> {
   return apiPut("/config", update);
+}
+
+export function postRestart(): Promise<{ ok: boolean }> {
+  return apiSend<{ ok: boolean }>("POST", "/system/restart");
+}
+
+export type RestartPhase = "stopping" | "waiting" | "done";
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function healthOk(): Promise<boolean> {
+  try {
+    const res = await fetch("/healthz", { cache: "no-store" });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function waitForHealthDown(timeoutMs = 5000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!(await healthOk())) return;
+    await sleep(200);
+  }
+}
+
+async function waitForHealthUp(timeoutMs = 20000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await healthOk()) return;
+    await sleep(400);
+  }
+  throw new Error("restart timeout");
+}
+
+export async function restartService(onPhase?: (phase: RestartPhase) => void): Promise<void> {
+  onPhase?.("stopping");
+  await postRestart();
+  await sleep(500);
+
+  onPhase?.("waiting");
+  await waitForHealthDown();
+  await waitForHealthUp();
+
+  onPhase?.("done");
+  await sleep(1000);
 }
 
 export interface PageRequest {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -56,22 +57,32 @@ func (s *Server) handlePostConfigTest(w http.ResponseWriter, r *http.Request) {
 
 	go func() {
 		defer wg.Done()
-		llmRes, err := llm.TestLLMConnection(ctx, config.LLMConfig{
+		llmCfg, err := s.mergeLLMTestBody(configTestLLMBody{
 			APIBase: req.LLM.APIBase,
 			APIKey:  req.LLM.APIKey,
 			Model:   req.LLM.Model,
 		})
+		if err != nil {
+			out.LLM.Error = err.Error()
+			return
+		}
+		llmRes, err := llm.TestLLMConnection(ctx, llmCfg)
 		out.LLM = llmTestSide(llmRes, err)
 	}()
 
 	go func() {
 		defer wg.Done()
-		embedDur, err := llm.TestEmbedConnection(ctx, config.EmbedConfig{
+		embedCfg, err := s.mergeEmbedTestBody(configTestEmbedBody{
 			APIBase:    req.Embed.APIBase,
 			APIKey:     req.Embed.APIKey,
 			Model:      req.Embed.Model,
 			Dimensions: req.Embed.Dimensions,
 		})
+		if err != nil {
+			out.Embed.Error = err.Error()
+			return
+		}
+		embedDur, err := llm.TestEmbedConnection(ctx, embedCfg)
 		if err != nil {
 			out.Embed.Error = err.Error()
 		} else {
@@ -137,11 +148,12 @@ func (s *Server) handlePostConfigTestLLM(w http.ResponseWriter, r *http.Request)
 	ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
 	defer cancel()
 
-	res, err := llm.TestLLMConnection(ctx, config.LLMConfig{
-		APIBase: req.APIBase,
-		APIKey:  req.APIKey,
-		Model:   req.Model,
-	})
+	llmCfg, err := s.mergeLLMTestBody(req)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	res, err := llm.TestLLMConnection(ctx, llmCfg)
 	writeJSON(w, http.StatusOK, llmTestSide(res, err))
 }
 
@@ -155,13 +167,61 @@ func (s *Server) handlePostConfigTestEmbed(w http.ResponseWriter, r *http.Reques
 	ctx, cancel := context.WithTimeout(r.Context(), 25*time.Second)
 	defer cancel()
 
-	dur, err := llm.TestEmbedConnection(ctx, config.EmbedConfig{
-		APIBase:    req.APIBase,
-		APIKey:     req.APIKey,
-		Model:      req.Model,
-		Dimensions: req.Dimensions,
-	})
+	embedCfg, err := s.mergeEmbedTestBody(req)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	dur, err := llm.TestEmbedConnection(ctx, embedCfg)
 	writeConfigTestSide(w, dur, err)
+}
+
+func (s *Server) mergeLLMTestBody(req configTestLLMBody) (config.LLMConfig, error) {
+	saved, err := config.Load(s.configPath)
+	if err != nil {
+		return config.LLMConfig{}, err
+	}
+	out := config.LLMConfig{
+		APIBase: strings.TrimSpace(req.APIBase),
+		APIKey:  strings.TrimSpace(req.APIKey),
+		Model:   strings.TrimSpace(req.Model),
+	}
+	if out.APIBase == "" {
+		out.APIBase = saved.LLM.APIBase
+	}
+	if out.Model == "" {
+		out.Model = saved.LLM.Model
+	}
+	if out.APIKey == "" {
+		out.APIKey = saved.LLM.APIKey
+	}
+	return out, nil
+}
+
+func (s *Server) mergeEmbedTestBody(req configTestEmbedBody) (config.EmbedConfig, error) {
+	saved, err := config.Load(s.configPath)
+	if err != nil {
+		return config.EmbedConfig{}, err
+	}
+	out := config.EmbedConfig{
+		APIBase:    strings.TrimSpace(req.APIBase),
+		APIKey:     strings.TrimSpace(req.APIKey),
+		Model:      strings.TrimSpace(req.Model),
+		Dimensions: req.Dimensions,
+	}
+	if out.APIBase == "" {
+		out.APIBase = saved.Embed.APIBase
+	}
+	if out.Model == "" {
+		out.Model = saved.Embed.Model
+	}
+	if out.APIKey == "" {
+		out.APIKey = saved.Embed.APIKey
+	}
+	if out.Dimensions <= 0 {
+		out.Dimensions = saved.Embed.Dimensions
+	}
+	return out, nil
 }
 
 func (s *Server) handleGetConfig(w http.ResponseWriter, r *http.Request) {
@@ -208,13 +268,8 @@ func (s *Server) handlePutConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.log.Info("config saved", "path", s.configPath)
-	message := "Config saved. Restart rmbd to apply LLM/embed worker changes."
-	if reembedNeeded {
-		message = "Config saved. Embedding settings changed — vectors cleared; restart rmbd to re-embed all memories."
-	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":              true,
-		"message":         message,
 		"reembed_started": reembedNeeded,
 		"config":          config.ToView(updated, s.configPath),
 	})

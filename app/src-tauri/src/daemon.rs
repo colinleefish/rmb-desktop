@@ -97,6 +97,12 @@ impl DaemonManager {
 
         self.start()?;
         wait_for_health(true, Duration::from_secs(15));
+        if !health_ok(&base_url()) {
+            return Err(format!(
+                "rmbd did not become healthy at {}",
+                base_url()
+            ));
+        }
         Ok(())
     }
 

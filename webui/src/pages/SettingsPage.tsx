@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
+import { CircleCheck, Loader2 } from "lucide-react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
-import { getConfig, getVersion, putConfig } from "../lib/api";
+import { getConfig, getVersion, putConfig, restartService, type RestartPhase } from "../lib/api";
 import type { ConfigUpdateRequest, ConfigView } from "../lib/types";
 import { useI18n } from "../i18n";
 import { LanguageSelect } from "../components/LanguageSelect";
 import { SelectMenu } from "../components/SelectMenu";
 import { ConfiguredApiKeyField } from "../components/ConfiguredApiKeyField";
+import { ModelsConnectionTestPanel } from "../components/ModelsConnectionTestPanel";
 import { EmbedDimensionsSelect } from "../components/EmbedDimensionsSelect";
 import { Modal } from "../components/Modal";
 import { DEFAULT_PIPELINE } from "../lib/pipelineDefaults";
@@ -30,6 +32,8 @@ function embedSettingsChanged(
   );
 }
 
+type SaveStatus = "saved" | "saved_reembed" | "restarted" | null;
+
 export function SettingsPage() {
   const { t, lang, setLang } = useI18n();
   const location = useLocation();
@@ -38,9 +42,12 @@ export function SettingsPage() {
 
   const [config, setConfig] = useState<ConfigView | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>(null);
   const [saving, setSaving] = useState(false);
   const [showEmbedConfirm, setShowEmbedConfirm] = useState(false);
+  const [showRestartPrompt, setShowRestartPrompt] = useState(false);
+  const [restarting, setRestarting] = useState(false);
+  const [restartPhase, setRestartPhase] = useState<RestartPhase | null>(null);
 
   const [addr, setAddr] = useState("");
   const [launchAtLogin, setLaunchAtLogin] = useState(false);
@@ -84,7 +91,7 @@ export function SettingsPage() {
     if (!config || !pipeline) return;
     setSaving(true);
     setError(null);
-    setMessage(null);
+    setSaveStatus(null);
     const update: ConfigUpdateRequest = {
       addr,
       launch_at_login: launchAtLogin,
@@ -107,7 +114,8 @@ export function SettingsPage() {
       setLaunchAtLogin(res.config.launch_at_login);
       setLlmKey("");
       setEmbedKey("");
-      setMessage(res.message);
+      setSaveStatus(res.reembed_started ? "saved_reembed" : "saved");
+      setShowRestartPrompt(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -132,9 +140,35 @@ export function SettingsPage() {
   ];
 
   function selectTab(next: SettingsSection) {
-    setMessage(null);
+    setSaveStatus(null);
     setError(null);
     navigate(settingsPath(next), { replace: true });
+  }
+
+  async function handleRestartNow() {
+    setRestarting(true);
+    setRestartPhase("stopping");
+    setError(null);
+    try {
+      await restartService(setRestartPhase);
+      const c = await getConfig();
+      setConfig(c);
+      setAddr(c.addr);
+      setLaunchAtLogin(c.launch_at_login);
+      setLlmBase(c.llm.api_base);
+      setLlmModel(c.llm.model);
+      setEmbedBase(c.embed.api_base);
+      setEmbedModel(c.embed.model);
+      setEmbedDims(normalizeEmbedDimension(c.embed.dimensions));
+      setPipeline(c.pipeline);
+      setShowRestartPrompt(false);
+      setSaveStatus("restarted");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.settings.restartFailed);
+    } finally {
+      setRestarting(false);
+      setRestartPhase(null);
+    }
   }
 
   if (!config || !pipeline) {
@@ -229,6 +263,7 @@ export function SettingsPage() {
               <ConfiguredApiKeyField
                 label={t.settings.llm.apiKey}
                 configured={config.llm.api_key_set}
+                keySuffix={config.llm.api_key_suffix}
                 value={llmKey}
                 onChange={setLlmKey}
                 emptyPlaceholder={t.settings.llm.apiKeyPlaceholder}
@@ -265,12 +300,23 @@ export function SettingsPage() {
               <ConfiguredApiKeyField
                 label={t.settings.embed.apiKey}
                 configured={config.embed.api_key_set}
+                keySuffix={config.embed.api_key_suffix}
                 value={embedKey}
                 onChange={setEmbedKey}
                 emptyPlaceholder={t.settings.embed.apiKeyPlaceholder}
                 replacePlaceholder={t.settings.embed.apiKeyReplacePlaceholder}
               />
             </section>
+
+            <ModelsConnectionTestPanel
+              llm={{ api_base: llmBase, api_key: llmKey, model: llmModel }}
+              embed={{
+                api_base: embedBase,
+                api_key: embedKey,
+                model: embedModel,
+                dimensions: embedDims,
+              }}
+            />
           </div>
         )}
 
@@ -318,7 +364,15 @@ export function SettingsPage() {
             >
               {saving ? t.settings.saving : t.settings.save}
             </button>
-            {message && <p className="text-sm text-emerald-600">{message}</p>}
+            {saveStatus === "saved" && (
+              <p className="text-sm text-emerald-600">{t.settings.saved}</p>
+            )}
+            {saveStatus === "saved_reembed" && (
+              <p className="text-sm text-emerald-600">{t.settings.savedReembed}</p>
+            )}
+            {saveStatus === "restarted" && (
+              <p className="text-sm text-emerald-600">{t.settings.restartComplete}</p>
+            )}
             {error && <p className="text-sm text-red-600">{error}</p>}
           </div>
       </div>
@@ -328,6 +382,38 @@ export function SettingsPage() {
           v{buildInfo.version} · {buildInfo.commit}
         </p>
       )}
+
+      <Modal
+        open={showRestartPrompt}
+        onClose={() => !restarting && setShowRestartPrompt(false)}
+        title={restarting ? t.settings.restarting : t.settings.restartTitle}
+      >
+        {restarting ? (
+          <RestartProgress phase={restartPhase} labels={t.settings} />
+        ) : (
+          <>
+            <p className="text-sm text-rmb-gray">{t.settings.restartBody}</p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowRestartPrompt(false)}
+                disabled={restarting}
+                className="rounded-md border border-rmb-gray/20 bg-white px-4 py-2 text-sm font-medium text-rmb-dark hover:bg-rmb-light disabled:opacity-50"
+              >
+                {t.settings.restartLater}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleRestartNow()}
+                disabled={restarting}
+                className="rounded-md bg-rmb-accent px-4 py-2 text-sm font-medium text-white hover:bg-rmb-accent/90 disabled:opacity-50"
+              >
+                {t.settings.restartNow}
+              </button>
+            </div>
+          </>
+        )}
+      </Modal>
 
       <Modal
         open={showEmbedConfirm}
@@ -354,6 +440,64 @@ export function SettingsPage() {
           </button>
         </div>
       </Modal>
+    </div>
+  );
+}
+
+function RestartProgress({
+  phase,
+  labels,
+}: {
+  phase: RestartPhase | null;
+  labels: {
+    restartStopping: string;
+    restartWaiting: string;
+    restartDone: string;
+  };
+}) {
+  const steps: { id: RestartPhase; label: string }[] = [
+    { id: "stopping", label: labels.restartStopping },
+    { id: "waiting", label: labels.restartWaiting },
+    { id: "done", label: labels.restartDone },
+  ];
+  const order: RestartPhase[] = ["stopping", "waiting", "done"];
+  const currentIndex = phase ? order.indexOf(phase) : 0;
+
+  return (
+    <div className="space-y-4 py-2">
+      {steps.map((step, index) => {
+        const done = index < currentIndex || (phase === "done" && index === currentIndex);
+        const active = phase === step.id && phase !== "done";
+        const pending = index > currentIndex;
+
+        return (
+          <div key={step.id} className="flex items-center gap-3 text-sm">
+            {done ? (
+              <CircleCheck className="size-5 shrink-0 text-emerald-600" aria-hidden />
+            ) : active ? (
+              <Loader2 className="size-5 shrink-0 animate-spin text-rmb-accent" aria-hidden />
+            ) : (
+              <span
+                className={`size-5 shrink-0 rounded-full border-2 ${
+                  pending ? "border-rmb-gray/25" : "border-rmb-accent"
+                }`}
+                aria-hidden
+              />
+            )}
+            <span
+              className={
+                done
+                  ? "text-rmb-dark"
+                  : active
+                    ? "font-medium text-rmb-dark"
+                    : "text-rmb-gray/55"
+              }
+            >
+              {step.label}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }

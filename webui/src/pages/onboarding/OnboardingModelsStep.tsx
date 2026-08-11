@@ -259,10 +259,7 @@ export function OnboardingModelsStep({
       {showTestPanel && (
         <div className="space-y-2 rounded-lg border border-rmb-gray/15 bg-rmb-light/40 p-4">
           <p className="text-sm font-medium text-rmb-dark">{t.onboarding.models.testResults}</p>
-          {testing && (
-            <p className="text-xs text-rmb-gray">{t.onboarding.models.testingHint}</p>
-          )}
-          <TestResultRow label={t.settings.models.llm} state={llmTest} showModelsList />
+          <TestResultRow label={t.settings.models.llm} state={llmTest} />
           <TestResultRow label={t.settings.models.embed} state={embedTest} />
         </div>
       )}
@@ -329,11 +326,9 @@ function EmbedSetupNotice() {
 function TestResultRow({
   label,
   state,
-  showModelsList = false,
 }: {
   label: string;
   state: TestSideState;
-  showModelsList?: boolean;
 }) {
   const { t } = useI18n();
 
@@ -343,86 +338,28 @@ function TestResultRow({
 
   if (state.status === "testing") {
     return (
-      <div className="flex items-start gap-2 text-sm">
-        <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin text-rmb-gray" aria-hidden />
-        <div>
-          <span className="font-medium text-rmb-dark">{label}</span>
-          <span className="text-rmb-gray"> — {t.onboarding.models.testing}</span>
-        </div>
+      <div className="flex items-center gap-2 text-sm">
+        <Loader2 className="size-4 shrink-0 animate-spin text-rmb-gray" aria-hidden />
+        <span className="font-medium text-rmb-dark">{label}</span>
+        <span className="text-rmb-gray">— {t.onboarding.models.testing}</span>
       </div>
     );
   }
 
   const result = state.result;
-  const requested = result.requested_model?.trim();
-  const models = result.models ?? [];
-  const showList = showModelsList && models.length > 0;
 
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-start gap-2 text-sm">
-        {result.ok ? (
-          <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" />
-        ) : (
-          <XCircle className="mt-0.5 size-4 shrink-0 text-red-600" />
-        )}
-        <div className="min-w-0">
-          <span className="font-medium text-rmb-dark">{label}</span>
-          {result.ok ? (
-            <span className="text-rmb-gray">
-              {" "}
-              — {t.onboarding.models.testOk}
-              {result.latency_ms != null && ` (${result.latency_ms} ms)`}
-              {requested && result.model_found && (
-                <span className="text-emerald-700">
-                  {" "}
-                  — {t.onboarding.models.testModelInList.replace("{model}", requested)}
-                </span>
-              )}
-            </span>
-          ) : (
-            <span className="text-red-600"> — {result.error ?? t.onboarding.models.testFailed}</span>
-          )}
-        </div>
-      </div>
-
-      {showList && (
-        <div className="ml-6 space-y-1">
-          <p className="text-xs text-rmb-gray">
-            {t.onboarding.models.testModelsPreview.replace(
-              "{count}",
-              String(result.models_count ?? models.length),
-            )}
-          </p>
-          <ul
-            className="max-h-28 overflow-y-auto rounded border border-rmb-gray/15 bg-white/80 px-2 py-1.5 text-xs text-rmb-gray"
-            aria-label={t.onboarding.models.testModelsListLabel}
-          >
-            {models.map((id) => {
-              const isMatch = requested && id === requested;
-              return (
-                <li
-                  key={id}
-                  className={
-                    isMatch
-                      ? "font-medium text-emerald-700"
-                      : requested && result.model_found === false
-                        ? "text-rmb-gray/80"
-                        : undefined
-                  }
-                >
-                  {id}
-                  {isMatch ? ` ${t.onboarding.models.testModelMatchMark}` : ""}
-                </li>
-              );
-            })}
-          </ul>
-          {requested && result.model_found === false && (
-            <p className="text-xs text-red-600">
-              {t.onboarding.models.testModelNotInList.replace("{model}", requested)}
-            </p>
-          )}
-        </div>
+    <div className="flex items-center gap-2 text-sm">
+      {result.ok ? (
+        <CheckCircle2 className="size-4 shrink-0 text-emerald-600" aria-hidden />
+      ) : (
+        <XCircle className="size-4 shrink-0 text-red-600" aria-hidden />
+      )}
+      <span className="font-medium text-rmb-dark">{label}</span>
+      {result.ok ? (
+        <span className="text-emerald-700">— {t.onboarding.models.testOk}</span>
+      ) : (
+        <span className="text-red-600">— {result.error ?? t.onboarding.models.testFailed}</span>
       )}
     </div>
   );

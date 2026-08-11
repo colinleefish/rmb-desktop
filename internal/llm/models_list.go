@@ -11,6 +11,7 @@ import (
 )
 
 const maxModelsErrorBodyBytes = 512
+const maxModelsResponseBodyBytes = 4 << 20 // large provider catalogs can exceed 512 bytes
 
 // OpenAI-compatible providers often mount chat under Anthropic-style subpaths.
 var knownCompatSuffixes = []string{
@@ -126,21 +127,31 @@ func listModels(ctx context.Context, apiBase, apiKey string, timeout time.Durati
 			continue
 		}
 
-		bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, maxModelsErrorBodyBytes))
+		bodyBytes, readErr := io.ReadAll(io.LimitReader(resp.Body, maxModelsResponseBodyBytes))
 		resp.Body.Close()
+		if readErr != nil {
+			lastErr = fmt.Errorf("read models response: %w", readErr)
+			continue
+		}
 		body := strings.TrimSpace(string(bodyBytes))
 
 		if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusMethodNotAllowed {
-			lastErr = fmt.Errorf("models http %d: %s", resp.StatusCode, body)
+			lastErr = fmt.Errorf("models http %d: %s", resp.StatusCode, truncateBody(body, maxModelsErrorBodyBytes))
 			continue
 		}
 		if resp.StatusCode >= 400 {
-			return nil, fmt.Errorf("models http %d: %s", resp.StatusCode, body)
+			return nil, fmt.Errorf("models http %d: %s", resp.StatusCode, truncateBody(body, maxModelsErrorBodyBytes))
+		}
+
+		if len(bodyBytes) == 0 {
+			lastErr = fmt.Errorf("models http %d: empty response", resp.StatusCode)
+			continue
 		}
 
 		var parsed modelsListResponse
 		if err := json.Unmarshal(bodyBytes, &parsed); err != nil {
-			return nil, fmt.Errorf("decode models response: %w", err)
+			lastErr = fmt.Errorf("decode models response: %w", err)
+			continue
 		}
 
 		ids := make([]string, 0, len(parsed.Data))

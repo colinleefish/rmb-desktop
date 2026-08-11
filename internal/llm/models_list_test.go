@@ -1,6 +1,14 @@
 package llm
 
-import "testing"
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+)
 
 func TestBuildModelsURLCandidates_plainRoot(t *testing.T) {
 	got := buildModelsURLCandidates("https://api.deepseek.com")
@@ -54,5 +62,42 @@ func TestModelsContain(t *testing.T) {
 	}
 	if !modelsContain(ids, "") {
 		t.Fatal("empty model should pass")
+	}
+}
+
+func TestListModels_largeJSONBody(t *testing.T) {
+	// Regression: responses larger than 512 bytes must not be truncated before decode.
+	var models []struct {
+		ID string `json:"id"`
+	}
+	for i := 0; i < 40; i++ {
+		models = append(models, struct {
+			ID string `json:"id"`
+		}{ID: fmt.Sprintf("model-with-a-long-name-%d", i)})
+	}
+	payload, err := json.Marshal(map[string]any{"data": models})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(payload) <= maxModelsErrorBodyBytes {
+		t.Fatalf("expected payload > %d bytes, got %d", maxModelsErrorBodyBytes, len(payload))
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/models" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(payload)
+	}))
+	defer srv.Close()
+
+	ids, err := listModels(context.Background(), srv.URL, "test-key", 5*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ids) != len(models) {
+		t.Fatalf("ids=%d want %d", len(ids), len(models))
 	}
 }

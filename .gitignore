@@ -32,3 +32,5 @@ app/src-tauri/binaries/
 internal/http/static/web/*
 !internal/http/static/web/.gitkeep
 !internal/http/static/web/README.md
+
+temp/

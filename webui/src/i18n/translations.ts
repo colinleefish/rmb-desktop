@@ -269,7 +269,8 @@ export const translations = {
         integrations: "Integration",
       },
       models: {
-        intro: "LLM and embedding providers use the OpenAI-compatible API format (base URL, API key, and model name).",
+        intro:
+          "RMB uses OpenAI-compatible APIs for both LLM and embeddings: base URL, API key, and model name. Connection test calls GET /v1/models (LLM, requires key) and POST /embeddings (embed).",
         llm: "LLM",
         embed: "Embeddings",
       },
@@ -283,6 +284,7 @@ export const translations = {
       },
       llm: {
         apiBase: "API base URL",
+        apiBasePlaceholder: "https://api.openai.com/v1",
         apiKey: "API key",
         apiKeyPlaceholder: "Leave blank to keep current key",
         apiKeySet: "Key is configured",
@@ -290,6 +292,7 @@ export const translations = {
       },
       embed: {
         apiBase: "API base URL",
+        apiBasePlaceholder: "https://api.openai.com/v1",
         apiKey: "API key",
         apiKeyPlaceholder: "Leave blank to keep current key",
         apiKeySet: "Key is configured",
@@ -319,6 +322,67 @@ export const translations = {
         label: "Display language",
         en: "English",
         zh: "中文",
+      },
+    },
+    onboarding: {
+      title: "Welcome to RMB",
+      subtitle: "Set up models and connect your coding agents in a few steps.",
+      progressLabel: "Setup progress",
+      demoBanner:
+        "UI demo — connection test calls rmbd (make build && restart desktop app, or make run-rmbd). Agent apply is simulated. Reset: localStorage.removeItem('rmb.onboardingComplete') then reload.",
+      resetDemo: "Reset onboarding demo",
+      steps: {
+        language: "Language",
+        models: "Models & API keys",
+        agents: "Agent integration",
+      },
+      language: {
+        title: "Welcome to RMB",
+        subtitle: "Local-first memory for your coding agents.",
+        continue: "Continue",
+      },
+      models: {
+        title: "Configure LLM and embeddings",
+        intro:
+          "RMB uses OpenAI-compatible APIs (base URL, API key, model). LLM connection test lists models via GET /v1/models (API key required); embeddings use a minimal embed request.",
+        llmKeyPlaceholder: "Paste your LLM API key here (e.g. sk-…)",
+        embedKeyPlaceholder: "Paste your embedding API key here (e.g. sk-…)",
+        llmModelPlaceholder: "gpt-4o-mini",
+        embedModelPlaceholder: "text-embedding-3-small",
+        embedNoticeTitle: "Before you continue",
+        embedNoticeDimensions:
+          "Embedding dimensions are fixed after setup — you won't be able to change them later.",
+        embedNoticeModel:
+          "If you change the embedding model later, all existing memories will be re-embedded.",
+        testConnection: "Test connection",
+        testing: "Testing…",
+        testingHint: "LLM: GET /v1/models (validates API key). Embeddings: minimal embed request. Usually a few seconds.",
+        testResults: "Connection test",
+        testOk: "OK",
+        testFailed: "Failed",
+        testModelInList: '"{model}" is in the model list',
+        testModelNotInList: '"{model}" was not found in the list below',
+        testModelsPreview: "GET /v1/models returned {count} models (showing first 40):",
+        testModelsListLabel: "Available models",
+        testModelMatchMark: "← your model",
+        fixErrorsHint: "Fix the errors above, then test again.",
+        saving: "Saving…",
+        continue: "Continue",
+      },
+      agents: {
+        title: "Connect your agents",
+        intro:
+          "Choose an agent installed on this machine. Apply the hook and recall steps, then verify capture works.",
+        verifyIntro:
+          "Send a message in your agent, then check that a session appears in RMB.",
+        checkSessions: "Check for sessions",
+        checking: "Checking…",
+        simulateVerify: "Simulate verification (demo)",
+        verifySimulated: "Verification simulated for demo.",
+        verifySuccess: "Sessions detected — capture is working.",
+        needOneAgent: "Configure at least one detected agent before finishing.",
+        finish: "Finish setup",
+        skipForNow: "Skip for now",
       },
     },
     common: {
@@ -601,7 +665,8 @@ export const translations = {
         integrations: "集成",
       },
       models: {
-        intro: "LLM 与嵌入模型均使用 OpenAI 兼容 API 格式（API 地址、密钥与模型名称）。",
+        intro:
+          "RMB 的 LLM 与嵌入均使用 OpenAI 兼容 API：API 地址、密钥与模型名称。连接测试会对 LLM 调用 GET /v1/models（需密钥）并对嵌入调用 POST /embeddings。",
         llm: "LLM",
         embed: "嵌入",
       },
@@ -615,6 +680,7 @@ export const translations = {
       },
       llm: {
         apiBase: "API 地址",
+        apiBasePlaceholder: "https://api.openai.com/v1",
         apiKey: "API 密钥",
         apiKeyPlaceholder: "留空则保留当前密钥",
         apiKeySet: "密钥已配置",
@@ -622,6 +688,7 @@ export const translations = {
       },
       embed: {
         apiBase: "API 地址",
+        apiBasePlaceholder: "https://api.openai.com/v1",
         apiKey: "API 密钥",
         apiKeyPlaceholder: "留空则保留当前密钥",
         apiKeySet: "密钥已配置",
@@ -651,6 +718,63 @@ export const translations = {
         label: "显示语言",
         en: "English",
         zh: "中文",
+      },
+    },
+    onboarding: {
+      title: "欢迎使用 RMB",
+      subtitle: "几步完成模型配置并连接编程智能体。",
+      progressLabel: "设置进度",
+      demoBanner:
+        "界面演示 — 连接测试会调用 rmbd（需 make build 并重启桌面应用，或 make run-rmbd）。Agent 应用为模拟。重置：localStorage.removeItem('rmb.onboardingComplete') 后刷新。",
+      resetDemo: "重置引导演示",
+      steps: {
+        language: "语言",
+        models: "模型与 API 密钥",
+        agents: "智能体集成",
+      },
+      language: {
+        title: "欢迎使用 RMB",
+        subtitle: "面向编程智能体的本地优先记忆系统。",
+        continue: "继续",
+      },
+      models: {
+        title: "配置 LLM 与嵌入模型",
+        intro:
+          "RMB 使用 OpenAI 兼容 API（地址、密钥、模型）。LLM 连接测试通过 GET /v1/models 列出模型（需要 API 密钥）；嵌入测试发送最小 embed 请求。",
+        llmKeyPlaceholder: "在此粘贴 LLM API 密钥（如 sk-…）",
+        embedKeyPlaceholder: "在此粘贴嵌入 API 密钥（如 sk-…）",
+        llmModelPlaceholder: "gpt-4o-mini",
+        embedModelPlaceholder: "text-embedding-3-small",
+        embedNoticeTitle: "继续之前请注意",
+        embedNoticeDimensions: "嵌入维度在设置完成后无法更改，请谨慎选择。",
+        embedNoticeModel: "若之后更换嵌入模型，所有已有记忆将重新嵌入。",
+        testConnection: "测试连接",
+        testing: "测试中…",
+        testingHint: "LLM：GET /v1/models（验证 API 密钥）。嵌入：最小 embed 请求。通常几秒完成。",
+        testResults: "连接测试",
+        testOk: "成功",
+        testFailed: "失败",
+        testModelInList: "「{model}」在模型列表中",
+        testModelNotInList: "「{model}」不在下方列表中",
+        testModelsPreview: "GET /v1/models 返回 {count} 个模型（最多展示 40 个）：",
+        testModelsListLabel: "可用模型列表",
+        testModelMatchMark: "← 你的模型",
+        fixErrorsHint: "请修正上方错误后重新测试。",
+        saving: "保存中…",
+        continue: "继续",
+      },
+      agents: {
+        title: "连接智能体",
+        intro: "选择本机已安装的智能体，完成 Hook 与召回配置，并验证采集是否正常。",
+        verifyIntro: "在智能体中发送一条消息，然后确认 RMB 中是否出现新会话。",
+        checkSessions: "检查会话",
+        checking: "检查中…",
+        simulateVerify: "模拟验证（演示）",
+        verifySimulated: "已为演示模拟验证成功。",
+        verifySuccess: "已检测到会话 — 采集正常。",
+        needOneAgent: "完成前请至少配置一个已检测到的智能体。",
+        finish: "完成设置",
+        skipForNow: "暂时跳过",
       },
     },
     common: {

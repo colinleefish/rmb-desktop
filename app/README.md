@@ -12,13 +12,14 @@ cd app && npm install
 RMBD_PATH=../bin/rmbd npm run dev
 ```
 
-You should see an **rmb** icon in the macOS menu bar (top-right). Right-click for:
+You should see an **RMB** icon in the macOS menu bar (top-right). Click for:
 
-- **Open Dashboard** → `http://127.0.0.1:19019/ui/`
-- **Start rmbd** / **Stop rmbd**
-- **Quit**
+- **🟢 RMB is running** — opens the dashboard (`http://127.0.0.1:19019/ui/`)
+- **Quit RMB** — stops the menu bar app and its background service
 
-The app uses `ActivationPolicy::Accessory` — no Dock icon (for now).
+While the menu bar icon is visible, the local `rmbd` service runs with the app. Quitting stops both.
+
+The app is **menu bar only** (`LSUIElement`) — no Dock icon. Quit only from the tray menu (**Quit RMB**), which stops both the app and `rmbd`.
 
 ## Build
 
@@ -47,14 +48,20 @@ make prepare-sidecars   # bin/rmb + bin/rmbd → app/src-tauri/binaries/*-<targe
 
 ## Login item (optional)
 
+Use **one** approach — not both:
+
 | LaunchAgent | Purpose |
 |-------------|---------|
-| [`com.remember.rmbd.plist`](../install/macos/com.remember.rmbd.plist) | Start `rmbd` at login |
-| [`com.remember.rmb.plist`](../install/macos/com.remember.rmb.plist) | Desktop app at login |
+| [`com.remember.rmb.plist`](../install/macos/com.remember.rmb.plist) | **Recommended:** menu bar app at login (starts `rmbd` with the app) |
+| [`com.remember.rmbd.plist`](../install/macos/com.remember.rmbd.plist) | Headless `rmbd` only — do not use alongside the menu bar app |
 
-Copy binaries to `~/.rmb/bin/` (`rmbd-desktop`, `rmb-app`), edit paths in the plists, then:
+The `rmbd` LaunchAgent uses `KeepAlive` and will restart the daemon if you quit it manually. The menu bar app disables that agent when it runs.
 
 ```bash
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/me.remember.rmbd.plist
+# Menu bar app at login (recommended)
 launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/me.remember.rmb.plist
+
+# Stop the headless daemon agent if you no longer need it
+launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/me.remember.rmbd.plist
+launchctl disable gui/$(id -u)/me.remember.rmbd
 ```

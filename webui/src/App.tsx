@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { OnboardingGate } from "./components/onboarding/OnboardingGate";
 import { Layout } from "./components/Layout";
 import { OverviewRoute } from "./pages/index";
 import { MemoriesPage } from "./pages/MemoriesPage";
@@ -9,12 +10,20 @@ import { SkillDetailPage } from "./pages/SkillDetailPage";
 import { IntegrationsPage } from "./pages/IntegrationsPage";
 import { RedirectSettingsIntegrations } from "./pages/RedirectSettingsIntegrations";
 import { SettingsPage } from "./pages/SettingsPage";
+import { OnboardingPage } from "./pages/onboarding/OnboardingPage";
 
 export default function App() {
   return (
     <BrowserRouter basename="/ui">
       <Routes>
-        <Route element={<Layout />}>
+        <Route path="onboarding" element={<OnboardingPage />} />
+        <Route
+          element={
+            <OnboardingGate>
+              <Layout />
+            </OnboardingGate>
+          }
+        >
           <Route index element={<OverviewRoute />} />
           <Route path="sessions" element={<SessionsPage />} />
           <Route path="sessions/:sessionKey" element={<SessionDetailPage />} />

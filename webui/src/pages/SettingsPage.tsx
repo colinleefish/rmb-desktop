@@ -3,7 +3,14 @@ import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { getConfig, putConfig } from "../lib/api";
 import type { ConfigUpdateRequest, ConfigView } from "../lib/types";
 import { useI18n } from "../i18n";
+import { LanguageSelect } from "../components/LanguageSelect";
+import { EmbedDimensionsSelect } from "../components/EmbedDimensionsSelect";
 import { DEFAULT_PIPELINE } from "../lib/pipelineDefaults";
+import {
+  DEFAULT_EMBED_DIMENSION,
+  normalizeEmbedDimension,
+  type EmbedDimension,
+} from "../lib/embedDimensions";
 import { durationToSeconds, secondsToDuration } from "../lib/pipelineDuration";
 import { parseSettingsPath, settingsPath, type SettingsSection } from "../lib/settingsRoutes";
 
@@ -25,7 +32,7 @@ export function SettingsPage() {
   const [embedBase, setEmbedBase] = useState("");
   const [embedKey, setEmbedKey] = useState("");
   const [embedModel, setEmbedModel] = useState("");
-  const [embedDims, setEmbedDims] = useState(1024);
+  const [embedDims, setEmbedDims] = useState<EmbedDimension>(DEFAULT_EMBED_DIMENSION);
   const [pipeline, setPipeline] = useState<ConfigView["pipeline"] | null>(null);
 
   useEffect(() => {
@@ -37,7 +44,7 @@ export function SettingsPage() {
         setLlmModel(c.llm.model);
         setEmbedBase(c.embed.api_base);
         setEmbedModel(c.embed.model);
-        setEmbedDims(c.embed.dimensions);
+        setEmbedDims(normalizeEmbedDimension(c.embed.dimensions));
         setPipeline(c.pipeline);
       })
       .catch((err: Error) => setError(err.message));
@@ -137,17 +144,17 @@ export function SettingsPage() {
               </p>
             </div>
             <div className="border-t border-rmb-gray/15 pt-4">
-              <label className="block text-sm font-medium text-rmb-gray">
+              <label id="settings-language-label" className="block text-sm font-medium text-rmb-gray">
                 {t.settings.language.label}
               </label>
-              <select
-                value={lang}
-                onChange={(e) => setLang(e.target.value as "en" | "zh")}
-                className="mt-1 w-full max-w-xs rounded-md border border-rmb-gray/20 px-3 py-2 text-sm"
-              >
-                <option value="en">{t.settings.language.en}</option>
-                <option value="zh">{t.settings.language.zh}</option>
-              </select>
+              <div className="mt-1 max-w-xs">
+                <LanguageSelect
+                  id="settings-language"
+                  labelId="settings-language-label"
+                  value={lang}
+                  onChange={setLang}
+                />
+              </div>
             </div>
           </div>
         )}
@@ -157,7 +164,12 @@ export function SettingsPage() {
             <p className="text-sm text-rmb-gray">{t.settings.models.intro}</p>
             <section className="space-y-4">
               <h3 className="text-sm font-semibold text-rmb-dark">{t.settings.models.llm}</h3>
-              <Field label={t.settings.llm.apiBase} value={llmBase} onChange={setLlmBase} />
+              <Field
+                label={t.settings.llm.apiBase}
+                value={llmBase}
+                onChange={setLlmBase}
+                placeholder={t.settings.llm.apiBasePlaceholder}
+              />
               <Field label={t.settings.llm.model} value={llmModel} onChange={setLlmModel} />
               <div>
                 <label className="block text-sm font-medium text-rmb-gray">{t.settings.llm.apiKey}</label>
@@ -176,13 +188,29 @@ export function SettingsPage() {
 
             <section className="space-y-4 border-t border-rmb-gray/15 pt-8">
               <h3 className="text-sm font-semibold text-rmb-dark">{t.settings.models.embed}</h3>
-              <Field label={t.settings.embed.apiBase} value={embedBase} onChange={setEmbedBase} />
-              <Field label={t.settings.embed.model} value={embedModel} onChange={setEmbedModel} />
               <Field
-                label={t.settings.embed.dimensions}
-                value={String(embedDims)}
-                onChange={(v) => setEmbedDims(Number(v) || 1024)}
+                label={t.settings.embed.apiBase}
+                value={embedBase}
+                onChange={setEmbedBase}
+                placeholder={t.settings.embed.apiBasePlaceholder}
               />
+              <Field label={t.settings.embed.model} value={embedModel} onChange={setEmbedModel} />
+              <div>
+                <label
+                  id="settings-embed-dimensions-label"
+                  className="block text-sm font-medium text-rmb-gray"
+                >
+                  {t.settings.embed.dimensions}
+                </label>
+                <div className="mt-1 max-w-xs">
+                  <EmbedDimensionsSelect
+                    id="settings-embed-dimensions"
+                    labelId="settings-embed-dimensions-label"
+                    value={embedDims}
+                    onChange={setEmbedDims}
+                  />
+                </div>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-rmb-gray">{t.settings.embed.apiKey}</label>
                 {config.embed.api_key_set && (
@@ -259,12 +287,14 @@ function Field({
   onChange,
   type = "text",
   min,
+  placeholder,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   type?: "text" | "number";
   min?: number;
+  placeholder?: string;
 }) {
   return (
     <div>
@@ -274,7 +304,8 @@ function Field({
         min={min}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1 w-full rounded-md border border-rmb-gray/20 px-3 py-2 text-sm"
+        placeholder={placeholder}
+        className="mt-1 w-full rounded-md border border-rmb-gray/20 px-3 py-2 text-sm placeholder:text-rmb-gray/45"
       />
     </div>
   );

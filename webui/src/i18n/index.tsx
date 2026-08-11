@@ -11,6 +11,9 @@ import {
   type Lang,
   type Translation,
 } from "./translations";
+import { isLang, detectBrowserLang } from "./languages";
+
+export { SUPPORTED_LANGUAGES, isLang, DEFAULT_LANG, detectBrowserLang } from "./languages";
 
 const STORAGE_KEY = "rmb.lang";
 
@@ -24,9 +27,8 @@ const I18nContext = createContext<I18nContextValue | null>(null);
 
 function readLang(): Lang {
   const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored === "zh" || stored === "en") return stored;
-  const nav = navigator.language.toLowerCase();
-  return nav.startsWith("zh") ? "zh" : "en";
+  if (stored && isLang(stored)) return stored;
+  return detectBrowserLang();
 }
 
 export function I18nProvider({ children }: { children: ReactNode }) {

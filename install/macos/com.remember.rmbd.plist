@@ -8,11 +8,13 @@
     <array>
         <string>/Users/liguanghui/.rmb/bin/rmbd-desktop</string>
         <string>serve</string>
+        <string>-config</string>
+        <string>/Users/liguanghui/Library/Application Support/rmb-desktop/config.yaml</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
-    <true/>
+    <false/>
     <key>StandardOutPath</key>
     <string>/tmp/rmbd.stdout.log</string>
     <key>StandardErrorPath</key>

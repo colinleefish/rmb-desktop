@@ -16,7 +16,7 @@
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
-    <true/>
+    <false/>
     <key>StandardOutPath</key>
     <string>/tmp/rmb-app.stdout.log</string>
     <key>StandardErrorPath</key>

@@ -31,6 +31,28 @@ Disable: `localStorage.removeItem('rmb.mockSetup')`.
 
 Only Settings → Integration uses mock data; sessions, memories, and the rest still hit rmbd.
 
+### Onboarding wizard (UI demo)
+
+Prototype the first-run setup wizard. Connection test calls rmbd (start rmbd for real checks). Agent apply is simulated:
+
+```bash
+cd webui && npm run dev:onboarding
+```
+
+Open http://localhost:5173/ui/ — you are redirected to `/ui/onboarding` until you finish or skip.
+
+Or in any dev session:
+
+```bash
+localStorage.setItem('rmb.mockOnboarding', '1')
+localStorage.setItem('rmb.mockSetup', '1')
+localStorage.removeItem('rmb.onboardingComplete')
+```
+
+Reload. Reset demo: `localStorage.removeItem('rmb.onboardingComplete')` then reload.
+
+Direct link to wizard anytime: http://localhost:5173/ui/onboarding
+
 ## Production embed
 
 ```bash

@@ -16,7 +16,7 @@ import {
 } from "../lib/memoryCategories";
 import type { MemoryCategoryOverview, OverviewCounts } from "../lib/types";
 import { useI18n } from "../i18n";
-import type { Lang } from "../i18n/translations";
+import { LanguageSelect } from "../components/LanguageSelect";
 
 type NavChild = {
   to: string;
@@ -295,14 +295,7 @@ export function Sidebar() {
         <label className="block px-1 text-[11px] font-medium text-rmb-gray">
           {t.settings.language.label}
         </label>
-        <select
-          value={lang}
-          onChange={(e) => setLang(e.target.value as Lang)}
-          className="w-full rounded-md border border-rmb-gray/20 bg-white px-2 py-1.5 text-sm text-rmb-dark"
-        >
-          <option value="en">{t.settings.language.en}</option>
-          <option value="zh">{t.settings.language.zh}</option>
-        </select>
+        <LanguageSelect id="sidebar-language" value={lang} onChange={setLang} />
 
         <NavLink
           to="/settings/general"

@@ -41,4 +41,20 @@
   .rmb-led-pending {
     box-shadow: 0 0 4px 1px color-mix(in srgb, var(--color-rmb-accent) 30%, transparent);
   }
+
+  .rmb-language-select {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 13px;
+    line-height: 20px;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  .onboarding-language-step {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 13px;
+    line-height: 20px;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
 }

@@ -3,6 +3,7 @@
 
 mod bootstrap;
 mod daemon;
+mod instance;
 
 use daemon::{DaemonManager, dashboard_url, health_ok};
 use std::sync::Arc;
@@ -14,24 +15,19 @@ use tauri::{
 };
 
 const ID_STATUS: &str = "status";
-const ID_OPEN: &str = "open_dashboard";
-const ID_START: &str = "start_rmbd";
-const ID_STOP: &str = "stop_rmbd";
 const ID_QUIT: &str = "quit";
 
 fn main() {
-    let status = CustomMenuItem::new(ID_STATUS, "○ Checking…").disabled();
-    let open = CustomMenuItem::new(ID_OPEN, "Open Dashboard");
-    let start = CustomMenuItem::new(ID_START, "Start rmbd");
-    let stop = CustomMenuItem::new(ID_STOP, "Stop rmbd").disabled();
-    let quit = CustomMenuItem::new(ID_QUIT, "Quit");
+    let _instance_lock = match instance::acquire() {
+        Ok(lock) => lock,
+        Err(_) => return,
+    };
+
+    let status = CustomMenuItem::new(ID_STATUS, "Starting…").disabled();
+    let quit = CustomMenuItem::new(ID_QUIT, "Quit RMB");
 
     let tray_menu = SystemTrayMenu::new()
         .add_item(status)
-        .add_native_item(SystemTrayMenuItem::Separator)
-        .add_item(open)
-        .add_item(start)
-        .add_item(stop)
         .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(quit);
 
@@ -46,11 +42,15 @@ fn main() {
         })
         .setup({
             let daemon = Arc::clone(&daemon);
-            move |_app| {
+            move |app| {
                 if let Err(err) = bootstrap::ensure_installed() {
                     eprintln!("bootstrap: {err}");
                 }
-                let handle = _app.handle();
+                if let Err(err) = daemon.ensure_running() {
+                    eprintln!("start rmbd: {err}");
+                }
+                let handle = app.handle();
+                refresh_menu(&handle, &daemon);
                 spawn_health_poller(handle, daemon);
                 Ok(())
             }
@@ -64,7 +64,7 @@ fn main() {
     let daemon_for_exit = Arc::clone(&daemon);
     app.run(move |_, event| {
         if let RunEvent::ExitRequested { .. } = event {
-            daemon_for_exit.stop_managed();
+            daemon_for_exit.shutdown();
         }
     });
 }
@@ -72,24 +72,17 @@ fn main() {
 fn on_tray_event(app: &AppHandle, event: SystemTrayEvent, daemon: &Arc<DaemonManager>) {
     if let SystemTrayEvent::MenuItemClick { id, .. } = event {
         match id.as_str() {
-            ID_OPEN => {
+            ID_STATUS => {
+                if !health_ok(&daemon::base_url()) {
+                    return;
+                }
                 let url = dashboard_url();
                 if let Err(err) = open::that(&url) {
                     eprintln!("open dashboard: {err}");
                 }
             }
-            ID_START => {
-                if let Err(err) = daemon.start() {
-                    eprintln!("start rmbd: {err}");
-                }
-                refresh_menu(app, daemon);
-            }
-            ID_STOP => {
-                daemon.stop_managed();
-                refresh_menu(app, daemon);
-            }
             ID_QUIT => {
-                daemon.stop_managed();
+                daemon.shutdown();
                 app.exit(0);
             }
             _ => {}
@@ -107,18 +100,12 @@ fn spawn_health_poller(app: AppHandle, daemon: Arc<DaemonManager>) {
 fn refresh_menu(app: &AppHandle, daemon: &DaemonManager) {
     let tray = app.tray_handle();
     let healthy = health_ok(&daemon::base_url());
-    let managed = daemon.managed_running();
 
     let status_label = if healthy {
-        "● rmbd running"
-    } else if managed {
-        "◐ rmbd starting…"
+        "🟢 RMB is running"
     } else {
-        "○ rmbd stopped"
+        "Starting…"
     };
     let _ = tray.get_item(ID_STATUS).set_title(status_label);
-
-    let _ = tray.get_item(ID_START).set_enabled(!healthy && !managed);
-    let _ = tray.get_item(ID_STOP).set_enabled(managed);
-    let _ = tray.get_item(ID_OPEN).set_enabled(healthy);
+    let _ = tray.get_item(ID_STATUS).set_enabled(healthy);
 }

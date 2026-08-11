@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:mock-setup": "VITE_MOCK_SETUP=true vite",
+    "dev:onboarding": "VITE_MOCK_SETUP=true VITE_MOCK_ONBOARDING=true vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview"

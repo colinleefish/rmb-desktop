@@ -14,9 +14,11 @@ import { useI18n } from "../../i18n";
 export function IntegrationSettingsPanel({
   agentId,
   onAgentChange,
+  onAgentsChange,
 }: {
   agentId: IntegrationAgentId;
   onAgentChange: (id: IntegrationAgentId) => void;
+  onAgentsChange?: (agents: AgentSetupState[]) => void;
 }) {
   const { t } = useI18n();
   const [agents, setAgents] = useState<AgentSetupState[]>([]);
@@ -32,6 +34,7 @@ export function IntegrationSettingsPanel({
     try {
       const list = await fetchSetupStatus();
       setAgents(list);
+      onAgentsChange?.(list);
       const preview =
         list.find((a) => a.id === agentId) ?? (await fetchAgentPreview(agentId));
       setAgent(preview);
@@ -40,7 +43,7 @@ export function IntegrationSettingsPanel({
     } finally {
       setLoading(false);
     }
-  }, [agentId]);
+  }, [agentId, onAgentsChange]);
 
   useEffect(() => {
     void loadAgents();
@@ -69,7 +72,11 @@ export function IntegrationSettingsPanel({
 
   function handleAgentUpdated(updated: AgentSetupState) {
     setAgent(updated);
-    setAgents((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
+    setAgents((prev) => {
+      const next = prev.map((a) => (a.id === updated.id ? updated : a));
+      onAgentsChange?.(next);
+      return next;
+    });
   }
 
   if (loading && !agent) {

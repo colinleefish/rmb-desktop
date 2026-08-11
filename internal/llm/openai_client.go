@@ -39,12 +39,14 @@ type OpenAICompatibleClient struct {
 type chatCompletionRequest struct {
 	Model       string        `json:"model"`
 	Temperature float64       `json:"temperature"`
+	MaxTokens   int           `json:"max_tokens,omitempty"`
 	Messages    []chatMessage `json:"messages"`
 }
 
 type chatMessage struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role             string `json:"role"`
+	Content          string `json:"content"`
+	ReasoningContent string `json:"reasoning_content,omitempty"`
 }
 
 type chatCompletionResponse struct {
@@ -201,6 +203,9 @@ func (c *OpenAICompatibleClient) chatCompletion(ctx context.Context, reqBody cha
 		return "", false, errors.New("llm response has no choices")
 	}
 	content := strings.TrimSpace(completion.Choices[0].Message.Content)
+	if content == "" {
+		content = strings.TrimSpace(completion.Choices[0].Message.ReasoningContent)
+	}
 	if content == "" {
 		return "", false, errors.New("llm response is empty")
 	}

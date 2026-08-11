@@ -59,6 +59,10 @@ export function getConfig(): Promise<ConfigView> {
   return apiGet<ConfigView>("/config");
 }
 
+export function getVersion(): Promise<{ version: string; commit: string }> {
+  return apiGet<{ version: string; commit: string }>("/version");
+}
+
 export function putConfig(
   update: ConfigUpdateRequest,
 ): Promise<{ ok: boolean; message: string; config: ConfigView }> {

@@ -16,7 +16,6 @@ import {
 } from "../lib/memoryCategories";
 import type { MemoryCategoryOverview, OverviewCounts } from "../lib/types";
 import { useI18n } from "../i18n";
-import { LanguageSelect } from "../components/LanguageSelect";
 
 type NavChild = {
   to: string;
@@ -185,7 +184,7 @@ function SidebarNavItem({
 }
 
 export function Sidebar() {
-  const { t, lang, setLang } = useI18n();
+  const { t } = useI18n();
   const location = useLocation();
   const [counts, setCounts] = useState<OverviewCounts | null>(null);
   const [memoryByCategory, setMemoryByCategory] = useState<MemoryCategoryOverview | null>(null);
@@ -291,12 +290,7 @@ export function Sidebar() {
         ))}
       </nav>
 
-      <div className="space-y-2 border-t border-rmb-gray/15 p-3">
-        <label className="block px-1 text-[11px] font-medium text-rmb-gray">
-          {t.settings.language.label}
-        </label>
-        <LanguageSelect id="sidebar-language" value={lang} onChange={setLang} />
-
+      <div className="border-t border-rmb-gray/15 p-3">
         <NavLink
           to="/settings/general"
           className={({ isActive }) =>

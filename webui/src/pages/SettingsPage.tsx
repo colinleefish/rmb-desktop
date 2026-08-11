@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
-import { getConfig, putConfig } from "../lib/api";
+import { getConfig, getVersion, putConfig } from "../lib/api";
 import type { ConfigUpdateRequest, ConfigView } from "../lib/types";
 import { useI18n } from "../i18n";
 import { LanguageSelect } from "../components/LanguageSelect";
@@ -52,6 +52,7 @@ export function SettingsPage() {
   const [embedModel, setEmbedModel] = useState("");
   const [embedDims, setEmbedDims] = useState<EmbedDimension>(DEFAULT_EMBED_DIMENSION);
   const [pipeline, setPipeline] = useState<ConfigView["pipeline"] | null>(null);
+  const [buildInfo, setBuildInfo] = useState<{ version: string; commit: string } | null>(null);
 
   useEffect(() => {
     getConfig()
@@ -67,6 +68,9 @@ export function SettingsPage() {
         setPipeline(c.pipeline);
       })
       .catch((err: Error) => setError(err.message));
+    getVersion()
+      .then(setBuildInfo)
+      .catch(() => {});
   }, []);
 
   if (location.pathname === "/settings" || location.pathname === "/settings/") {
@@ -318,6 +322,12 @@ export function SettingsPage() {
             {error && <p className="text-sm text-red-600">{error}</p>}
           </div>
       </div>
+
+      {buildInfo && (
+        <p className="text-xs text-rmb-gray/60">
+          v{buildInfo.version} · {buildInfo.commit}
+        </p>
+      )}
 
       <Modal
         open={showEmbedConfirm}

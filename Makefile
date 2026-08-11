@@ -2,6 +2,9 @@
 
 GO_TAGS := sqlite_fts5
 EMBED_INDEX := internal/http/static/web/index.html
+VERSION ?= 0.1.11
+COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
+GO_LDFLAGS := -X github.com/colinleefish/rmb-desktop/internal/version.Version=$(VERSION) -X github.com/colinleefish/rmb-desktop/internal/version.Commit=$(COMMIT)
 
 ICON_SRC := icons/pyramid-dark-accent.svg
 TRAY_ICON_SRC := icons/pyramid-tray.svg
@@ -10,8 +13,8 @@ test: webui-embed-check
 	CGO_ENABLED=1 go test -tags "$(GO_TAGS)" ./...
 
 build: webui-embed-check
-	CGO_ENABLED=1 go build -tags "$(GO_TAGS)" -o bin/rmbd ./cmd/rmbd
-	CGO_ENABLED=1 go build -tags "$(GO_TAGS)" -o bin/rmb ./cmd/rmb
+	CGO_ENABLED=1 go build -tags "$(GO_TAGS)" -ldflags "$(GO_LDFLAGS)" -o bin/rmbd ./cmd/rmbd
+	CGO_ENABLED=1 go build -tags "$(GO_TAGS)" -ldflags "$(GO_LDFLAGS)" -o bin/rmb ./cmd/rmb
 
 build-all: webui-build build
 
@@ -42,7 +45,7 @@ prepare-sidecars: build
 app-dev: prepare-sidecars
 	cd app && RMBD_PATH=$(CURDIR)/bin/rmbd npm run dev
 
-DMG_BUNDLE := app/src-tauri/target/release/bundle/dmg/RMB Desktop_0.1.10_aarch64.dmg
+DMG_BUNDLE := app/src-tauri/target/release/bundle/dmg/RMB Desktop_$(VERSION)_aarch64.dmg
 APP_BUNDLE := app/src-tauri/target/release/bundle/macos/RMB Desktop.app
 PROXY_URL ?= socks5://127.0.0.1:1080
 GH := ALL_PROXY=$(PROXY_URL) HTTPS_PROXY=$(PROXY_URL) HTTP_PROXY=$(PROXY_URL) gh
@@ -57,7 +60,7 @@ release-publish:
 		--title "RMB Desktop $(VERSION)" \
 		$(if $(NOTES),--notes-file $(NOTES),)
 
-app-build: app-icons prepare-sidecars
+app-build: webui-build app-icons prepare-sidecars
 	cd app && npm run build
 	bash scripts/finish-dmg.sh "$(DMG_BUNDLE)"
 

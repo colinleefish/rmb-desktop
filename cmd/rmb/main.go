@@ -12,9 +12,8 @@ import (
 	"github.com/colinleefish/rmb-desktop/internal/client"
 	"github.com/colinleefish/rmb-desktop/internal/config"
 	"github.com/colinleefish/rmb-desktop/internal/hook"
+	"github.com/colinleefish/rmb-desktop/internal/version"
 )
-
-const cliVersion = "0.1.10"
 
 func main() {
 	os.Exit(run())
@@ -41,7 +40,7 @@ func run() int {
 	case "setup":
 		return setupCmd(os.Args[2:])
 	case "version":
-		fmt.Println(cliVersion)
+		fmt.Println(version.Version)
 		return 0
 	case "help", "-h", "--help":
 		return printBootstrap()

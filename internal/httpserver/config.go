@@ -9,6 +9,7 @@ import (
 
 	"github.com/colinleefish/rmb-desktop/internal/config"
 	"github.com/colinleefish/rmb-desktop/internal/launchatlogin"
+	"github.com/colinleefish/rmb-desktop/internal/reembed"
 	"github.com/colinleefish/rmb-desktop/internal/llm"
 )
 
@@ -191,10 +192,19 @@ func (s *Server) handlePutConfig(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	embedBefore := cfg.Embed
 	updated, err := config.ApplyUpdate(cfg, req)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
+	}
+	reembedNeeded := reembed.SettingsChanged(embedBefore, updated.Embed)
+	if reembedNeeded {
+		if err := reembed.ClearAll(r.Context(), s.db); err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		s.log.Info("embed settings changed; cleared stored vectors for re-embedding")
 	}
 	if err := launchatlogin.Set(updated.LaunchAtLogin); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
@@ -205,9 +215,14 @@ func (s *Server) handlePutConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.log.Info("config saved", "path", s.configPath)
+	message := "Config saved. Restart rmbd to apply LLM/embed worker changes."
+	if reembedNeeded {
+		message = "Config saved. Embedding settings changed — vectors cleared; restart rmbd to re-embed all memories."
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"ok":      true,
-		"message": "Config saved. Restart rmbd to apply LLM/embed worker changes.",
-		"config":  config.ToView(updated, s.configPath),
+		"ok":              true,
+		"message":         message,
+		"reembed_started": reembedNeeded,
+		"config":          config.ToView(updated, s.configPath),
 	})
 }

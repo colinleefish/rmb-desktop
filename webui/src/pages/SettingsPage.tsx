@@ -227,6 +227,7 @@ export function SettingsPage() {
 
             <section className="space-y-4 border-t border-rmb-gray/15 pt-8">
               <h3 className="text-sm font-semibold text-rmb-dark">{t.settings.models.embed}</h3>
+              <p className="text-xs text-rmb-gray">{t.settings.embed.reembedNotice}</p>
               <Field
                 label={t.settings.embed.apiBase}
                 value={embedBase}
@@ -327,6 +328,7 @@ function Field({
   type = "text",
   min,
   placeholder,
+  compact,
 }: {
   label: string;
   value: string;
@@ -334,6 +336,7 @@ function Field({
   type?: "text" | "number";
   min?: number;
   placeholder?: string;
+  compact?: boolean;
 }) {
   return (
     <div>
@@ -341,10 +344,17 @@ function Field({
       <input
         type={type}
         min={min}
+        inputMode={type === "number" ? "numeric" : undefined}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="mt-1 w-full rounded-md border border-rmb-gray/20 px-3 py-2 text-sm placeholder:text-rmb-gray/45"
+        className={`mt-1 rounded-md border border-rmb-gray/20 px-3 py-2 text-sm placeholder:text-rmb-gray/45 ${
+          compact ? "w-28" : "w-full"
+        } ${
+          type === "number"
+            ? "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            : ""
+        }`}
       />
     </div>
   );
@@ -382,6 +392,7 @@ function PipelineSecondsField({
       }
       type="number"
       min={0}
+      compact
     />
   );
 }
@@ -404,6 +415,9 @@ function PipelineNumField({
       label={label}
       value={String(raw)}
       onChange={(v) => setPipeline({ ...pipeline, [field]: Number(v) || 0 })}
+      type="number"
+      min={0}
+      compact
     />
   );
 }

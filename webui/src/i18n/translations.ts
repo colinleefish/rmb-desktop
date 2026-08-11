@@ -303,6 +303,8 @@ export const translations = {
         apiKeySet: "Key is configured",
         model: "Model",
         dimensions: "Dimensions",
+        reembedNotice:
+          "Changing the embedding model, API base URL, or dimensions clears existing vectors and triggers a full re-embed after you save and restart rmbd.",
       },
       advanced: {
         pipelineIntro: "Worker tuning. All intervals are in seconds.",
@@ -690,6 +692,8 @@ export const translations = {
         apiKeySet: "密钥已配置",
         model: "模型",
         dimensions: "维度",
+        reembedNotice:
+          "更换嵌入模型、API 地址或维度后，保存并重启 rmbd 会清空已有向量并重新嵌入全部记忆。",
       },
       advanced: {
         pipelineIntro: "工作进程调优。所有间隔均以秒为单位。",

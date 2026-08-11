@@ -2,8 +2,6 @@ package llm
 
 import (
 	"context"
-	"fmt"
-	"strings"
 	"time"
 
 	"github.com/colinleefish/rmb-desktop/internal/config"
@@ -14,26 +12,12 @@ const maxModelsInTestResponse = 40
 
 // LLMConnectionTestResult is the outcome of listing models via GET /models.
 type LLMConnectionTestResult struct {
-	Latency        time.Duration
-	RequestedModel string
-	Models         []string
-	ModelsTotal    int
-	ModelFound     bool
+	Latency     time.Duration
+	Models      []string
+	ModelsTotal int
 }
 
-func (r LLMConnectionTestResult) Err() error {
-	if r.RequestedModel == "" || r.ModelFound {
-		return nil
-	}
-	return fmt.Errorf(
-		"model %q not found in provider model list (%d models returned)",
-		r.RequestedModel,
-		r.ModelsTotal,
-	)
-}
-
-// TestLLMConnection lists models via OpenAI-compatible GET /models (requires API key).
-// When a model name is configured, ModelFound reflects whether it appears in the list.
+// TestLLMConnection verifies connectivity by listing models (OpenAI-compatible GET /models).
 func TestLLMConnection(ctx context.Context, cfg config.LLMConfig) (LLMConnectionTestResult, error) {
 	start := time.Now()
 	ids, err := listModels(ctx, cfg.APIBase, cfg.APIKey, testConnectionTimeout)
@@ -41,18 +25,11 @@ func TestLLMConnection(ctx context.Context, cfg config.LLMConfig) (LLMConnection
 		return LLMConnectionTestResult{}, err
 	}
 
-	model := strings.TrimSpace(cfg.Model)
-	out := LLMConnectionTestResult{
-		Latency:        time.Since(start),
-		RequestedModel: model,
-		ModelsTotal:    len(ids),
-		Models:         capModelIDs(ids, maxModelsInTestResponse),
-		ModelFound:     modelsContain(ids, model),
-	}
-	if err := out.Err(); err != nil {
-		return out, err
-	}
-	return out, nil
+	return LLMConnectionTestResult{
+		Latency:     time.Since(start),
+		ModelsTotal: len(ids),
+		Models:      capModelIDs(ids, maxModelsInTestResponse),
+	}, nil
 }
 
 func capModelIDs(ids []string, max int) []string {

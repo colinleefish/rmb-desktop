@@ -42,7 +42,7 @@ prepare-sidecars: build
 app-dev: prepare-sidecars
 	cd app && RMBD_PATH=$(CURDIR)/bin/rmbd npm run dev
 
-DMG_BUNDLE := app/src-tauri/target/release/bundle/dmg/RMB Desktop_0.1.9_aarch64.dmg
+DMG_BUNDLE := app/src-tauri/target/release/bundle/dmg/RMB Desktop_0.1.10_aarch64.dmg
 APP_BUNDLE := app/src-tauri/target/release/bundle/macos/RMB Desktop.app
 PROXY_URL ?= socks5://127.0.0.1:1080
 GH := ALL_PROXY=$(PROXY_URL) HTTPS_PROXY=$(PROXY_URL) HTTP_PROXY=$(PROXY_URL) gh

@@ -52,19 +52,6 @@ func TestBuildModelsURLCandidates_codingSuffix(t *testing.T) {
 	}
 }
 
-func TestModelsContain(t *testing.T) {
-	ids := []string{"gpt-4o-mini", "deepseek-chat"}
-	if !modelsContain(ids, "deepseek-chat") {
-		t.Fatal("expected match")
-	}
-	if modelsContain(ids, "missing") {
-		t.Fatal("expected no match")
-	}
-	if !modelsContain(ids, "") {
-		t.Fatal("empty model should pass")
-	}
-}
-
 func TestListModels_largeJSONBody(t *testing.T) {
 	// Regression: responses larger than 512 bytes must not be truncated before decode.
 	var models []struct {

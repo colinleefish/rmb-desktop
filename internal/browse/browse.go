@@ -50,8 +50,9 @@ func (s *Service) Overview(ctx context.Context) (Overview, error) {
 			return Overview{}, fmt.Errorf("count: %w", err)
 		}
 	}
+	// Exclude curated rmb://agent singleton — it is system docs, not user memory.
 	if err := s.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM memories WHERE superseded_at IS NULL`,
+		`SELECT COUNT(*) FROM memories WHERE superseded_at IS NULL AND category != 'agent'`,
 	).Scan(&out.Counts.Memories); err != nil {
 		return Overview{}, fmt.Errorf("count memories: %w", err)
 	}
@@ -77,7 +78,7 @@ func (s *Service) memoryCategoryOverview(ctx context.Context) (MemoryCategoryOve
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT category, COUNT(*)
 		FROM memories
-		WHERE superseded_at IS NULL AND category != 'profile'
+		WHERE superseded_at IS NULL AND category NOT IN ('profile', 'agent')
 		GROUP BY category`)
 	if err != nil {
 		return MemoryCategoryOverview{}, fmt.Errorf("memory categories: %w", err)

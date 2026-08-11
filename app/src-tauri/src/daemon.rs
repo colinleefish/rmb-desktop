@@ -4,10 +4,18 @@ use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
 
+use serde::Deserialize;
+
 use crate::bootstrap;
 
-const DEFAULT_BASE_URL: &str = "http://127.0.0.1:19019";
+const DEFAULT_ADDR: &str = "127.0.0.1:19019";
 const LAUNCHD_LABEL: &str = "me.remember.rmbd";
+
+#[derive(Deserialize)]
+struct ConfigAddr {
+    #[serde(default)]
+    addr: Option<String>,
+}
 
 pub struct DaemonManager {
     child: Mutex<Option<Child>>,
@@ -42,7 +50,7 @@ impl DaemonManager {
         if self.managed_running() {
             return Ok(());
         }
-        if health_ok(DEFAULT_BASE_URL) {
+        if health_ok(&base_url()) {
             return Ok(());
         }
 
@@ -77,13 +85,13 @@ impl DaemonManager {
             return Ok(());
         }
         // Dev / launchd may already have a healthy listener — do not kill it.
-        if health_ok(DEFAULT_BASE_URL) {
+        if health_ok(&base_url()) {
             return Ok(());
         }
 
         detach_external_daemon();
         wait_for_health(false, Duration::from_secs(3));
-        if health_ok(DEFAULT_BASE_URL) {
+        if health_ok(&base_url()) {
             return Ok(());
         }
 
@@ -92,7 +100,7 @@ impl DaemonManager {
         Ok(())
     }
 
-    /// Stops the managed daemon, unloads launchd, and kills listeners on 19019.
+    /// Stops the managed daemon, unloads launchd, and kills listeners on the configured port.
     pub fn shutdown(&self) {
         self.stop_managed();
         detach_external_daemon();
@@ -103,7 +111,7 @@ impl DaemonManager {
 fn wait_for_health(want_healthy: bool, timeout: Duration) {
     let deadline = std::time::Instant::now() + timeout;
     while std::time::Instant::now() < deadline {
-        if health_ok(DEFAULT_BASE_URL) == want_healthy {
+        if health_ok(&base_url()) == want_healthy {
             return;
         }
         thread::sleep(Duration::from_millis(200));
@@ -113,7 +121,7 @@ fn wait_for_health(want_healthy: bool, timeout: Duration) {
 #[cfg(target_os = "macos")]
 fn detach_external_daemon() {
     let Some(uid) = gui_uid() else {
-        kill_listeners_on_port(19019);
+        kill_listeners_on_port(daemon_port());
         return;
     };
     let domain = format!("gui/{uid}");
@@ -138,12 +146,12 @@ fn detach_external_daemon() {
         .stderr(Stdio::null())
         .status();
 
-    kill_listeners_on_port(19019);
+    kill_listeners_on_port(daemon_port());
 }
 
 #[cfg(not(target_os = "macos"))]
 fn detach_external_daemon() {
-    kill_listeners_on_port(19019);
+    kill_listeners_on_port(daemon_port());
 }
 
 #[cfg(target_os = "macos")]
@@ -192,17 +200,62 @@ fn kill_listeners_on_port(port: u16) {
     thread::sleep(Duration::from_millis(300));
 }
 
+fn config_file_path() -> Option<PathBuf> {
+    dirs::home_dir().map(|home| {
+        home.join("Library")
+            .join("Application Support")
+            .join("rmb-desktop")
+            .join("config.yaml")
+    })
+}
+
+fn read_config_addr() -> Option<String> {
+    let path = config_file_path()?;
+    let content = std::fs::read_to_string(path).ok()?;
+    let cfg: ConfigAddr = serde_yaml::from_str(&content).ok()?;
+    cfg.addr.filter(|s| !s.trim().is_empty())
+}
+
+fn normalize_addr(addr: &str) -> String {
+    let addr = addr.trim();
+    if addr.is_empty() {
+        return format!("http://{DEFAULT_ADDR}");
+    }
+    if addr.starts_with("http://") || addr.starts_with("https://") {
+        addr.trim_end_matches('/').to_string()
+    } else {
+        format!("http://{}", addr.trim_end_matches('/'))
+    }
+}
+
 pub fn base_url() -> String {
-    std::env::var("RMB_ADDR")
-        .map(|v| {
-            let v = v.trim().to_string();
-            if v.starts_with("http://") || v.starts_with("https://") {
-                v
-            } else {
-                format!("http://{v}")
-            }
-        })
-        .unwrap_or_else(|_| DEFAULT_BASE_URL.to_string())
+    if let Ok(v) = std::env::var("RMB_ADDR") {
+        let v = v.trim();
+        if !v.is_empty() {
+            return normalize_addr(v);
+        }
+    }
+    if let Some(addr) = read_config_addr() {
+        return normalize_addr(&addr);
+    }
+    normalize_addr(DEFAULT_ADDR)
+}
+
+fn daemon_port() -> u16 {
+    let url = base_url();
+    let host_port = url
+        .trim_start_matches("http://")
+        .trim_start_matches("https://");
+    if let Some((_host, port_str)) = host_port.rsplit_once(':') {
+        if let Ok(port) = port_str.parse::<u16>() {
+            return port;
+        }
+    }
+    if url.starts_with("https://") {
+        443
+    } else {
+        80
+    }
 }
 
 pub fn dashboard_url() -> String {
@@ -268,18 +321,13 @@ fn which_rmbd() -> Result<PathBuf, ()> {
 }
 
 fn config_serve_args() -> Vec<String> {
-    let Some(home) = dirs::home_dir() else {
+    let Some(path) = config_file_path() else {
         return Vec::new();
     };
-    let config = home
-        .join("Library")
-        .join("Application Support")
-        .join("rmb-desktop")
-        .join("config.yaml");
-    if config.is_file() {
+    if path.is_file() {
         vec![
             "-config".to_string(),
-            config.to_string_lossy().into_owned(),
+            path.to_string_lossy().into_owned(),
         ]
     } else {
         Vec::new()

@@ -27,9 +27,12 @@ var knownCompatSuffixes = []string{
 }
 
 type modelsListResponse struct {
-	Data []struct {
-		ID string `json:"id"`
-	} `json:"data"`
+	Data []modelsListItem `json:"data"`
+}
+
+type modelsListItem struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 func buildModelsURLCandidates(baseURL string) []string {
@@ -156,8 +159,7 @@ func listModels(ctx context.Context, apiBase, apiKey string, timeout time.Durati
 
 		ids := make([]string, 0, len(parsed.Data))
 		for _, item := range parsed.Data {
-			id := strings.TrimSpace(item.ID)
-			if id != "" {
+			for _, id := range modelListIDs(item) {
 				ids = append(ids, id)
 			}
 		}
@@ -170,15 +172,19 @@ func listModels(ctx context.Context, apiBase, apiKey string, timeout time.Durati
 	return nil, fmt.Errorf("no models endpoint candidates for %s", base)
 }
 
-func modelsContain(ids []string, model string) bool {
-	want := strings.TrimSpace(model)
-	if want == "" {
-		return true
-	}
-	for _, id := range ids {
-		if id == want {
-			return true
+func modelListIDs(item modelsListItem) []string {
+	seen := make(map[string]struct{}, 2)
+	var ids []string
+	for _, raw := range []string{item.ID, item.Name} {
+		id := strings.TrimSpace(raw)
+		if id == "" {
+			continue
 		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
 	}
-	return false
+	return ids
 }

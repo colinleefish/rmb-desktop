@@ -5,7 +5,9 @@ import type { ConfigUpdateRequest, ConfigView } from "../lib/types";
 import { useI18n } from "../i18n";
 import { LanguageSelect } from "../components/LanguageSelect";
 import { SelectMenu } from "../components/SelectMenu";
+import { ConfiguredApiKeyField } from "../components/ConfiguredApiKeyField";
 import { EmbedDimensionsSelect } from "../components/EmbedDimensionsSelect";
+import { Modal } from "../components/Modal";
 import { DEFAULT_PIPELINE } from "../lib/pipelineDefaults";
 import {
   DEFAULT_EMBED_DIMENSION,
@@ -14,6 +16,19 @@ import {
 } from "../lib/embedDimensions";
 import { durationToSeconds, secondsToDuration } from "../lib/pipelineDuration";
 import { parseSettingsPath, settingsPath, type SettingsSection } from "../lib/settingsRoutes";
+
+function embedSettingsChanged(
+  saved: ConfigView["embed"],
+  embedBase: string,
+  embedModel: string,
+  embedDims: EmbedDimension,
+): boolean {
+  return (
+    saved.api_base.trim() !== embedBase.trim() ||
+    saved.model.trim() !== embedModel.trim() ||
+    normalizeEmbedDimension(saved.dimensions) !== embedDims
+  );
+}
 
 export function SettingsPage() {
   const { t, lang, setLang } = useI18n();
@@ -25,8 +40,10 @@ export function SettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showEmbedConfirm, setShowEmbedConfirm] = useState(false);
 
   const [addr, setAddr] = useState("");
+  const [launchAtLogin, setLaunchAtLogin] = useState(false);
   const [llmBase, setLlmBase] = useState("");
   const [llmKey, setLlmKey] = useState("");
   const [llmModel, setLlmModel] = useState("");
@@ -35,13 +52,13 @@ export function SettingsPage() {
   const [embedModel, setEmbedModel] = useState("");
   const [embedDims, setEmbedDims] = useState<EmbedDimension>(DEFAULT_EMBED_DIMENSION);
   const [pipeline, setPipeline] = useState<ConfigView["pipeline"] | null>(null);
-  const [launchAtLoginSaving, setLaunchAtLoginSaving] = useState(false);
 
   useEffect(() => {
     getConfig()
       .then((c) => {
         setConfig(c);
         setAddr(c.addr);
+        setLaunchAtLogin(c.launch_at_login);
         setLlmBase(c.llm.api_base);
         setLlmModel(c.llm.model);
         setEmbedBase(c.embed.api_base);
@@ -59,13 +76,14 @@ export function SettingsPage() {
     return <Navigate to="/settings/general" replace />;
   }
 
-  async function handleSave() {
+  async function performSave() {
     if (!config || !pipeline) return;
     setSaving(true);
     setError(null);
     setMessage(null);
     const update: ConfigUpdateRequest = {
       addr,
+      launch_at_login: launchAtLogin,
       llm: {
         api_base: llmBase,
         model: llmModel,
@@ -82,6 +100,7 @@ export function SettingsPage() {
     try {
       const res = await putConfig(update);
       setConfig(res.config);
+      setLaunchAtLogin(res.config.launch_at_login);
       setLlmKey("");
       setEmbedKey("");
       setMessage(res.message);
@@ -89,7 +108,17 @@ export function SettingsPage() {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setSaving(false);
+      setShowEmbedConfirm(false);
     }
+  }
+
+  async function handleSave() {
+    if (!config || !pipeline) return;
+    if (embedSettingsChanged(config.embed, embedBase, embedModel, embedDims)) {
+      setShowEmbedConfirm(true);
+      return;
+    }
+    await performSave();
   }
 
   const tabs: { id: SettingsSection; label: string }[] = [
@@ -99,23 +128,9 @@ export function SettingsPage() {
   ];
 
   function selectTab(next: SettingsSection) {
-    navigate(settingsPath(next), { replace: true });
-  }
-
-  async function handleLaunchAtLoginChange(enabled: boolean) {
-    if (!config) return;
-    setLaunchAtLoginSaving(true);
-    setError(null);
     setMessage(null);
-    try {
-      const res = await putConfig({ launch_at_login: enabled });
-      setConfig(res.config);
-      setMessage(res.message);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setLaunchAtLoginSaving(false);
-    }
+    setError(null);
+    navigate(settingsPath(next), { replace: true });
   }
 
   if (!config || !pipeline) {
@@ -169,11 +184,8 @@ export function SettingsPage() {
                 <SelectMenu
                   id="settings-launch-at-login"
                   labelId="settings-launch-at-login-label"
-                  value={config.launch_at_login ? "enabled" : "disabled"}
-                  disabled={launchAtLoginSaving}
-                  onChange={(next) => {
-                    void handleLaunchAtLoginChange(next === "enabled");
-                  }}
+                  value={launchAtLogin ? "enabled" : "disabled"}
+                  onChange={(next) => setLaunchAtLogin(next === "enabled")}
                   options={[
                     { value: "enabled", label: t.settings.general.launchAtLoginEnabled },
                     { value: "disabled", label: t.settings.general.launchAtLoginDisabled },
@@ -210,19 +222,14 @@ export function SettingsPage() {
                 placeholder={t.settings.llm.apiBasePlaceholder}
               />
               <Field label={t.settings.llm.model} value={llmModel} onChange={setLlmModel} />
-              <div>
-                <label className="block text-sm font-medium text-rmb-gray">{t.settings.llm.apiKey}</label>
-                {config.llm.api_key_set && (
-                  <p className="mt-1 text-xs text-emerald-600">{t.settings.llm.apiKeySet}</p>
-                )}
-                <input
-                  type="password"
-                  value={llmKey}
-                  onChange={(e) => setLlmKey(e.target.value)}
-                  placeholder={t.settings.llm.apiKeyPlaceholder}
-                  className="mt-1 w-full rounded-md border border-rmb-gray/20 px-3 py-2 text-sm"
-                />
-              </div>
+              <ConfiguredApiKeyField
+                label={t.settings.llm.apiKey}
+                configured={config.llm.api_key_set}
+                value={llmKey}
+                onChange={setLlmKey}
+                emptyPlaceholder={t.settings.llm.apiKeyPlaceholder}
+                replacePlaceholder={t.settings.llm.apiKeyReplacePlaceholder}
+              />
             </section>
 
             <section className="space-y-4 border-t border-rmb-gray/15 pt-8">
@@ -251,19 +258,14 @@ export function SettingsPage() {
                   />
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-rmb-gray">{t.settings.embed.apiKey}</label>
-                {config.embed.api_key_set && (
-                  <p className="mt-1 text-xs text-emerald-600">{t.settings.embed.apiKeySet}</p>
-                )}
-                <input
-                  type="password"
-                  value={embedKey}
-                  onChange={(e) => setEmbedKey(e.target.value)}
-                  placeholder={t.settings.embed.apiKeyPlaceholder}
-                  className="mt-1 w-full rounded-md border border-rmb-gray/20 px-3 py-2 text-sm"
-                />
-              </div>
+              <ConfiguredApiKeyField
+                label={t.settings.embed.apiKey}
+                configured={config.embed.api_key_set}
+                value={embedKey}
+                onChange={setEmbedKey}
+                emptyPlaceholder={t.settings.embed.apiKeyPlaceholder}
+                replacePlaceholder={t.settings.embed.apiKeyReplacePlaceholder}
+              />
             </section>
           </div>
         )}
@@ -303,20 +305,45 @@ export function SettingsPage() {
 
         </div>
 
-        <div className="flex items-center gap-4 border-t border-rmb-gray/15 bg-rmb-light/30 px-6 py-4">
+        <div className="flex flex-wrap items-center gap-4 border-t border-rmb-gray/15 bg-rmb-light/30 px-6 py-4">
             <button
               type="button"
-              onClick={handleSave}
+              onClick={() => void handleSave()}
               disabled={saving}
               className="rounded-md bg-rmb-accent px-4 py-2 text-sm font-medium text-white hover:bg-rmb-accent/90 disabled:opacity-50"
             >
               {saving ? t.settings.saving : t.settings.save}
             </button>
-            {message && <p className="text-sm text-emerald-600">{t.settings.saved}</p>}
-            {message && <p className="text-sm text-rmb-gray">{t.settings.restartHint}</p>}
+            {message && <p className="text-sm text-emerald-600">{message}</p>}
             {error && <p className="text-sm text-red-600">{error}</p>}
           </div>
       </div>
+
+      <Modal
+        open={showEmbedConfirm}
+        onClose={() => setShowEmbedConfirm(false)}
+        title={t.settings.embed.reembedConfirmTitle}
+      >
+        <p className="text-sm text-rmb-gray">{t.settings.embed.reembedConfirmBody}</p>
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={() => setShowEmbedConfirm(false)}
+            disabled={saving}
+            className="rounded-md border border-rmb-gray/20 bg-white px-4 py-2 text-sm font-medium text-rmb-dark hover:bg-rmb-light disabled:opacity-50"
+          >
+            {t.settings.embed.reembedConfirmCancel}
+          </button>
+          <button
+            type="button"
+            onClick={() => void performSave()}
+            disabled={saving}
+            className="rounded-md bg-rmb-accent px-4 py-2 text-sm font-medium text-white hover:bg-rmb-accent/90 disabled:opacity-50"
+          >
+            {saving ? t.settings.saving : t.settings.embed.reembedConfirmAction}
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }

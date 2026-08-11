@@ -14,13 +14,11 @@ import (
 )
 
 type configTestSide struct {
-	OK             bool     `json:"ok"`
-	LatencyMs      int64    `json:"latency_ms,omitempty"`
-	Error          string   `json:"error,omitempty"`
-	RequestedModel string   `json:"requested_model,omitempty"`
-	ModelFound     *bool    `json:"model_found,omitempty"`
-	ModelsCount    int      `json:"models_count,omitempty"`
-	Models         []string `json:"models,omitempty"`
+	OK          bool     `json:"ok"`
+	LatencyMs   int64    `json:"latency_ms,omitempty"`
+	Error       string   `json:"error,omitempty"`
+	ModelsCount int      `json:"models_count,omitempty"`
+	Models      []string `json:"models,omitempty"`
 }
 
 type configTestResponse struct {
@@ -112,13 +110,8 @@ func writeConfigTestSide(w http.ResponseWriter, dur time.Duration, err error) {
 
 func llmTestSide(res llm.LLMConnectionTestResult, err error) configTestSide {
 	out := configTestSide{
-		LatencyMs:      res.Latency.Milliseconds(),
-		RequestedModel: res.RequestedModel,
-		Models:         res.Models,
-	}
-	if res.RequestedModel != "" {
-		found := res.ModelFound
-		out.ModelFound = &found
+		LatencyMs: res.Latency.Milliseconds(),
+		Models:    res.Models,
 	}
 	if res.ModelsTotal > 0 {
 		out.ModelsCount = res.ModelsTotal

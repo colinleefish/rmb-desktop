@@ -1,56 +1,48 @@
-# rmb-desktop
+# RMB Desktop
 
-Local-first, cross-platform memory for AI coding agents.
+English / [简体中文](README_CN.md)
 
-Everything runs on your machine: capture, distillation, storage, and recall. No server to deploy. Data lives in a single SQLite database with vector search.
+**Give your AI coding agents a memory that lasts.**
 
-Syncthing-style product shape: background daemon + web GUI + desktop app.
+RMB remembers what you told Cursor, Claude Code, Codex, and other agents — so they stop asking the same questions every session. Everything runs on your Mac (or PC). Your data stays on your machine.
 
-## Architecture
+Website: [re-mem-ber.me](https://re-mem-ber.me)
 
-```
-app (Tauri)       →  tray · setup wizard · open dashboard
-       ↓ manages
-rmbd (daemon)     →  HTTP API · workers · embedded web UI
-       ↓
-SQLite + vectors  →  platform app-data dir (see plan)
+## What it does
 
-rmb (CLI)         →  hook-submit · search · setup · cat · tree · meta
-```
+AI agents forget everything when a chat ends. RMB fixes that in three steps:
 
-Stable IDs use a unified **`rmb://`** scheme (e.g. `rmb://profile`, `rmb://atoms/<uuid>`).
+1. **Capture** — quietly records conversations from your coding agents
+2. **Remember** — turns those chats into useful facts in the background
+3. **Recall** — lets agents search past knowledge before asking you again
 
-## Quick start
+Think of it as a shared notebook for all your agents.
 
-```bash
-make build
-make app-dev        # tray icon in menu bar
-```
+## Who it's for
 
-See [`app/README.md`](./app/README.md) for desktop app details.
+Anyone who uses AI coding tools and is tired of re-explaining project context, preferences, or decisions.
 
-## Status
+Supports: 
 
-M0–M4 complete; desktop app (M7 preview) scaffolded. **M5 web UI in progress** — browse API + Vite dashboard at `/ui/`.
+- [x] Cursor
+- [x] Claude Code
+- [x] Codex
+- [x] OpenCode
+- [x] Pi
 
-## Planned layout
+## Download and Setup
 
-```
-rmb-desktop/
-├── cmd/rmb/       # CLI entrypoint
-├── cmd/rmbd/      # daemon entrypoint
-├── internal/      # storage, workers, recall, hooks, API
-├── webui/         # Vite + React dashboard (embedded in rmbd)
-├── app/           # Tauri desktop app
-└── install/       # per-OS service installers
-```
+1. Download from [re-mem-ber.me](https://re-mem-ber.me) or [GitHub Releases](https://github.com/colinleefish/rmb-desktop/releases)
+2. Open the app — you'll see an RMB icon in the menu bar
+3. Follow the setup wizard (pick your agents + API keys)
+4. Keep coding — RMB runs in the background
 
-## Principles
 
-- **Standalone** — all memory, distillation, and storage logic lives in this repo.
-- **Local-first** — works offline; optional paid sync across devices (later).
-- **SQLite + vectors** — single-file database, no external DB server.
-- **Cross-platform** — macOS, Linux, Windows.
+## Privacy
+
+- Runs entirely on your device — no cloud account required
+- Needs an LLM API key only for turning chats into memories
+- Optional multi-device sync may come later; v1 is single-device
 
 ## License
 

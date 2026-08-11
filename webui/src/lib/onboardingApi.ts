@@ -20,8 +20,6 @@ export type ConfigTestSide = {
   ok: boolean;
   latency_ms?: number;
   error?: string;
-  requested_model?: string;
-  model_found?: boolean;
   models_count?: number;
   models?: string[];
 };

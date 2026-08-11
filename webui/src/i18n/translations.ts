@@ -377,14 +377,7 @@ export const translations = {
       agents: {
         title: "Connect your agents",
         intro:
-          "Choose an agent installed on this machine. Apply the hook and recall steps, then verify capture works.",
-        verifyIntro:
-          "Send a message in your agent, then check that a session appears in RMB.",
-        checkSessions: "Check for sessions",
-        checking: "Checking…",
-        simulateVerify: "Simulate verification (demo)",
-        verifySimulated: "Verification simulated for demo.",
-        verifySuccess: "Sessions detected — capture is working.",
+          "Choose an agent installed on this machine and apply the hook and recall steps.",
         needOneAgent: "Configure at least one detected agent before finishing.",
         finish: "Finish setup",
         skipForNow: "Skip for now",
@@ -774,13 +767,7 @@ export const translations = {
       },
       agents: {
         title: "连接智能体",
-        intro: "选择本机已安装的智能体，完成 Hook 与召回配置，并验证采集是否正常。",
-        verifyIntro: "在智能体中发送一条消息，然后确认 RMB 中是否出现新会话。",
-        checkSessions: "检查会话",
-        checking: "检查中…",
-        simulateVerify: "模拟验证（演示）",
-        verifySimulated: "已为演示模拟验证成功。",
-        verifySuccess: "已检测到会话 — 采集正常。",
+        intro: "选择本机已安装的智能体，完成 Hook 与召回配置。",
         needOneAgent: "完成前请至少配置一个已检测到的智能体。",
         finish: "完成设置",
         skipForNow: "暂时跳过",

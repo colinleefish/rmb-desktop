@@ -1,7 +1,7 @@
 {
   "name": "rmb-app",
   "private": true,
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "rmb desktop app (Tauri v1)",
   "license": "MIT",
   "scripts": {

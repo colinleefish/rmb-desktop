@@ -1,6 +1,6 @@
 [package]
 name = "rmb-app"
-version = "0.1.0"
+version = "0.1.1"
 description = "rmb desktop app"
 authors = ["colinleefish"]
 license = ""

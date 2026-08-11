@@ -1,5 +1,7 @@
-/** Dev-only: onboarding wizard uses mock config test + local completion state. */
+/** Dev-only flags for onboarding wizard mock modes. */
 import { clearOnboardingState } from "./onboardingState";
+import { resetOnboardingComplete } from "./onboardingComplete";
+
 export function isOnboardingDemo(): boolean {
   if (import.meta.env.VITE_MOCK_ONBOARDING === "true") return true;
   if (!import.meta.env.DEV) return false;
@@ -10,22 +12,8 @@ export function isOnboardingDemo(): boolean {
   }
 }
 
-const COMPLETE_KEY = "rmb.onboardingComplete";
-
-export function isOnboardingComplete(): boolean {
-  try {
-    return localStorage.getItem(COMPLETE_KEY) === "1";
-  } catch {
-    return false;
-  }
-}
-
-export function markOnboardingComplete(): void {
-  localStorage.setItem(COMPLETE_KEY, "1");
-  clearOnboardingState();
-}
-
 export function resetOnboardingDemo(): void {
-  localStorage.removeItem(COMPLETE_KEY);
-  clearOnboardingState();
+  void resetOnboardingComplete().then(() => {
+    clearOnboardingState();
+  });
 }

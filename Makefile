@@ -42,22 +42,22 @@ prepare-sidecars: build
 app-dev: prepare-sidecars
 	cd app && RMBD_PATH=$(CURDIR)/bin/rmbd npm run dev
 
-DMG_BUNDLE := app/src-tauri/target/release/bundle/dmg/rmb_0.1.1_aarch64.dmg
-APP_BUNDLE := app/src-tauri/target/release/bundle/macos/rmb.app
+DMG_BUNDLE := app/src-tauri/target/release/bundle/dmg/RMB Desktop_0.1.2_aarch64.dmg
+APP_BUNDLE := app/src-tauri/target/release/bundle/macos/RMB Desktop.app
 
 app-build: app-icons prepare-sidecars
 	cd app && npm run build
 	bash scripts/finish-dmg.sh "$(DMG_BUNDLE)"
 
 app-install: app-build
-	rm -rf /Applications/rmb.app
-	cp -R "$(APP_BUNDLE)" /Applications/rmb.app
+	rm -rf "/Applications/RMB Desktop.app"
+	cp -R "$(APP_BUNDLE)" "/Applications/RMB Desktop.app"
 	cp "$(APP_BUNDLE)/Contents/MacOS/rmb" "$(HOME)/.rmb/bin/rmb-app"
 	chmod +x "$(HOME)/.rmb/bin/rmb-app"
 	cp "$(APP_BUNDLE)/Contents/MacOS/rmbd" "$(HOME)/.rmb/bin/rmbd-desktop"
 	chmod +x "$(HOME)/.rmb/bin/rmbd-desktop"
 	rm -rf "$(APP_BUNDLE)"
-	open /Applications/rmb.app
+	open "/Applications/RMB Desktop.app"
 
 app-icons:
 	cd app && npx @resvg/resvg-js-cli ../$(ICON_SRC) /tmp/rmb-app-icon.png --fit-width 1024 --fit-height 1024

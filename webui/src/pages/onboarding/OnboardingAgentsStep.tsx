@@ -6,7 +6,8 @@ import { useI18n } from "../../i18n";
 import type { IntegrationAgentId } from "../../integrations/types";
 import { isAgentConfigured } from "../../lib/agentStatus";
 import { fetchSetupStatus } from "../../lib/setupApi";
-import { isOnboardingDemo, markOnboardingComplete } from "../../lib/onboardingMock";
+import { isOnboardingDemo } from "../../lib/onboardingMock";
+import { markOnboardingComplete } from "../../lib/onboardingComplete";
 import { pageSessions } from "../../lib/api";
 
 export function OnboardingAgentsStep() {
@@ -47,8 +48,8 @@ export function OnboardingAgentsStep() {
     setVerified(true);
   }
 
-  function handleFinish() {
-    markOnboardingComplete();
+  async function handleFinish() {
+    await markOnboardingComplete({ skippedAgents: false });
     navigate("/", { replace: true });
   }
 
@@ -139,8 +140,9 @@ export function OnboardingAgentsStep() {
         <button
           type="button"
           onClick={() => {
-            markOnboardingComplete();
-            navigate("/", { replace: true });
+            void markOnboardingComplete({ skippedAgents: true }).then(() => {
+              navigate("/", { replace: true });
+            });
           }}
           className="text-sm text-rmb-gray hover:text-rmb-dark"
         >

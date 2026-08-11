@@ -55,3 +55,12 @@ func DBPath() (string, error) {
 	}
 	return filepath.Join(dir, "data", "rmb.db"), nil
 }
+
+// OnboardingCompletePath returns the marker file written when first-run setup finishes.
+func OnboardingCompletePath() (string, error) {
+	dir, err := DataDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "onboarding.complete"), nil
+}

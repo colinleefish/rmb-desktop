@@ -1,18 +1,31 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { isOnboardingComplete, isOnboardingDemo } from "../../lib/onboardingMock";
+import { fetchOnboardingCompleted } from "../../lib/onboardingComplete";
 
-/** Redirects to onboarding wizard in demo mode until the user finishes or skips. */
+/** Redirect to onboarding until onboarding.complete exists on disk. */
 export function OnboardingGate({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    if (!isOnboardingDemo()) return;
-    if (isOnboardingComplete()) return;
-    if (location.pathname.startsWith("/onboarding")) return;
-    navigate("/onboarding", { replace: true });
+    let cancelled = false;
+
+    void (async () => {
+      const completed = await fetchOnboardingCompleted();
+      if (cancelled) return;
+      setReady(true);
+      if (completed) return;
+      if (location.pathname.startsWith("/onboarding")) return;
+      navigate("/onboarding", { replace: true });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [location.pathname, navigate]);
+
+  if (!ready) return null;
 
   return children;
 }

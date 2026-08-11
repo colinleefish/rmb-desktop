@@ -3,10 +3,10 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>me.remember.rmb</string>
+    <string>me.remember.rmb.login</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/liguanghui/.rmb/bin/rmb-app</string>
+        <string>/Applications/RMB Desktop.app/Contents/MacOS/RMB Desktop</string>
     </array>
     <key>EnvironmentVariables</key>
     <dict>

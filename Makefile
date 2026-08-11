@@ -42,8 +42,20 @@ prepare-sidecars: build
 app-dev: prepare-sidecars
 	cd app && RMBD_PATH=$(CURDIR)/bin/rmbd npm run dev
 
-DMG_BUNDLE := app/src-tauri/target/release/bundle/dmg/RMB Desktop_0.1.8_aarch64.dmg
+DMG_BUNDLE := app/src-tauri/target/release/bundle/dmg/RMB Desktop_0.1.9_aarch64.dmg
 APP_BUNDLE := app/src-tauri/target/release/bundle/macos/RMB Desktop.app
+PROXY_URL ?= socks5://127.0.0.1:1080
+GH := ALL_PROXY=$(PROXY_URL) HTTPS_PROXY=$(PROXY_URL) HTTP_PROXY=$(PROXY_URL) gh
+
+# Upload/publish GitHub release (uses proxy). VERSION=0.1.x NOTES=file.md optional.
+release-publish:
+	@test -n "$(VERSION)" || (echo "usage: make release-publish VERSION=0.1.x" >&2; exit 1)
+	@test -f "$(DMG_BUNDLE)" || (echo "missing $(DMG_BUNDLE); run make app-build" >&2; exit 1)
+	cp "$(DMG_BUNDLE)" "/tmp/RMB.Desktop_$(VERSION)_aarch64.dmg"
+	$(GH) release create "v$(VERSION)" "/tmp/RMB.Desktop_$(VERSION)_aarch64.dmg" \
+		--repo colinleefish/rmb-desktop \
+		--title "RMB Desktop $(VERSION)" \
+		$(if $(NOTES),--notes-file $(NOTES),)
 
 app-build: app-icons prepare-sidecars
 	cd app && npm run build
@@ -52,7 +64,7 @@ app-build: app-icons prepare-sidecars
 app-install: app-build
 	rm -rf "/Applications/RMB Desktop.app"
 	cp -R "$(APP_BUNDLE)" "/Applications/RMB Desktop.app"
-	cp "$(APP_BUNDLE)/Contents/MacOS/rmb" "$(HOME)/.rmb/bin/rmb-app"
+	cp "$(APP_BUNDLE)/Contents/MacOS/RMB Desktop" "$(HOME)/.rmb/bin/rmb-app"
 	chmod +x "$(HOME)/.rmb/bin/rmb-app"
 	cp "$(APP_BUNDLE)/Contents/MacOS/rmbd" "$(HOME)/.rmb/bin/rmbd-desktop"
 	chmod +x "$(HOME)/.rmb/bin/rmbd-desktop"

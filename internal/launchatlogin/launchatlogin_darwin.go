@@ -10,7 +10,11 @@ import (
 	"strings"
 )
 
-const label = "me.remember.rmb"
+const label = "me.remember.rmb.login"
+
+// legacyLabel collided with the app's bundle identifier (me.remember.rmb),
+// leaving launchd in a disabled-but-not-loaded state where bootstrap fails.
+const legacyLabel = "me.remember.rmb"
 
 func set(enabled bool) error {
 	if enabled {
@@ -35,10 +39,20 @@ func enable() error {
 	domain := fmt.Sprintf("gui/%s", uid)
 	target := fmt.Sprintf("%s/%s", domain, label)
 
+	cleanupLegacyAgent(domain)
 	bootout(domain, plistPath)
 
+	// Unblock a previously disabled registration before bootstrap.
+	_ = runLaunchctl("enable", target)
+
 	if err := runLaunchctl("bootstrap", domain, plistPath); err != nil {
-		return err
+		if !isAlreadyLoaded(err) {
+			bootout(domain, plistPath)
+			_ = runLaunchctl("enable", target)
+			if err2 := runLaunchctl("bootstrap", domain, plistPath); err2 != nil && !isAlreadyLoaded(err2) {
+				return err2
+			}
+		}
 	}
 	return runLaunchctl("enable", target)
 }
@@ -57,7 +71,25 @@ func disable() error {
 		return err
 	}
 	bootout(domain, plistPath)
+
+	cleanupLegacyAgent(domain)
 	return nil
+}
+
+func cleanupLegacyAgent(domain string) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return
+	}
+	legacyPlist := filepath.Join(home, "Library", "LaunchAgents", legacyLabel+".plist")
+	legacyTarget := fmt.Sprintf("%s/%s", domain, legacyLabel)
+
+	_ = runLaunchctl("disable", legacyTarget)
+	bootout(domain, legacyPlist)
+	_ = runLaunchctl("bootout", domain, legacyLabel)
+	if fileExists(legacyPlist) {
+		_ = os.Remove(legacyPlist)
+	}
 }
 
 func bootout(domain, plistPath string) {
@@ -74,6 +106,10 @@ func plistPath() (string, error) {
 }
 
 func appBinaryPath(home string) string {
+	appInApplications := "/Applications/RMB Desktop.app/Contents/MacOS/RMB Desktop"
+	if fileExists(appInApplications) {
+		return appInApplications
+	}
 	app := filepath.Join(home, ".rmb", "bin", "rmb-app")
 	if fileExists(app) {
 		return app
@@ -150,6 +186,15 @@ func runLaunchctl(args ...string) error {
 		return fmt.Errorf("launchctl %s: %s", strings.Join(args, " "), msg)
 	}
 	return nil
+}
+
+func isAlreadyLoaded(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "already bootstrapped") ||
+		strings.Contains(msg, "service already loaded")
 }
 
 func fileExists(path string) bool {

@@ -24,7 +24,7 @@ func TestWritePlist(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	plistPath := filepath.Join(home, "Library", "LaunchAgents", "me.remember.rmb.plist")
+	plistPath := filepath.Join(home, "Library", "LaunchAgents", label+".plist")
 	if err := writePlist(plistPath); err != nil {
 		t.Fatal(err)
 	}

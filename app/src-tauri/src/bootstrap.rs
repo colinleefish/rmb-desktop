@@ -15,16 +15,13 @@ pub fn ensure_installed() -> Result<(), String> {
     let cli_dst = install_dir.join(CLI_NAME);
     let daemon_dst = install_dir.join(DAEMON_NAME);
 
+    let app_dst = install_dir.join(APP_CLI_NAME);
     if needs_refresh(&cli_dst, &daemon_dst)? {
         install_sidecar("rmb", &cli_dst)?;
         install_sidecar("rmbd", &daemon_dst)?;
-        let app_dst = install_dir.join(APP_CLI_NAME);
-        install_sidecar("rmb", &app_dst)?;
-    } else {
-        let app_dst = install_dir.join(APP_CLI_NAME);
-        if !app_dst.exists() && cli_dst.is_file() {
-            install_sidecar("rmb", &app_dst)?;
-        }
+        install_current_exe(&app_dst)?;
+    } else if !app_dst.exists() {
+        install_current_exe(&app_dst)?;
     }
 
     Ok(())
@@ -51,6 +48,24 @@ fn is_newer(src: &Path, dst: &Path) -> Result<bool, String> {
     let src_mtime = src_meta.modified().map_err(io_err)?;
     let dst_mtime = dst_meta.modified().map_err(io_err)?;
     Ok(src_mtime > dst_mtime)
+}
+
+fn install_current_exe(dst: &Path) -> Result<(), String> {
+    let src = std::env::current_exe().map_err(|e| format!("current_exe: {e}"))?;
+    if let Some(parent) = dst.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("create {}: {e}", parent.display()))?;
+    }
+    fs::copy(&src, dst).map_err(|e| format!("copy {} -> {}: {e}", src.display(), dst.display()))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut perms = fs::metadata(dst)
+            .map_err(|e| format!("stat {}: {e}", dst.display()))?
+            .permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(dst, perms).map_err(|e| format!("chmod {}: {e}", dst.display()))?;
+    }
+    Ok(())
 }
 
 fn install_sidecar(base_name: &str, dst: &Path) -> Result<(), String> {

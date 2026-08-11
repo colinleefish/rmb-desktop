@@ -14,7 +14,7 @@ import (
 	"github.com/colinleefish/rmb-desktop/internal/hook"
 )
 
-const cliVersion = "0.1.3"
+const cliVersion = "0.1.4"
 
 func main() {
 	os.Exit(run())

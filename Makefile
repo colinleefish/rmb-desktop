@@ -42,7 +42,7 @@ prepare-sidecars: build
 app-dev: prepare-sidecars
 	cd app && RMBD_PATH=$(CURDIR)/bin/rmbd npm run dev
 
-DMG_BUNDLE := app/src-tauri/target/release/bundle/dmg/RMB Desktop_0.1.3_aarch64.dmg
+DMG_BUNDLE := app/src-tauri/target/release/bundle/dmg/RMB Desktop_0.1.4_aarch64.dmg
 APP_BUNDLE := app/src-tauri/target/release/bundle/macos/RMB Desktop.app
 
 app-build: app-icons prepare-sidecars

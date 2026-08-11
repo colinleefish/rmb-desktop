@@ -194,6 +194,7 @@ export function OnboardingModelsStep({
           value={llmBase}
           onChange={setLlmBase}
           placeholder={t.settings.llm.apiBasePlaceholder}
+          inputMode="url"
         />
         <Field
           label={t.settings.llm.model}
@@ -201,7 +202,7 @@ export function OnboardingModelsStep({
           onChange={setLlmModel}
           placeholder={t.onboarding.models.llmModelPlaceholder}
         />
-        <PasswordField
+        <SecretField
           label={t.settings.llm.apiKey}
           value={llmKey}
           onChange={setLlmKey}
@@ -219,6 +220,7 @@ export function OnboardingModelsStep({
           value={embedBase}
           onChange={setEmbedBase}
           placeholder={t.settings.embed.apiBasePlaceholder}
+          inputMode="url"
         />
         <Field
           label={t.settings.embed.model}
@@ -246,7 +248,7 @@ export function OnboardingModelsStep({
             <span>{t.onboarding.models.embedNoticeDimensions}</span>
           </p>
         </div>
-        <PasswordField
+        <SecretField
           label={t.settings.embed.apiKey}
           value={embedKey}
           onChange={setEmbedKey}
@@ -429,16 +431,26 @@ function TestResultRow({
 const fieldClassName =
   "mt-1 w-full rounded-md border border-rmb-gray/20 px-3 py-2 text-sm text-rmb-dark";
 
+const noAutofillInputProps = {
+  autoComplete: "off",
+  spellCheck: false,
+  "data-1p-ignore": true,
+  "data-lpignore": "true",
+  "data-form-type": "other",
+} as const;
+
 function Field({
   label,
   value,
   onChange,
   placeholder,
+  inputMode,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
+  inputMode?: "text" | "url";
 }) {
   return (
     <div>
@@ -448,13 +460,15 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
+        inputMode={inputMode}
+        {...noAutofillInputProps}
         className={`${fieldClassName} placeholder:text-rmb-gray/45`}
       />
     </div>
   );
 }
 
-function PasswordField({
+function SecretField({
   label,
   value,
   onChange,
@@ -469,11 +483,12 @@ function PasswordField({
     <div>
       <label className="block text-sm font-medium text-rmb-gray">{label}</label>
       <input
-        type="password"
+        type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className={`${fieldClassName} placeholder:text-rmb-gray/45`}
+        {...noAutofillInputProps}
+        className={`${fieldClassName} rmb-masked-input placeholder:text-rmb-gray/45`}
       />
     </div>
   );

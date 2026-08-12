@@ -1,6 +1,6 @@
 [package]
 name = "rmb-app"
-version = "0.1.12"
+version = "0.1.13"
 description = "rmb desktop app"
 authors = ["colinleefish"]
 license = ""
@@ -21,6 +21,9 @@ serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 tauri = { version = "1.8.1", features = ["system-tray"] }
 ureq = { version = "2", features = ["json"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.52", features = ["Win32_Foundation", "Win32_Security", "Win32_System_Threading"] }
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]

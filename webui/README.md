@@ -31,6 +31,19 @@ Disable: `localStorage.removeItem('rmb.mockSetup')`.
 
 Only Settings → Integration uses mock data; sessions, memories, and the rest still hit rmbd.
 
+### Pipeline health dashboard (UI demo)
+
+Prototype the distillation health page with a 100-session backlog scenario (no rmbd required):
+
+```bash
+cd webui && npm run dev:mock-pipeline
+```
+
+Open http://localhost:5173/ui/pipeline
+
+Or in the browser console: `localStorage.setItem('rmb.mockPipeline', '1')` then reload.
+Disable: `localStorage.removeItem('rmb.mockPipeline')`.
+
 ### Onboarding wizard (UI demo)
 
 Prototype the first-run setup wizard. Connection test calls rmbd (start rmbd for real checks). Agent apply is simulated:

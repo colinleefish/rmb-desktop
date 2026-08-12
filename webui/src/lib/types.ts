@@ -122,9 +122,41 @@ export interface CorrectionRow {
   target_uris?: string[];
 }
 
-export interface PipelineStateRow extends PipelineState {
+export interface PipelineStatusCounts {
+  pending: number;
+  running: number;
+  failed: number;
+  idle: number;
+  waiting: number;
+}
+
+export interface PipelineFunnel {
+  sessions: number;
+  t1_done: number;
+  t2_done: number;
+  t3_done: number;
+}
+
+export interface PipelineProblem {
   session_key: string;
   session_uri: string;
+  stage: "t1" | "t2" | "t3" | string;
+  status: string;
+  updated_at: string;
+  reason?: string;
+}
+
+export interface PipelineHealth {
+  distillation_enabled: boolean;
+  tracked_sessions: number;
+  generated_at: string;
+  stages: {
+    t1: PipelineStatusCounts;
+    t2: PipelineStatusCounts;
+    t3: PipelineStatusCounts;
+  };
+  funnel: PipelineFunnel;
+  problems: PipelineProblem[];
 }
 
 export interface SessionDetail {
@@ -221,6 +253,10 @@ export interface ConfigView {
     l2_max_atoms_per_batch: number;
     l3_max_atoms_per_batch: number;
     embed_batch_size: number;
+    l1_min_concurrency: number;
+    l1_max_concurrency: number;
+    l2_min_concurrency: number;
+    l2_max_concurrency: number;
   };
 }
 

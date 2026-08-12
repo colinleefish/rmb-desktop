@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/colinleefish/rmb-desktop/internal/browse"
+	"github.com/colinleefish/rmb-desktop/internal/config"
 )
 
 const (
@@ -93,13 +94,17 @@ func (s *Server) handleBrowseMemories(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, page)
 }
 
-func (s *Server) handleBrowsePipeline(w http.ResponseWriter, r *http.Request) {
-	page, err := s.browse.ListPipelineStates(r.Context(), parseListParams(r))
+func (s *Server) handleBrowsePipelineHealth(w http.ResponseWriter, r *http.Request) {
+	distillationEnabled := false
+	if cfg, err := config.Load(s.configPath); err == nil {
+		distillationEnabled = cfg.DistillationEnabled()
+	}
+	health, err := s.browse.PipelineHealth(r.Context(), distillationEnabled)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, page)
+	writeJSON(w, http.StatusOK, health)
 }
 
 func (s *Server) handleBrowseTasks(w http.ResponseWriter, r *http.Request) {

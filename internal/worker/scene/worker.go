@@ -11,6 +11,7 @@ import (
 	"github.com/colinleefish/rmb-desktop/internal/db"
 	"github.com/colinleefish/rmb-desktop/internal/llm"
 	"github.com/colinleefish/rmb-desktop/internal/model"
+	"github.com/colinleefish/rmb-desktop/internal/worker/backpressure"
 	"github.com/colinleefish/rmb-desktop/internal/workerlock"
 )
 
@@ -26,13 +27,22 @@ type Worker struct {
 	locks *workerlock.SessionLocks
 	log   *slog.Logger
 	now   func() time.Time
+	bp    *backpressure.Controller
 }
 
 func NewWorker(database *sql.DB, llm SceneBuilder, cfg config.PipelineConfig, locks *workerlock.SessionLocks, log *slog.Logger) *Worker {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Worker{db: database, llm: llm, cfg: cfg, locks: locks, log: log, now: time.Now}
+	return &Worker{
+		db:    database,
+		llm:   llm,
+		cfg:   cfg,
+		locks: locks,
+		log:   log,
+		now:   time.Now,
+		bp:    backpressure.New(cfg.L2MinConcurrency, cfg.L2MaxConcurrency),
+	}
 }
 
 func (w *Worker) Run(ctx context.Context) error {
@@ -43,7 +53,11 @@ func (w *Worker) Run(ctx context.Context) error {
 	if interval <= 0 {
 		return fmt.Errorf("invalid l2 poll interval")
 	}
-	w.log.Info("l2 scene worker started", "poll_interval", interval)
+	w.log.Info("l2 scene worker started",
+		"poll_interval", interval,
+		"min_concurrency", w.bp.Min(),
+		"max_concurrency", w.bp.Max(),
+	)
 	w.runOneCycle(ctx)
 
 	ticker := time.NewTicker(interval)
@@ -65,18 +79,76 @@ func (w *Worker) runOneCycle(ctx context.Context) {
 		w.log.Error("l2 select candidates failed", "err", err)
 		return
 	}
-	for _, id := range ids {
-		if err := w.processSession(ctx, id); err != nil {
-			w.log.Error("l2 process session failed", "session_id", id, "err", err)
+	if len(ids) == 0 {
+		w.bp.EndCycle(0)
+		return
+	}
+
+	if n, err := w.countPendingSessions(ctx); err == nil {
+		if prev, next := w.bp.SeedFromBacklog(n); prev != next {
+			w.log.Info("l2 concurrency seeded", "from", prev, "to", next, "pending", n)
+		}
+	}
+
+	limit := w.bp.Limit()
+	w.log.Info("l2 cycle", "candidates", len(ids), "concurrency", limit)
+
+	remaining := ids
+	for len(remaining) > 0 {
+		if ctx.Err() != nil {
+			return
+		}
+		limit = w.bp.Limit()
+		n := limit
+		if n > len(remaining) {
+			n = len(remaining)
+		}
+		batch := remaining[:n]
+		remaining = remaining[n:]
+
+		backpressure.RunParallel(ctx, batch, limit, func(ctx context.Context, id string) {
+			err := w.processSession(ctx, id)
+			w.bp.Observe(backpressure.Outcome{
+				Err:      err,
+				Pressure: llm.IsTransientError(err),
+			})
+			if err != nil && !llm.IsTransientError(err) {
+				w.log.Error("l2 process session failed", "session_id", id, "err", err)
+			}
+		})
+
+		pendingHint := len(remaining)
+		if n, err := w.countPendingSessions(ctx); err == nil {
+			pendingHint = n
+		}
+		prev, next := w.bp.EndCycle(pendingHint)
+		if prev != next {
+			w.log.Info("l2 concurrency adjusted", "from", prev, "to", next, "pending", pendingHint)
+		}
+		if next < prev {
+			return
 		}
 	}
 }
 
+func (w *Worker) countPendingSessions(ctx context.Context) (int, error) {
+	var n int
+	err := w.db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM pipeline_state
+		WHERE l2_status IN ('pending', 'failed') AND l1_status != 'running'`).Scan(&n)
+	return n, err
+}
+
 func (w *Worker) selectCandidateSessions(ctx context.Context) ([]string, error) {
+	limit := w.bp.Max()
+	if limit < 1 {
+		limit = 4
+	}
+	fetch := limit * 2
 	rows, err := w.db.QueryContext(ctx, `
 		SELECT session_id FROM pipeline_state
 		WHERE l2_status IN ('pending', 'failed') AND l1_status != 'running'
-		ORDER BY updated_at LIMIT 8`)
+		ORDER BY updated_at LIMIT ?`, fetch)
 	if err != nil {
 		return nil, err
 	}
@@ -328,7 +400,7 @@ func (w *Worker) handleProcessError(ctx context.Context, sessionID string, cause
 	if llm.IsTransientError(cause) {
 		w.log.Warn("l2 transient error", "session_id", sessionID, "err", cause)
 		_, _ = w.db.ExecContext(ctx, `UPDATE pipeline_state SET l2_status = 'pending' WHERE session_id = ?`, sessionID)
-		return nil
+		return cause
 	}
 	_, _ = w.db.ExecContext(ctx, `UPDATE pipeline_state SET l2_status = 'failed' WHERE session_id = ?`, sessionID)
 	return cause

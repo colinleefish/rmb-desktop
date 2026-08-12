@@ -22,6 +22,9 @@ type UploadInput struct {
 	SessionKey string
 	Source     string
 	Messages   []Message
+	// StartedAt, when set, is stored as the turn's created_at (unix ms).
+	// Used by migration/replay so chronological order survives bulk upload.
+	StartedAt *time.Time
 }
 
 // UploadResult summarizes a stored turn.
@@ -54,6 +57,10 @@ func (s *Service) Upload(ctx context.Context, in UploadInput) (UploadResult, err
 
 	now := time.Now().UTC()
 	nowMS := now.UnixMilli()
+	turnMS := nowMS
+	if in.StartedAt != nil && !in.StartedAt.IsZero() {
+		turnMS = in.StartedAt.UTC().UnixMilli()
+	}
 
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -120,7 +127,7 @@ func (s *Service) Upload(ctx context.Context, in UploadInput) (UploadResult, err
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO session_turns (id, session_id, messages_json, created_at, l1_status)
 		VALUES (?, ?, ?, ?, 'pending')`,
-		turnID, sessionID, string(messagesJSON), nowMS,
+		turnID, sessionID, string(messagesJSON), turnMS,
 	)
 	if err != nil {
 		return UploadResult{}, fmt.Errorf("insert turn: %w", err)
@@ -134,7 +141,7 @@ func (s *Service) Upload(ctx context.Context, in UploadInput) (UploadResult, err
 		SessionID: sessionID,
 		TurnID:    turnID,
 		TurnURI:   "rmb://turns/" + turnID,
-		CreatedAt: now,
+		CreatedAt: time.UnixMilli(turnMS).UTC(),
 	}, nil
 }
 

@@ -53,6 +53,47 @@ type TurnRow struct {
 	UpdatedAt     string `json:"updated_at"`
 }
 
+// PipelineStatusCounts is pending/running/failed/idle/waiting for one tier.
+type PipelineStatusCounts struct {
+	Pending int64 `json:"pending"`
+	Running int64 `json:"running"`
+	Failed  int64 `json:"failed"`
+	Idle    int64 `json:"idle"`
+	Waiting int64 `json:"waiting"` // status idle but stage never advanced (not reached yet)
+}
+
+// PipelineFunnel is how many sessions finished each distillation stage.
+type PipelineFunnel struct {
+	Sessions int64 `json:"sessions"`
+	T1Done   int64 `json:"t1_done"`
+	T2Done   int64 `json:"t2_done"`
+	T3Done   int64 `json:"t3_done"`
+}
+
+// PipelineProblem is a failed or long-pending session stage.
+type PipelineProblem struct {
+	SessionKey string `json:"session_key"`
+	SessionURI string `json:"session_uri"`
+	Stage      string `json:"stage"`
+	Status     string `json:"status"`
+	UpdatedAt  string `json:"updated_at"`
+	Reason     string `json:"reason,omitempty"`
+}
+
+// PipelineHealth is the global distillation dashboard payload.
+type PipelineHealth struct {
+	DistillationEnabled bool `json:"distillation_enabled"`
+	TrackedSessions     int64 `json:"tracked_sessions"`
+	GeneratedAt         string `json:"generated_at"`
+	Stages              struct {
+		T1 PipelineStatusCounts `json:"t1"`
+		T2 PipelineStatusCounts `json:"t2"`
+		T3 PipelineStatusCounts `json:"t3"`
+	} `json:"stages"`
+	Funnel   PipelineFunnel    `json:"funnel"`
+	Problems []PipelineProblem `json:"problems"`
+}
+
 // PipelineStateJSON mirrors the cloud API field names (t1/t2/t3).
 type PipelineStateJSON struct {
 	SessionID            string  `json:"session_id"`
@@ -122,13 +163,6 @@ type MemoryJSON struct {
 	CreatedAt            string   `json:"created_at"`
 	UpdatedAt            string   `json:"updated_at"`
 	RecallStats          *RecallStats `json:"recall_stats,omitempty"`
-}
-
-// PipelineStateRow joins pipeline state with session key.
-type PipelineStateRow struct {
-	PipelineStateJSON
-	SessionKey string `json:"session_key"`
-	SessionURI string `json:"session_uri"`
 }
 
 // SessionDetail is the full session drill-down payload.

@@ -38,6 +38,14 @@ Supports:
 4. Keep coding — RMB runs in the background
 
 
+### If macOS says the app is "damaged"
+
+The app is not notarized yet, so Gatekeeper blocks downloaded copies that carry the quarantine attribute. After dragging the app to `Applications`, run this in Terminal and open it again:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/RMB Desktop.app"
+```
+
 ## Privacy
 
 - Runs entirely on your device — no cloud account required

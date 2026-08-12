@@ -1,4 +1,6 @@
 import type { ConfigView, ConfigUpdateRequest } from "./types";
+import { isPipelineMocked } from "./pipelineMock";
+import { mockPipelineHealth } from "./pipelineHealthMock";
 
 const API = "/api/v1";
 
@@ -53,6 +55,13 @@ async function apiSend<T>(method: string, path: string, payload?: unknown): Prom
 
 export function getOverview() {
   return apiGet<import("./types").Overview>("/browse/overview");
+}
+
+export function getPipelineHealth() {
+  if (isPipelineMocked()) {
+    return Promise.resolve(mockPipelineHealth());
+  }
+  return apiGet<import("./types").PipelineHealth>("/browse/pipeline-health");
 }
 
 export function getConfig(): Promise<ConfigView> {

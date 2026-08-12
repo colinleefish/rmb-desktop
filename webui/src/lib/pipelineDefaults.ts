@@ -15,4 +15,8 @@ export const DEFAULT_PIPELINE: ConfigView["pipeline"] = {
   l2_max_atoms_per_batch: 60,
   l3_max_atoms_per_batch: 60,
   embed_batch_size: 32,
+  l1_min_concurrency: 1,
+  l1_max_concurrency: 8,
+  l2_min_concurrency: 1,
+  l2_max_concurrency: 4,
 };

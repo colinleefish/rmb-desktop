@@ -182,6 +182,7 @@ fn gui_uid() -> Option<String> {
     }
 }
 
+#[cfg(unix)]
 fn kill_listeners_on_port(port: u16) {
     let Ok(output) = Command::new("lsof")
         .args(["-ti", &format!(":{port}")])
@@ -206,13 +207,36 @@ fn kill_listeners_on_port(port: u16) {
     thread::sleep(Duration::from_millis(300));
 }
 
+#[cfg(windows)]
+fn kill_listeners_on_port(port: u16) {
+    let Ok(output) = Command::new("netstat")
+        .args(["-ano", "-p", "tcp"])
+        .output()
+    else {
+        return;
+    };
+    if !output.status.success() {
+        return;
+    }
+    let needle = format!(":{port}");
+    for line in String::from_utf8_lossy(&output.stdout).lines() {
+        if !line.contains(&needle) || !line.contains("LISTENING") {
+            continue;
+        }
+        let Some(pid) = line.split_whitespace().last() else {
+            continue;
+        };
+        let _ = Command::new("taskkill")
+            .args(["/PID", pid, "/F"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
+    thread::sleep(Duration::from_millis(300));
+}
+
 fn config_file_path() -> Option<PathBuf> {
-    dirs::home_dir().map(|home| {
-        home.join("Library")
-            .join("Application Support")
-            .join("rmb-desktop")
-            .join("config.yaml")
-    })
+    dirs::data_dir().map(|dir| dir.join("rmb-desktop").join("config.yaml"))
 }
 
 fn read_config_addr() -> Option<String> {
@@ -295,7 +319,9 @@ fn find_rmbd_binary() -> PathBuf {
         if let Some(dir) = exe.parent() {
             for candidate in [
                 dir.join("rmbd"),
+                dir.join("rmbd.exe"),
                 dir.join("rmbd-desktop"),
+                dir.join("rmbd-desktop.exe"),
                 dir.join("../rmbd"),
                 dir.join("../../../bin/rmbd"),
                 dir.join("../../../../bin/rmbd"),
@@ -315,7 +341,10 @@ fn find_rmbd_binary() -> PathBuf {
 }
 
 fn which_rmbd() -> Result<PathBuf, ()> {
+    #[cfg(unix)]
     let output = Command::new("which").arg("rmbd").output().map_err(|_| ())?;
+    #[cfg(windows)]
+    let output = Command::new("where").arg("rmbd").output().map_err(|_| ())?;
     if !output.status.success() {
         return Err(());
     }

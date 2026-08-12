@@ -44,19 +44,24 @@ func (c EmbedConfig) HasKey() bool {
 }
 
 type PipelineConfig struct {
-	L1PollInterval  time.Duration `yaml:"l1_poll_interval"`
-	L2PollInterval  time.Duration `yaml:"l2_poll_interval"`
-	L3PollInterval  time.Duration `yaml:"l3_poll_interval"`
+	L1PollInterval    time.Duration `yaml:"l1_poll_interval"`
+	L2PollInterval    time.Duration `yaml:"l2_poll_interval"`
+	L3PollInterval    time.Duration `yaml:"l3_poll_interval"`
 	EmbedPollInterval time.Duration `yaml:"embed_poll_interval"`
-	L1EveryN        int           `yaml:"l1_every_n"`
-	L1IdleSeconds   time.Duration `yaml:"l1_idle_seconds"`
-	L1Warmup        bool          `yaml:"l1_warmup"`
-	L2DelayAfterL1  time.Duration `yaml:"l2_delay_after_l1"`
-	L1MaxTurns      int           `yaml:"l1_max_turns_per_batch"`
-	L1MaxChars      int           `yaml:"l1_max_chars_per_batch"`
-	L2MaxAtoms      int           `yaml:"l2_max_atoms_per_batch"`
-	L3MaxAtoms      int           `yaml:"l3_max_atoms_per_batch"`
-	EmbedBatchSize  int           `yaml:"embed_batch_size"`
+	L1EveryN          int           `yaml:"l1_every_n"`
+	L1IdleSeconds     time.Duration `yaml:"l1_idle_seconds"`
+	L1Warmup          bool          `yaml:"l1_warmup"`
+	L2DelayAfterL1    time.Duration `yaml:"l2_delay_after_l1"`
+	L1MaxTurns        int           `yaml:"l1_max_turns_per_batch"`
+	L1MaxChars        int           `yaml:"l1_max_chars_per_batch"`
+	L2MaxAtoms        int           `yaml:"l2_max_atoms_per_batch"`
+	L3MaxAtoms        int           `yaml:"l3_max_atoms_per_batch"`
+	EmbedBatchSize    int           `yaml:"embed_batch_size"`
+	// Adaptive concurrency (sessions in parallel) with AIMD back pressure.
+	L1MinConcurrency int `yaml:"l1_min_concurrency"`
+	L1MaxConcurrency int `yaml:"l1_max_concurrency"`
+	L2MinConcurrency int `yaml:"l2_min_concurrency"`
+	L2MaxConcurrency int `yaml:"l2_max_concurrency"`
 }
 
 // Default returns configuration with platform defaults applied.
@@ -91,6 +96,10 @@ func Default() (Config, error) {
 			L2MaxAtoms:        60,
 			L3MaxAtoms:        60,
 			EmbedBatchSize:    32,
+			L1MinConcurrency:  1,
+			L1MaxConcurrency:  8,
+			L2MinConcurrency:  1,
+			L2MaxConcurrency:  4,
 		},
 	}, nil
 }
@@ -128,6 +137,7 @@ func Load(path string) (Config, error) {
 	if cfg.Embed.Dimensions <= 0 {
 		cfg.Embed.Dimensions = 1024
 	}
+	cfg.Pipeline = normalizePipelineConcurrency(cfg.Pipeline)
 	return applyEnv(cfg), nil
 }
 
@@ -182,5 +192,28 @@ func applyEnv(cfg Config) Config {
 	if v := strings.TrimSpace(os.Getenv("RMB_EMBED_MODEL")); v != "" {
 		cfg.Embed.Model = v
 	}
+	cfg.Pipeline = normalizePipelineConcurrency(cfg.Pipeline)
 	return cfg
+}
+
+func normalizePipelineConcurrency(p PipelineConfig) PipelineConfig {
+	if p.L1MinConcurrency <= 0 {
+		p.L1MinConcurrency = 1
+	}
+	if p.L1MaxConcurrency <= 0 {
+		p.L1MaxConcurrency = 8
+	}
+	if p.L1MaxConcurrency < p.L1MinConcurrency {
+		p.L1MaxConcurrency = p.L1MinConcurrency
+	}
+	if p.L2MinConcurrency <= 0 {
+		p.L2MinConcurrency = 1
+	}
+	if p.L2MaxConcurrency <= 0 {
+		p.L2MaxConcurrency = 4
+	}
+	if p.L2MaxConcurrency < p.L2MinConcurrency {
+		p.L2MaxConcurrency = p.L2MinConcurrency
+	}
+	return p
 }

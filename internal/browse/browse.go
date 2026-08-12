@@ -397,62 +397,121 @@ func (s *Service) ListMemories(ctx context.Context, p ListParams) (Page[MemoryJS
 	return pageOf(items, total, limit, p.Offset), nil
 }
 
-func (s *Service) ListPipelineStates(ctx context.Context, p ListParams) (Page[PipelineStateRow], error) {
-	limit := clampLimit(p.Limit)
-	where := ""
-	var args []any
-	if q := strings.TrimSpace(p.Query); q != "" {
-		like := "%" + strings.ToLower(q) + "%"
-		where = ` WHERE lower(s.session_key) LIKE ? OR lower(ps.l1_status) LIKE ?
-			OR lower(ps.l2_status) LIKE ? OR lower(ps.l3_status) LIKE ?`
-		args = []any{like, like, like, like}
-	}
+func (s *Service) PipelineHealth(ctx context.Context, distillationEnabled bool) (PipelineHealth, error) {
+	var out PipelineHealth
+	out.DistillationEnabled = distillationEnabled
+	out.GeneratedAt = time.Now().UTC().Format(timeRFC3339)
+	out.Problems = []PipelineProblem{}
 
-	var total int64
-	if err := s.db.QueryRowContext(ctx, `
-		SELECT COUNT(*) FROM pipeline_state ps
-		JOIN sessions s ON s.id = ps.session_id`+where, args...,
-	).Scan(&total); err != nil {
-		return Page[PipelineStateRow]{}, err
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM pipeline_state`).Scan(&out.TrackedSessions); err != nil {
+		return PipelineHealth{}, fmt.Errorf("count pipeline_state: %w", err)
 	}
+	out.Funnel.Sessions = out.TrackedSessions
 
-	query := `
-		SELECT ps.session_id, ps.l1_status, ps.l2_status, ps.l3_status,
-			ps.l1_advanced_at, ps.l2_advanced_at, ps.l3_advanced_at,
-			ps.l1_turns_since_advanced, ps.warmup_threshold, ps.updated_at,
-			s.session_key
-		FROM pipeline_state ps
-		JOIN sessions s ON s.id = ps.session_id` + where + `
-		ORDER BY ps.updated_at DESC
-		LIMIT ? OFFSET ?`
-	listArgs := append(append([]any{}, args...), limit, p.Offset)
-	rows, err := s.db.QueryContext(ctx, query, listArgs...)
+	t1, err := s.countPipelineStatuses(ctx, "l1_status")
 	if err != nil {
-		return Page[PipelineStateRow]{}, err
+		return PipelineHealth{}, err
+	}
+	t2, err := s.countPipelineStatuses(ctx, "l2_status")
+	if err != nil {
+		return PipelineHealth{}, err
+	}
+	t3, err := s.countPipelineStatuses(ctx, "l3_status")
+	if err != nil {
+		return PipelineHealth{}, err
+	}
+	out.Stages.T1 = t1
+	out.Stages.T2 = t2
+	out.Stages.T3 = t3
+	out.Funnel.T1Done = t1.Idle
+	out.Funnel.T2Done = t2.Idle
+	out.Funnel.T3Done = t3.Idle
+
+	// Prefer advanced_at for funnel when available (defaults l2/l3 to idle before work starts).
+	if err := s.db.QueryRowContext(ctx, `
+		SELECT
+			COALESCE(SUM(CASE WHEN l1_advanced_at IS NOT NULL THEN 1 ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN l2_advanced_at IS NOT NULL THEN 1 ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN l3_advanced_at IS NOT NULL THEN 1 ELSE 0 END), 0)
+		FROM pipeline_state`).Scan(&out.Funnel.T1Done, &out.Funnel.T2Done, &out.Funnel.T3Done); err != nil {
+		return PipelineHealth{}, fmt.Errorf("funnel advanced_at: %w", err)
+	}
+
+	problems, err := s.listPipelineProblems(ctx, 20)
+	if err != nil {
+		return PipelineHealth{}, err
+	}
+	out.Problems = problems
+	return out, nil
+}
+
+func (s *Service) countPipelineStatuses(ctx context.Context, column string) (PipelineStatusCounts, error) {
+	advancedCol := strings.Replace(column, "_status", "_advanced_at", 1)
+	// column/advancedCol are internal constants only (l1/l2/l3).
+	query := fmt.Sprintf(`
+		SELECT
+			COALESCE(SUM(CASE WHEN lower(%s) = 'pending' THEN 1 ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN lower(%s) = 'running' THEN 1 ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN lower(%s) = 'failed' THEN 1 ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN lower(%s) = 'idle' AND %s IS NOT NULL THEN 1 ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN lower(%s) = 'idle' AND %s IS NULL THEN 1 ELSE 0 END), 0)
+		FROM pipeline_state`, column, column, column, column, advancedCol, column, advancedCol)
+	var out PipelineStatusCounts
+	if err := s.db.QueryRowContext(ctx, query).Scan(
+		&out.Pending, &out.Running, &out.Failed, &out.Idle, &out.Waiting,
+	); err != nil {
+		return PipelineStatusCounts{}, fmt.Errorf("count %s: %w", column, err)
+	}
+	return out, nil
+}
+
+func (s *Service) listPipelineProblems(ctx context.Context, limit int) ([]PipelineProblem, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	// Prefer failed rows, then oldest pending across all tiers.
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT session_key, stage, status, updated_at FROM (
+			SELECT s.session_key AS session_key, 't1' AS stage, ps.l1_status AS status, ps.updated_at AS updated_at,
+				CASE WHEN lower(ps.l1_status) = 'failed' THEN 0 ELSE 1 END AS rank_group
+			FROM pipeline_state ps
+			JOIN sessions s ON s.id = ps.session_id
+			WHERE lower(ps.l1_status) IN ('failed', 'pending')
+			UNION ALL
+			SELECT s.session_key, 't2', ps.l2_status, ps.updated_at,
+				CASE WHEN lower(ps.l2_status) = 'failed' THEN 0 ELSE 1 END
+			FROM pipeline_state ps
+			JOIN sessions s ON s.id = ps.session_id
+			WHERE lower(ps.l2_status) IN ('failed', 'pending')
+			UNION ALL
+			SELECT s.session_key, 't3', ps.l3_status, ps.updated_at,
+				CASE WHEN lower(ps.l3_status) = 'failed' THEN 0 ELSE 1 END
+			FROM pipeline_state ps
+			JOIN sessions s ON s.id = ps.session_id
+			WHERE lower(ps.l3_status) IN ('failed', 'pending')
+			ORDER BY rank_group ASC, updated_at ASC
+			LIMIT ?
+		)`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("list pipeline problems: %w", err)
 	}
 	defer rows.Close()
 
-	var items []PipelineStateRow
+	var items []PipelineProblem
 	for rows.Next() {
-		var row PipelineStateRow
-		var l1Adv, l2Adv, l3Adv sql.NullInt64
+		var item PipelineProblem
 		var updatedMS int64
-		if err := rows.Scan(
-			&row.SessionID, &row.T1Status, &row.T2Status, &row.T3Status,
-			&l1Adv, &l2Adv, &l3Adv,
-			&row.T1TurnsSinceAdvanced, &row.WarmupThreshold, &updatedMS,
-			&row.SessionKey,
-		); err != nil {
-			return Page[PipelineStateRow]{}, err
+		if err := rows.Scan(&item.SessionKey, &item.Stage, &item.Status, &updatedMS); err != nil {
+			return nil, err
 		}
-		row.T1AdvancedAt = nullMSPtr(l1Adv)
-		row.T2AdvancedAt = nullMSPtr(l2Adv)
-		row.T3AdvancedAt = nullMSPtr(l3Adv)
-		row.UpdatedAt = formatMS(updatedMS)
-		row.SessionURI = uri.BuildSession(row.SessionKey)
-		items = append(items, row)
+		item.SessionURI = uri.BuildSession(item.SessionKey)
+		item.UpdatedAt = formatMS(updatedMS)
+		items = append(items, item)
 	}
-	return pageOf(items, total, limit, p.Offset), rows.Err()
+	if items == nil {
+		items = []PipelineProblem{}
+	}
+	return items, rows.Err()
 }
 
 func (s *Service) ListTasks(_ context.Context, p ListParams) (Page[map[string]any], error) {

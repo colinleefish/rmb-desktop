@@ -2383,7 +2383,7 @@ dependencies = [
 
 [[package]]
 name = "rmb-app"
-version = "0.1.11"
+version = "0.1.13"
 dependencies = [
  "dirs",
  "libc",
@@ -2394,6 +2394,7 @@ dependencies = [
  "tauri",
  "tauri-build",
  "ureq",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]

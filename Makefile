@@ -1,8 +1,8 @@
-.PHONY: test build build-all run-rmbd run-hook tidy app-dev app-build app-install app-icons webui-dev webui-build webui-embed-check icons-sync prepare-sidecars
+.PHONY: test build build-all run-rmbd run-hook tidy app-dev app-build app-build-windows app-install app-icons webui-dev webui-build webui-embed-check icons-sync prepare-sidecars build-windows-sidecars notarize
 
 GO_TAGS := sqlite_fts5
 EMBED_INDEX := internal/http/static/web/index.html
-VERSION ?= 0.1.12
+VERSION ?= 0.1.13
 COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 GO_LDFLAGS := -X github.com/colinleefish/rmb-desktop/internal/version.Version=$(VERSION) -X github.com/colinleefish/rmb-desktop/internal/version.Commit=$(COMMIT)
 
@@ -46,8 +46,13 @@ app-dev: prepare-sidecars
 	cd app && RMBD_PATH=$(CURDIR)/bin/rmbd npm run dev
 
 DMG_BUNDLE := app/src-tauri/target/release/bundle/dmg/RMB Desktop_$(VERSION)_aarch64.dmg
+WINDOWS_INSTALLER := app/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/RMB Desktop_$(VERSION)_x64-setup.exe
 APP_BUNDLE := app/src-tauri/target/release/bundle/macos/RMB Desktop.app
 PROXY_URL ?= socks5://127.0.0.1:1080
+SIGN_IDENTITY ?= Developer ID Application: GUANGHUI LI (N4YPJBRBN4)
+SIGN_KEYCHAIN ?= $(HOME)/Library/Keychains/rmb-sign.keychain-db
+SIGN_KEYCHAIN_PASS ?=
+NOTARY_PROFILE ?= rmb-notary
 GH := ALL_PROXY=$(PROXY_URL) HTTPS_PROXY=$(PROXY_URL) HTTP_PROXY=$(PROXY_URL) gh
 
 # Upload/publish GitHub release (uses proxy). VERSION=0.1.x NOTES=file.md optional.
@@ -60,9 +65,27 @@ release-publish:
 		--title "RMB Desktop $(VERSION)" \
 		$(if $(NOTES),--notes-file $(NOTES),)
 
+release-upload-windows:
+	@test -n "$(VERSION)" || (echo "usage: make release-upload-windows VERSION=0.1.x" >&2; exit 1)
+	@test -f "$(WINDOWS_INSTALLER)" || (echo "missing $(WINDOWS_INSTALLER); run make app-build-windows" >&2; exit 1)
+	cp "$(WINDOWS_INSTALLER)" "/tmp/RMB.Desktop_$(VERSION)_x64-setup.exe"
+	$(GH) release upload "v$(VERSION)" "/tmp/RMB.Desktop_$(VERSION)_x64-setup.exe" --repo colinleefish/rmb-desktop --clobber
+
+build-windows-sidecars: webui-embed-check
+	VERSION=$(VERSION) COMMIT=$(COMMIT) bash scripts/build-windows-sidecars.sh
+
+app-build-windows: webui-build app-icons build-windows-sidecars
+	export PATH="$$HOME/.cargo/bin:/opt/homebrew/opt/llvm/bin:/opt/homebrew/bin:$$PATH"; \
+	cd app && npm run tauri build -- --runner cargo-xwin --target x86_64-pc-windows-msvc
+
 app-build: webui-build app-icons prepare-sidecars
-	cd app && npm run build
+	-security unlock-keychain -p "$(SIGN_KEYCHAIN_PASS)" "$(SIGN_KEYCHAIN)"
+	cd app && APPLE_SIGNING_IDENTITY="$(SIGN_IDENTITY)" npm run build
 	bash scripts/finish-dmg.sh "$(DMG_BUNDLE)"
+
+notarize:
+	xcrun notarytool submit "$(DMG_BUNDLE)" --keychain-profile "$(NOTARY_PROFILE)" --wait
+	xcrun stapler staple "$(DMG_BUNDLE)"
 
 app-install: app-build
 	rm -rf "/Applications/RMB Desktop.app"

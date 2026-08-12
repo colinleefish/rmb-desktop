@@ -1,5 +1,6 @@
 import { clearOnboardingState } from "./onboardingState";
 import { isOnboardingDemo } from "./onboardingMock";
+import { isPipelineMocked } from "./pipelineMock";
 
 const API = "/api/v1/onboarding";
 const COMPLETE_KEY = "rmb.onboardingComplete";
@@ -38,6 +39,8 @@ async function onboardingPost<T>(path: string, payload?: unknown): Promise<T> {
 
 /** Whether first-run onboarding finished (onboarding.complete marker file on disk). */
 export async function fetchOnboardingCompleted(): Promise<boolean> {
+  // UI-only pipeline preview: skip the wizard so /pipeline is reachable without rmbd.
+  if (isPipelineMocked()) return true;
   try {
     const status = await onboardingGet<OnboardingStatus>("/status");
     return status.completed;

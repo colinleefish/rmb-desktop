@@ -53,6 +53,10 @@ type PipelineView struct {
 	L2MaxAtoms        int    `json:"l2_max_atoms_per_batch"`
 	L3MaxAtoms        int    `json:"l3_max_atoms_per_batch"`
 	EmbedBatchSize    int    `json:"embed_batch_size"`
+	L1MinConcurrency  int    `json:"l1_min_concurrency"`
+	L1MaxConcurrency  int    `json:"l1_max_concurrency"`
+	L2MinConcurrency  int    `json:"l2_min_concurrency"`
+	L2MaxConcurrency  int    `json:"l2_max_concurrency"`
 }
 
 // UpdateRequest is the PUT body from the settings page.
@@ -91,6 +95,10 @@ type PipelineUpdate struct {
 	L2MaxAtoms        *int    `json:"l2_max_atoms_per_batch"`
 	L3MaxAtoms        *int    `json:"l3_max_atoms_per_batch"`
 	EmbedBatchSize    *int    `json:"embed_batch_size"`
+	L1MinConcurrency  *int    `json:"l1_min_concurrency"`
+	L1MaxConcurrency  *int    `json:"l1_max_concurrency"`
+	L2MinConcurrency  *int    `json:"l2_min_concurrency"`
+	L2MaxConcurrency  *int    `json:"l2_max_concurrency"`
 }
 
 func ToView(cfg Config, configPath string) View {
@@ -118,6 +126,7 @@ func ToView(cfg Config, configPath string) View {
 }
 
 func pipelineToView(p PipelineConfig) PipelineView {
+	p = normalizePipelineConcurrency(p)
 	return PipelineView{
 		L1PollInterval:    p.L1PollInterval.String(),
 		L2PollInterval:    p.L2PollInterval.String(),
@@ -132,6 +141,10 @@ func pipelineToView(p PipelineConfig) PipelineView {
 		L2MaxAtoms:        p.L2MaxAtoms,
 		L3MaxAtoms:        p.L3MaxAtoms,
 		EmbedBatchSize:    p.EmbedBatchSize,
+		L1MinConcurrency:  p.L1MinConcurrency,
+		L1MaxConcurrency:  p.L1MaxConcurrency,
+		L2MinConcurrency:  p.L2MinConcurrency,
+		L2MaxConcurrency:  p.L2MaxConcurrency,
 	}
 }
 
@@ -237,7 +250,19 @@ func applyPipelineUpdate(p PipelineConfig, u PipelineUpdate) (PipelineConfig, er
 	if u.EmbedBatchSize != nil {
 		p.EmbedBatchSize = *u.EmbedBatchSize
 	}
-	return p, nil
+	if u.L1MinConcurrency != nil {
+		p.L1MinConcurrency = *u.L1MinConcurrency
+	}
+	if u.L1MaxConcurrency != nil {
+		p.L1MaxConcurrency = *u.L1MaxConcurrency
+	}
+	if u.L2MinConcurrency != nil {
+		p.L2MinConcurrency = *u.L2MinConcurrency
+	}
+	if u.L2MaxConcurrency != nil {
+		p.L2MaxConcurrency = *u.L2MaxConcurrency
+	}
+	return normalizePipelineConcurrency(p), nil
 }
 
 // Save writes cfg to path, creating parent directories as needed.

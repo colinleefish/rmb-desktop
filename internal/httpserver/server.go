@@ -111,7 +111,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/browse/skills", s.handleBrowseSkills)
 	s.mux.HandleFunc("GET /api/v1/browse/skills/{slug}", s.handleBrowseSkill)
 	s.mux.HandleFunc("PUT /api/v1/skills/{slug}", s.handlePutSkill)
-	s.mux.HandleFunc("GET /api/v1/browse/pipeline-state", s.handleBrowsePipeline)
+	s.mux.HandleFunc("GET /api/v1/browse/pipeline-health", s.handleBrowsePipelineHealth)
 	s.mux.HandleFunc("GET /api/v1/browse/tasks", s.handleBrowseTasks)
 	s.mux.HandleFunc("GET /api/v1/corrections", s.handleListCorrections)
 	s.mux.HandleFunc("POST /api/v1/corrections", s.handleCreateCorrection)
@@ -151,8 +151,9 @@ func (s *Server) handleHealthz(w http.ResponseWriter, r *http.Request) {
 }
 
 type uploadRequest struct {
-	Messages []session.Message `json:"messages"`
-	Source   string            `json:"source"`
+	Messages  []session.Message `json:"messages"`
+	Source    string            `json:"source"`
+	StartedAt string            `json:"started_at"`
 }
 
 func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
@@ -168,10 +169,21 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var startedAt *time.Time
+	if s := strings.TrimSpace(req.StartedAt); s != "" {
+		ts, err := time.Parse(time.RFC3339, s)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "started_at must be RFC3339, e.g. 2026-05-09T17:00:00Z")
+			return
+		}
+		startedAt = &ts
+	}
+
 	res, err := s.upload.Upload(r.Context(), session.UploadInput{
 		SessionKey: sessionKey,
 		Source:     req.Source,
 		Messages:   req.Messages,
+		StartedAt:  startedAt,
 	})
 	if err != nil {
 		s.log.Error("upload failed", "err", err)

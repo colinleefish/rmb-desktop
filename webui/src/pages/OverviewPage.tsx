@@ -32,6 +32,14 @@ export function OverviewPage({ counts }: { counts: OverviewCounts }) {
         { key: "corrections" },
       ],
     },
+    {
+      title: t.overview.workers,
+      caption: t.overview.workersCaption,
+      stats: [
+        { key: "pipeline_states", href: "/pipeline" },
+        { key: "tasks" },
+      ],
+    },
   ];
 
   const statLabels: Record<StatKey, { label: string; hint: string }> = {

@@ -46,7 +46,9 @@ fn main() {
                 if let Err(err) = bootstrap::ensure_installed() {
                     eprintln!("bootstrap: {err}");
                 }
-                if let Err(err) = daemon.ensure_running() {
+                // Always recycle rmbd after (re)installing sidecars so an old
+                // process left behind by Quit / a previous version cannot stick.
+                if let Err(err) = daemon.restart_after_update() {
                     eprintln!("start rmbd: {err}");
                 }
                 let handle = app.handle();
@@ -92,13 +94,16 @@ fn on_tray_event(app: &AppHandle, event: SystemTrayEvent, daemon: &Arc<DaemonMan
 
 fn spawn_health_poller(app: AppHandle, daemon: Arc<DaemonManager>) {
     thread::spawn(move || loop {
+        thread::sleep(Duration::from_secs(5));
         if !health_ok(&daemon::base_url()) {
             if let Err(err) = daemon.ensure_running() {
-                eprintln!("ensure rmbd: {err}");
+                // Expected once Quit has begun shutting the daemon down.
+                if err != "shutting down" {
+                    eprintln!("ensure rmbd: {err}");
+                }
             }
         }
         refresh_menu(&app, &daemon);
-        thread::sleep(Duration::from_secs(5));
     });
 }
 

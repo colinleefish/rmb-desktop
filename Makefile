@@ -2,7 +2,7 @@
 
 GO_TAGS := sqlite_fts5
 EMBED_INDEX := internal/http/static/web/index.html
-VERSION ?= 0.1.14
+VERSION ?= 0.1.15
 COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 GO_LDFLAGS := -X github.com/colinleefish/rmb-desktop/internal/version.Version=$(VERSION) -X github.com/colinleefish/rmb-desktop/internal/version.Commit=$(COMMIT)
 
@@ -82,7 +82,7 @@ app-build: webui-build app-icons prepare-sidecars
 	@# Unlock dedicated signing keychain (pass via SIGN_KEYCHAIN_PASS=... ; do not commit the password).
 	@if [ -z "$(SIGN_KEYCHAIN_PASS)" ]; then echo "warning: SIGN_KEYCHAIN_PASS empty — codesign may prompt for rmb-sign.keychain password" >&2; fi
 	-security unlock-keychain -p "$(SIGN_KEYCHAIN_PASS)" "$(SIGN_KEYCHAIN)"
-	cd app && APPLE_SIGNING_IDENTITY="$(SIGN_IDENTITY)" npm run build
+	cd app && RMB_APP_VERSION="$(VERSION)" RMB_APP_COMMIT="$(COMMIT)" APPLE_SIGNING_IDENTITY="$(SIGN_IDENTITY)" npm run build
 	bash scripts/finish-dmg.sh "$(DMG_BUNDLE)"
 
 notarize:

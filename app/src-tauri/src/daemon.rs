@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
@@ -17,9 +18,21 @@ struct ConfigAddr {
     addr: Option<String>,
 }
 
+#[derive(Deserialize)]
+struct VersionPayload {
+    #[serde(default)]
+    version: String,
+    #[serde(default)]
+    commit: String,
+}
+
 pub struct DaemonManager {
     child: Mutex<Option<Child>>,
     rmbd_path: PathBuf,
+    shutting_down: AtomicBool,
+    /// Version/commit stamped into the bundled sidecar (from build ldflags).
+    expected_version: String,
+    expected_commit: String,
 }
 
 impl DaemonManager {
@@ -27,6 +40,11 @@ impl DaemonManager {
         Self {
             child: Mutex::new(None),
             rmbd_path: find_rmbd_binary(),
+            shutting_down: AtomicBool::new(false),
+            expected_version: option_env!("RMB_APP_VERSION")
+                .unwrap_or(env!("CARGO_PKG_VERSION"))
+                .to_string(),
+            expected_commit: option_env!("RMB_APP_COMMIT").unwrap_or("unknown").to_string(),
         }
     }
 
@@ -47,10 +65,10 @@ impl DaemonManager {
     }
 
     pub fn start(&self) -> Result<(), String> {
-        if self.managed_running() {
-            return Ok(());
+        if self.shutting_down.load(Ordering::SeqCst) {
+            return Err("shutting down".into());
         }
-        if health_ok(&base_url()) {
+        if self.managed_running() {
             return Ok(());
         }
 
@@ -79,24 +97,33 @@ impl DaemonManager {
         }
     }
 
-    /// Starts the managed daemon after stopping any launchd-owned copy.
+    /// Starts the managed daemon, replacing any stale/external listener.
     pub fn ensure_running(&self) -> Result<(), String> {
-        if self.managed_running() {
+        if self.shutting_down.load(Ordering::SeqCst) {
             return Ok(());
         }
-        // Dev / launchd may already have a healthy listener — do not kill it.
-        if health_ok(&base_url()) {
+        if self.managed_running() {
+            if self.running_matches_expected() {
+                return Ok(());
+            }
+            // Managed child is an old build — recycle it.
+            self.stop_managed();
+        } else if health_ok(&base_url()) && self.running_matches_expected() {
+            // External daemon already serves this build.
             return Ok(());
         }
 
         detach_external_daemon();
         wait_for_health(false, Duration::from_secs(3));
-        if health_ok(&base_url()) {
+        if self.shutting_down.load(Ordering::SeqCst) {
             return Ok(());
         }
 
         self.start()?;
         wait_for_health(true, Duration::from_secs(15));
+        if self.shutting_down.load(Ordering::SeqCst) {
+            return Ok(());
+        }
         if !health_ok(&base_url()) {
             return Err(format!(
                 "rmbd did not become healthy at {}",
@@ -106,12 +133,66 @@ impl DaemonManager {
         Ok(())
     }
 
-    /// Stops the managed daemon, unloads launchd, and kills listeners on the configured port.
-    pub fn shutdown(&self) {
+    /// After installing updated sidecars, always restart so the new binary is what serves.
+    pub fn restart_after_update(&self) -> Result<(), String> {
+        if self.shutting_down.load(Ordering::SeqCst) {
+            return Ok(());
+        }
         self.stop_managed();
         detach_external_daemon();
         wait_for_health(false, Duration::from_secs(3));
+        if self.shutting_down.load(Ordering::SeqCst) {
+            return Ok(());
+        }
+        self.start()?;
+        wait_for_health(true, Duration::from_secs(15));
+        if !health_ok(&base_url()) {
+            return Err(format!(
+                "rmbd did not become healthy at {} after update restart",
+                base_url()
+            ));
+        }
+        Ok(())
     }
+
+    /// Stops the managed daemon, unloads launchd, and kills listeners on the configured port.
+    pub fn shutdown(&self) {
+        self.shutting_down.store(true, Ordering::SeqCst);
+        self.stop_managed();
+        detach_external_daemon();
+        wait_for_health(false, Duration::from_secs(5));
+        // Last resort: anything still on the port.
+        kill_listeners_on_port(daemon_port());
+        wait_for_health(false, Duration::from_secs(2));
+    }
+
+    fn running_matches_expected(&self) -> bool {
+        let Some(remote) = fetch_version(&base_url()) else {
+            return false;
+        };
+        if !self.expected_version.is_empty() && remote.version != self.expected_version {
+            return false;
+        }
+        // When commit is known for both sides, require an exact match so dirty
+        // same-version rebuilds still recycle the daemon.
+        if self.expected_commit != "unknown"
+            && !remote.commit.is_empty()
+            && remote.commit != "unknown"
+            && remote.commit != self.expected_commit
+        {
+            return false;
+        }
+        true
+    }
+}
+
+fn fetch_version(base: &str) -> Option<VersionPayload> {
+    let url = format!("{}/api/v1/version", base.trim_end_matches('/'));
+    let resp = ureq::get(&url)
+        .timeout(Duration::from_secs(2))
+        .call()
+        .ok()?;
+    resp.into_json::<VersionPayload>().ok()
 }
 
 fn wait_for_health(want_healthy: bool, timeout: Duration) {
@@ -193,18 +274,28 @@ fn kill_listeners_on_port(port: u16) {
     if !output.status.success() {
         return;
     }
-    for line in String::from_utf8_lossy(&output.stdout).lines() {
-        let pid = line.trim();
-        if pid.is_empty() {
-            continue;
-        }
+    let pids: Vec<String> = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .map(str::trim)
+        .filter(|p| !p.is_empty())
+        .map(str::to_string)
+        .collect();
+    for pid in &pids {
         let _ = Command::new("kill")
-            .arg(pid)
+            .args(["-TERM", pid])
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .status();
     }
-    thread::sleep(Duration::from_millis(300));
+    thread::sleep(Duration::from_millis(400));
+    for pid in &pids {
+        let _ = Command::new("kill")
+            .args(["-KILL", pid])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
+    thread::sleep(Duration::from_millis(200));
 }
 
 #[cfg(windows)]

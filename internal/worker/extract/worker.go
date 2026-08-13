@@ -150,11 +150,15 @@ func (w *Worker) selectCandidateSessions(ctx context.Context) ([]string, error) 
 	}
 	// Fetch a bit ahead of max concurrency so scaled-up cycles stay fed.
 	fetch := limit * 2
+	// FIFO by oldest unextracted turn: otherwise ORDER BY session_id puts
+	// late-UUID (backfilled) sessions at the tail and, combined with the
+	// backpressure early-exit below, they starve forever.
 	rows, err := w.db.QueryContext(ctx, `
-		SELECT DISTINCT session_id
+		SELECT session_id
 		FROM session_turns
 		WHERE l1_extracted_at IS NULL
-		ORDER BY session_id
+		GROUP BY session_id
+		ORDER BY MIN(created_at) ASC
 		LIMIT ?`, fetch)
 	if err != nil {
 		return nil, err

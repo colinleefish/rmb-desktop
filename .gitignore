@@ -34,3 +34,7 @@ internal/http/static/web/*
 !internal/http/static/web/README.md
 
 temp/
+
+# Python
+__pycache__/
+*.pyc

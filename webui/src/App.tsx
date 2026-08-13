@@ -15,7 +15,7 @@ import { OnboardingPage } from "./pages/onboarding/OnboardingPage";
 
 export default function App() {
   return (
-    <BrowserRouter basename="/ui">
+    <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, "")}>
       <Routes>
         <Route path="onboarding" element={<OnboardingPage />} />
         <Route

@@ -20,7 +20,7 @@ export function OnboardingLayout({
         ].join(" ")}
       >
         <header className="mb-8 text-center">
-          <img src="/ui/logo.svg" alt="" className="mx-auto h-10 w-10" />
+          <img src={`${import.meta.env.BASE_URL}logo.svg`} alt="" className="mx-auto h-10 w-10" />
           <h1 className="mt-4 text-2xl font-semibold text-rmb-dark">{t.onboarding.title}</h1>
           <p className="mt-2 text-sm text-rmb-gray">{t.onboarding.subtitle}</p>
         </header>
@@ -34,7 +34,7 @@ export function OnboardingLayout({
               type="button"
               onClick={() => {
                 resetOnboardingDemo();
-                window.location.href = "/ui/onboarding";
+                window.location.href = `${import.meta.env.BASE_URL}onboarding`;
               }}
               className="text-xs text-amber-800 underline hover:text-amber-950"
             >

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/colinleefish/rmb-desktop/internal/config"
@@ -17,6 +18,9 @@ import (
 )
 
 const distillDelay = 1 * time.Second
+
+// l3Concurrency bounds how many buckets distill in parallel during one rollup.
+const l3Concurrency = 8
 
 type MemoryDistiller interface {
 	DistillMemory(ctx context.Context, category, slug, atomsJSON string, corrections []string) (string, error)
@@ -107,41 +111,63 @@ func (w *Worker) rollup(ctx context.Context) error {
 	}
 
 	transientPending := false
+	var (
+		mu  sync.Mutex
+		wg  sync.WaitGroup
+		sem = make(chan struct{}, l3Concurrency)
+	)
 	for _, bucket := range buckets {
-		srcScenes := sourceSceneURIsFor(bucket, index)
-		corrStatements, corrURIs := correction.SplitSummaries(corrByTarget[bucket.URI])
-
-		unchanged, err := w.bucketUnchanged(ctx, bucket, srcScenes, corrURIs)
-		if err != nil {
-			w.log.Warn("l3 provenance check failed", "uri", bucket.URI, "err", err)
-			transientPending = true
+		if ctx.Err() != nil {
 			break
 		}
-		if unchanged {
-			continue
-		}
+		bucket := bucket
+		wg.Add(1)
+		sem <- struct{}{}
+		go func() {
+			defer wg.Done()
+			defer func() { <-sem }()
 
-		pm, err := w.distillBucket(ctx, bucket, corrStatements)
-		if err != nil {
-			if llm.IsTransientError(err) {
-				w.log.Warn("l3 transient error", "uri", bucket.URI, "err", err)
-				transientPending = true
-				break
-			}
-			w.log.Warn("l3 bucket failed", "uri", bucket.URI, "err", err)
-			continue
-		}
+			srcScenes := sourceSceneURIsFor(bucket, index)
+			corrStatements, corrURIs := correction.SplitSummaries(corrByTarget[bucket.URI])
 
-		if err := w.persistMemory(ctx, bucket, pm, srcScenes, corrURIs); err != nil {
-			if llm.IsTransientError(err) {
+			unchanged, err := w.bucketUnchanged(ctx, bucket, srcScenes, corrURIs)
+			if err != nil {
+				w.log.Warn("l3 provenance check failed", "uri", bucket.URI, "err", err)
+				mu.Lock()
 				transientPending = true
-				break
+				mu.Unlock()
+				return
 			}
-			w.log.Warn("l3 persist failed", "uri", bucket.URI, "err", err)
-			continue
-		}
-		time.Sleep(distillDelay)
+			if unchanged {
+				return
+			}
+
+			pm, err := w.distillBucket(ctx, bucket, corrStatements)
+			if err != nil {
+				if llm.IsTransientError(err) {
+					w.log.Warn("l3 transient error", "uri", bucket.URI, "err", err)
+					mu.Lock()
+					transientPending = true
+					mu.Unlock()
+				} else {
+					w.log.Warn("l3 bucket failed", "uri", bucket.URI, "err", err)
+				}
+				return
+			}
+
+			if err := w.persistMemory(ctx, bucket, pm, srcScenes, corrURIs); err != nil {
+				if llm.IsTransientError(err) {
+					mu.Lock()
+					transientPending = true
+					mu.Unlock()
+				} else {
+					w.log.Warn("l3 persist failed", "uri", bucket.URI, "err", err)
+				}
+				return
+			}
+		}()
 	}
+	wg.Wait()
 
 	if transientPending {
 		w.log.Info("l3 rollup incomplete, leaving sessions pending", "count", len(pendingIDs))

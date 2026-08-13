@@ -22,9 +22,13 @@ func Open(path string) (*sql.DB, error) {
 		return nil, fmt.Errorf("create db dir: %w", err)
 	}
 
-	// busy_timeout makes concurrent writers wait up to 5s for the write lock
-	// instead of immediately failing with SQLITE_BUSY ("database is locked").
-	dsn := path + "?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"
+	// _txlock=immediate makes every transaction BEGIN IMMEDIATE, taking the
+	// write lock up front. This avoids SQLITE_BUSY_SNAPSHOT in WAL mode: a
+	// read-then-write transaction whose snapshot went stale (another writer
+	// committed in between) cannot upgrade to a writer, and busy_timeout does
+	// NOT cover that case. mattn/go-sqlite3 already defaults busy_timeout to
+	// 5000, so it needs no explicit setting.
+	dsn := path + "?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_txlock=immediate"
 	db, err := sql.Open("sqlite3", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)

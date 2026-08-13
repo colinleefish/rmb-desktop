@@ -11,7 +11,7 @@
 
 ## SQLite concurrency & connection pool
 
-- Added `busy_timeout=5000` so concurrent writers wait for the write lock instead of failing with `SQLITE_BUSY` ("database is locked").
+- Transactions now use `BEGIN IMMEDIATE` (`_txlock=immediate`) to avoid WAL read-snapshot staleness (`SQLITE_BUSY_SNAPSHOT`), the real cause of intermittent "database is locked" under concurrent workers.
 - Connection pool bound now follows worker concurrency limits (derived from config) instead of a hardcoded number.
 
 ## Packaging / platform

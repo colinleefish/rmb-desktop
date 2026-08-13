@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 
@@ -194,6 +195,21 @@ func (w *Worker) pendingSessionIDs(ctx context.Context) ([]string, error) {
 }
 
 func (w *Worker) distillBucket(ctx context.Context, bucket Bucket, corrections []string) (ParsedMemory, error) {
+	// Single-atom buckets don't need LLM distillation — there's nothing to
+	// merge. Emit the fact directly so LLM failures (empty/truncated
+	// responses) can't stall the whole rollup.
+	if len(bucket.Atoms) == 1 {
+		content := strings.TrimSpace(bucket.Atoms[0].Content)
+		if content == "" {
+			return ParsedMemory{}, fmt.Errorf("single-atom bucket has empty content")
+		}
+		abstract := content
+		if r := []rune(content); len(r) > 200 {
+			abstract = string(r[:200])
+		}
+		return ParsedMemory{Abstract: abstract, Body: content}, nil
+	}
+
 	chunks := chunkAtoms(bucket.Atoms, w.cfg.L3MaxAtoms)
 	if len(chunks) == 1 {
 		atomsJSON, err := serializeAtomsForLLM(chunks[0])

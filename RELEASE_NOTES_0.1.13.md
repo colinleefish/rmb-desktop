@@ -8,6 +8,7 @@
 
 - L1/L2 process multiple sessions in parallel with AIMD back pressure (scale up on healthy backlog, cut on 429/timeouts).
 - Large queues warm-start concurrency (defaults: L1 1–64, L2 1–16) via `l1_min/max_concurrency` and `l2_min/max_concurrency`.
+- L2 scene chunks now split by scene count as well as atom count (`l2_max_scenes_per_batch`, default 8), so sessions with many distinct scenes no longer overflow the LLM's output token limit and fail with truncated JSON.
 
 ## SQLite concurrency & connection pool
 

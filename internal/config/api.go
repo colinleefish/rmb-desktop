@@ -51,6 +51,7 @@ type PipelineView struct {
 	L1MaxTurns        int    `json:"l1_max_turns_per_batch"`
 	L1MaxChars        int    `json:"l1_max_chars_per_batch"`
 	L2MaxAtoms        int    `json:"l2_max_atoms_per_batch"`
+	L2MaxScenes       int    `json:"l2_max_scenes_per_batch"`
 	L3MaxAtoms        int    `json:"l3_max_atoms_per_batch"`
 	EmbedBatchSize    int    `json:"embed_batch_size"`
 	L1MinConcurrency  int    `json:"l1_min_concurrency"`
@@ -93,6 +94,7 @@ type PipelineUpdate struct {
 	L1MaxTurns        *int    `json:"l1_max_turns_per_batch"`
 	L1MaxChars        *int    `json:"l1_max_chars_per_batch"`
 	L2MaxAtoms        *int    `json:"l2_max_atoms_per_batch"`
+	L2MaxScenes       *int    `json:"l2_max_scenes_per_batch"`
 	L3MaxAtoms        *int    `json:"l3_max_atoms_per_batch"`
 	EmbedBatchSize    *int    `json:"embed_batch_size"`
 	L1MinConcurrency  *int    `json:"l1_min_concurrency"`
@@ -139,6 +141,7 @@ func pipelineToView(p PipelineConfig) PipelineView {
 		L1MaxTurns:        p.L1MaxTurns,
 		L1MaxChars:        p.L1MaxChars,
 		L2MaxAtoms:        p.L2MaxAtoms,
+		L2MaxScenes:       p.L2MaxScenes,
 		L3MaxAtoms:        p.L3MaxAtoms,
 		EmbedBatchSize:    p.EmbedBatchSize,
 		L1MinConcurrency:  p.L1MinConcurrency,
@@ -243,6 +246,9 @@ func applyPipelineUpdate(p PipelineConfig, u PipelineUpdate) (PipelineConfig, er
 	}
 	if u.L2MaxAtoms != nil {
 		p.L2MaxAtoms = *u.L2MaxAtoms
+	}
+	if u.L2MaxScenes != nil {
+		p.L2MaxScenes = *u.L2MaxScenes
 	}
 	if u.L3MaxAtoms != nil {
 		p.L3MaxAtoms = *u.L3MaxAtoms

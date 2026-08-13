@@ -180,7 +180,7 @@ func (w *Worker) processSession(ctx context.Context, sessionID string) error {
 	}
 
 	groups := groupAtomsBySceneName(batch.Atoms)
-	chunks := chunkGroups(groups, w.cfg.L2MaxAtoms)
+	chunks := chunkGroups(groups, w.cfg.L2MaxAtoms, w.cfg.L2MaxScenes)
 	validURIs := atomURISet(batch.Atoms)
 
 	var parsed []ParsedScene

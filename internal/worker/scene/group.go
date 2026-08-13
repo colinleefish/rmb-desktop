@@ -61,22 +61,37 @@ func groupAtomsBySceneName(atoms []model.Atom) []atomGroup {
 	return out
 }
 
-func chunkGroups(groups []atomGroup, maxAtoms int) [][]atomGroup {
-	if maxAtoms <= 0 || len(groups) == 0 {
+// chunkGroups splits groups into chunks that respect both a maximum atom count
+// and a maximum scene-group count. The scene-group limit keeps the LLM's JSON
+// output from overflowing: every scene group becomes one scene in the response,
+// so a session with many distinct scene_names would otherwise ask the model for
+// an oversized reply that gets truncated (unexpected end of JSON input).
+func chunkGroups(groups []atomGroup, maxAtoms, maxScenes int) [][]atomGroup {
+	if len(groups) == 0 {
 		return [][]atomGroup{groups}
+	}
+	if maxAtoms <= 0 {
+		maxAtoms = 60
+	}
+	if maxScenes <= 0 {
+		maxScenes = 8
 	}
 	var chunks [][]atomGroup
 	var cur []atomGroup
-	curCount := 0
+	curAtoms, curScenes := 0, 0
 	for _, g := range groups {
 		n := len(g.Atoms)
-		if len(cur) > 0 && curCount+n > maxAtoms {
+		// Start a new chunk when adding this group would exceed either limit.
+		// An empty chunk never splits mid-group, so an oversized single group
+		// still gets its own chunk.
+		if len(cur) > 0 && (curAtoms+n > maxAtoms || curScenes+1 > maxScenes) {
 			chunks = append(chunks, cur)
 			cur = nil
-			curCount = 0
+			curAtoms, curScenes = 0, 0
 		}
 		cur = append(cur, g)
-		curCount += n
+		curAtoms += n
+		curScenes++
 	}
 	if len(cur) > 0 {
 		chunks = append(chunks, cur)

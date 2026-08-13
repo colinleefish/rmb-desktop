@@ -55,6 +55,7 @@ type PipelineConfig struct {
 	L1MaxTurns        int           `yaml:"l1_max_turns_per_batch"`
 	L1MaxChars        int           `yaml:"l1_max_chars_per_batch"`
 	L2MaxAtoms        int           `yaml:"l2_max_atoms_per_batch"`
+	L2MaxScenes       int           `yaml:"l2_max_scenes_per_batch"`
 	L3MaxAtoms        int           `yaml:"l3_max_atoms_per_batch"`
 	EmbedBatchSize    int           `yaml:"embed_batch_size"`
 	// Adaptive concurrency (sessions in parallel) with AIMD back pressure.
@@ -94,6 +95,7 @@ func Default() (Config, error) {
 			L1MaxTurns:        8,
 			L1MaxChars:        24000,
 			L2MaxAtoms:        60,
+			L2MaxScenes:       8,
 			L3MaxAtoms:        60,
 			EmbedBatchSize:    32,
 			L1MinConcurrency:  1,

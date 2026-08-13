@@ -719,7 +719,7 @@ func TestMergeClaudeRecallMarkdownFixtures(t *testing.T) {
 			if tc.wantHeading && !strings.Contains(proposed, recallMarkdownHeading) {
 				t.Fatalf("missing recall heading:\n%s", proposed)
 			}
-			if tc.wantHeading && !strings.Contains(proposed, "ALWAYS RUN `rmb` cli") {
+			if tc.wantHeading && !strings.Contains(proposed, "ALWAYS RUN `~/.rmb/bin/rmb` cli") {
 				t.Fatalf("missing recall body:\n%s", proposed)
 			}
 		})

@@ -6,13 +6,13 @@ const CURSOR_RECALL_RULE = `---
 description: Use of rmb command line 
 alwaysApply: true
 ---
-ALWAYS RUN \`rmb\` cli at the start of each conversation.
+ALWAYS RUN \`~/.rmb/bin/rmb\` cli at the start of each conversation.
 Search before asking the user. Follow rmb://agent for recall rules.
 `;
 
 const RECALL_MARKDOWN_BLOCK = `# RMB memory
 
-ALWAYS RUN \`rmb\` cli at the start of each conversation.
+ALWAYS RUN \`~/.rmb/bin/rmb\` cli at the start of each conversation.
 Search before asking the user. Follow rmb://agent for recall rules.
 `;
 

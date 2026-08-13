@@ -7,7 +7,7 @@ const recallEnd = "<!-- rmb:recall:end -->"
 const recallMarkdownHeading = "# RMB memory"
 
 func recallInstructionBody() string {
-	return `ALWAYS RUN ` + "`rmb`" + ` cli at the start of each conversation.
+	return `ALWAYS RUN ` + "`~/.rmb/bin/rmb`" + ` cli at the start of each conversation.
 Search before asking the user. Follow rmb://agent for recall rules.`
 }
 
@@ -33,8 +33,13 @@ func hasRecallBlock(content string) bool {
 	if strings.Contains(content, recallStart) && strings.Contains(content, recallEnd) {
 		return true
 	}
-	return strings.Contains(content, recallMarkdownHeading) &&
-		strings.Contains(content, "ALWAYS RUN `rmb` cli")
+	if !strings.Contains(content, recallMarkdownHeading) {
+		return false
+	}
+	// Accept both the old ("`rmb`") and new ("`~/.rmb/bin/rmb`") recall body so
+	// existing installs aren't re-appended.
+	return strings.Contains(content, "ALWAYS RUN `rmb` cli") ||
+		strings.Contains(content, "ALWAYS RUN `~/.rmb/bin/rmb` cli")
 }
 
 func mergeRecallMarkdown(current string) (proposed string, change ChangeType) {

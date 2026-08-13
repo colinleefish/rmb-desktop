@@ -73,7 +73,7 @@ func TestCursorRecallRuleFormat(t *testing.T) {
 	if !strings.Contains(rule, "alwaysApply: true") {
 		t.Fatalf("missing alwaysApply: %s", rule)
 	}
-	if !strings.Contains(rule, "ALWAYS RUN `rmb` cli") {
+	if !strings.Contains(rule, "ALWAYS RUN `~/.rmb/bin/rmb` cli") {
 		t.Fatalf("missing recall body: %s", rule)
 	}
 }
@@ -86,7 +86,7 @@ func TestMergeRecallMarkdownAppendsBlock(t *testing.T) {
 	if !strings.Contains(proposed, recallMarkdownHeading) {
 		t.Fatalf("missing recall heading: %s", proposed)
 	}
-	if !strings.Contains(proposed, "ALWAYS RUN `rmb` cli") {
+	if !strings.Contains(proposed, "ALWAYS RUN `~/.rmb/bin/rmb` cli") {
 		t.Fatalf("missing recall body: %s", proposed)
 	}
 }

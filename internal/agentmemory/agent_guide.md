@@ -1,3 +1,5 @@
+The rmb CLI lives at `~/.rmb/bin/rmb`. Use this full path whenever `rmb` is not on PATH.
+
 ## Memory pyramid (T0 → T3)
 
 | Tier | URI | What |

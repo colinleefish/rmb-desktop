@@ -38,3 +38,6 @@ temp/
 # Python
 __pycache__/
 *.pyc
+
+# Local release notes (publish via gh --notes-file; do not commit)
+RELEASE_NOTES*.md

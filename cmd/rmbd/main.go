@@ -36,6 +36,16 @@ func run() int {
 	}
 }
 
+// dbPoolSize bounds the SQLite connection pool to the session-worker concurrency
+// limits (L1 + L2, dynamic via config) plus the fixed embed/L3 workers and
+// headroom for the local HTTP server. The pool is lazy, so this is a ceiling,
+// not a preallocation.
+func dbPoolSize(cfg config.Config) int {
+	const fixedWorkers = 2 // embed + L3 (single goroutine each)
+	const httpHeadroom = 8 // local HTTP server (upload + recall reads)
+	return cfg.Pipeline.L1MaxConcurrency + cfg.Pipeline.L2MaxConcurrency + fixedWorkers + httpHeadroom
+}
+
 func serve(args []string) int {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
 	configPath := fs.String("config", "", "path to config.yaml")
@@ -59,6 +69,9 @@ func serve(args []string) int {
 		return 1
 	}
 	defer database.Close()
+	// Bound the pool to worker concurrency limits (dynamic via config) plus
+	// headroom for the fixed embed/L3 workers and the local HTTP server.
+	database.SetMaxOpenConns(dbPoolSize(cfg))
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

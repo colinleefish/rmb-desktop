@@ -22,11 +22,17 @@ func Open(path string) (*sql.DB, error) {
 		return nil, fmt.Errorf("create db dir: %w", err)
 	}
 
-	dsn := path + "?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)"
+	// busy_timeout makes concurrent writers wait up to 5s for the write lock
+	// instead of immediately failing with SQLITE_BUSY ("database is locked").
+	dsn := path + "?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"
 	db, err := sql.Open("sqlite3", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)
 	}
+	// Connection pool is left unbounded here. database/sql opens connections
+	// lazily, so the live connection count already tracks actual concurrency; WAL
+	// allows concurrent readers + one writer. Callers that want a ceiling (e.g.
+	// to follow worker concurrency limits) should call db.SetMaxOpenConns.
 	if err := db.Ping(); err != nil {
 		_ = db.Close()
 		return nil, fmt.Errorf("ping sqlite: %w", err)

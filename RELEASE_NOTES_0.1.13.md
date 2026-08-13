@@ -7,7 +7,12 @@
 ## Faster distillation backlog
 
 - L1/L2 process multiple sessions in parallel with AIMD back pressure (scale up on healthy backlog, cut on 429/timeouts).
-- Large queues warm-start concurrency (defaults: L1 1–8, L2 1–4) via `l1_min/max_concurrency` and `l2_min/max_concurrency`.
+- Large queues warm-start concurrency (defaults: L1 1–64, L2 1–16) via `l1_min/max_concurrency` and `l2_min/max_concurrency`.
+
+## SQLite concurrency & connection pool
+
+- Added `busy_timeout=5000` so concurrent writers wait for the write lock instead of failing with `SQLITE_BUSY` ("database is locked").
+- Connection pool bound now follows worker concurrency limits (derived from config) instead of a hardcoded number.
 
 ## Packaging / platform
 

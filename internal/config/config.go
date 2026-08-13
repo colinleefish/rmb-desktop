@@ -97,9 +97,9 @@ func Default() (Config, error) {
 			L3MaxAtoms:        60,
 			EmbedBatchSize:    32,
 			L1MinConcurrency:  1,
-			L1MaxConcurrency:  8,
+			L1MaxConcurrency:  64,
 			L2MinConcurrency:  1,
-			L2MaxConcurrency:  4,
+			L2MaxConcurrency:  16,
 		},
 	}, nil
 }
@@ -201,7 +201,7 @@ func normalizePipelineConcurrency(p PipelineConfig) PipelineConfig {
 		p.L1MinConcurrency = 1
 	}
 	if p.L1MaxConcurrency <= 0 {
-		p.L1MaxConcurrency = 8
+		p.L1MaxConcurrency = 64
 	}
 	if p.L1MaxConcurrency < p.L1MinConcurrency {
 		p.L1MaxConcurrency = p.L1MinConcurrency
@@ -210,7 +210,7 @@ func normalizePipelineConcurrency(p PipelineConfig) PipelineConfig {
 		p.L2MinConcurrency = 1
 	}
 	if p.L2MaxConcurrency <= 0 {
-		p.L2MaxConcurrency = 4
+		p.L2MaxConcurrency = 16
 	}
 	if p.L2MaxConcurrency < p.L2MinConcurrency {
 		p.L2MaxConcurrency = p.L2MinConcurrency

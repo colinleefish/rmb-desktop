@@ -99,6 +99,20 @@ func TestMergeRecallMarkdownUnchangedWhenBlockPresent(t *testing.T) {
 	}
 }
 
+func TestMergeRecallMarkdownMigratesOldWording(t *testing.T) {
+	old := "# RMB memory\n\n" + oldRecallInstructionBody() + "\n"
+	proposed, change := mergeRecallMarkdown(old)
+	if change != ChangeModify {
+		t.Fatalf("expected modify (migration), got %s\nproposed=%s", change, proposed)
+	}
+	if !strings.Contains(proposed, "ALWAYS RUN `~/.rmb/bin/rmb` cli") {
+		t.Fatalf("expected full path in migrated block: %s", proposed)
+	}
+	if strings.Contains(proposed, "ALWAYS RUN `rmb` cli") {
+		t.Fatalf("old wording should be gone: %s", proposed)
+	}
+}
+
 func TestHasRecallBlockLegacyMarkers(t *testing.T) {
 	legacy := "# x\n\n" + recallStart + "\nold\n" + recallEnd
 	if !hasRecallBlock(legacy) {

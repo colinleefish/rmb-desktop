@@ -11,6 +11,13 @@ func recallInstructionBody() string {
 Search before asking the user. Follow rmb://agent for recall rules.`
 }
 
+// oldRecallInstructionBody is the wording before the full path was added,
+// kept so mergeRecallMarkdown can migrate existing installs in place.
+func oldRecallInstructionBody() string {
+	return `ALWAYS RUN ` + "`rmb`" + ` cli at the start of each conversation.
+Search before asking the user. Follow rmb://agent for recall rules.`
+}
+
 // CursorRecallRule is the canonical recall text for Cursor rules (copy-only).
 func CursorRecallRule() string {
 	return `---
@@ -47,6 +54,11 @@ func mergeRecallMarkdown(current string) (proposed string, change ChangeType) {
 	cur := strings.TrimRight(current, "\n")
 	if cur == "" {
 		return block, ChangeCreate
+	}
+	// Migrate the old wording (bare `rmb`) to the full path in place.
+	if strings.Contains(cur, oldRecallInstructionBody()) {
+		proposed = strings.ReplaceAll(cur, oldRecallInstructionBody(), recallInstructionBody())
+		return ensureTrailingNewline(proposed), ChangeModify
 	}
 	if hasRecallBlock(cur) {
 		return ensureTrailingNewline(cur), ChangeUnchanged

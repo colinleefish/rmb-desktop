@@ -1,7 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import type { ComponentType } from "react";
 import {
-  Activity,
   LayoutDashboard,
   MessagesSquare,
   Plug,
@@ -214,12 +213,6 @@ export function Sidebar() {
           label: t.nav.sessions,
           icon: MessagesSquare,
           countKey: "sessions",
-        },
-        {
-          to: "/pipeline",
-          label: t.nav.pipeline,
-          icon: Activity,
-          countKey: "pipeline_states",
         },
       ],
     },

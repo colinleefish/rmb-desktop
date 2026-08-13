@@ -30,7 +30,10 @@ export const translations = {
     },
     overview: {
       title: "Overview",
-      subtitle: "Local-first memory pyramid — from raw turns to long-term facts.",
+      subtitle: "Local-first memory pyramid — distillation health and counts at a glance.",
+      workersRunning: "workers running",
+      metricsTitle: "Key metrics",
+      metricsCaption: "Objects distilled across your memory pyramid.",
       pyramid: "Distillation pyramid",
       pyramidChart: {
         caption: "Raw conversation flows upward into long-term memory.",
@@ -480,7 +483,10 @@ export const translations = {
     },
     overview: {
       title: "概览",
-      subtitle: "本地优先记忆金字塔 — 从原始轮次到长期事实。",
+      subtitle: "本地优先记忆金字塔 — 一览蒸馏健康与数量。",
+      workersRunning: "个工作进程运行中",
+      metricsTitle: "关键指标",
+      metricsCaption: "记忆金字塔中已蒸馏的对象。",
       pyramid: "蒸馏金字塔",
       pyramidChart: {
         caption: "原始对话向上蒸馏为长期记忆。",

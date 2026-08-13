@@ -8,14 +8,13 @@ import { SessionsPage } from "./pages/SessionsPage";
 import { SkillsPage } from "./pages/SkillsPage";
 import { SkillDetailPage } from "./pages/SkillDetailPage";
 import { IntegrationsPage } from "./pages/IntegrationsPage";
-import { PipelineHealthPage } from "./pages/PipelineHealthPage";
 import { RedirectSettingsIntegrations } from "./pages/RedirectSettingsIntegrations";
 import { SettingsPage } from "./pages/SettingsPage";
 import { OnboardingPage } from "./pages/onboarding/OnboardingPage";
 
 export default function App() {
   return (
-    <BrowserRouter basename="/ui">
+    <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, "")}>
       <Routes>
         <Route path="onboarding" element={<OnboardingPage />} />
         <Route
@@ -32,7 +31,7 @@ export default function App() {
           <Route path="memories/:category" element={<MemoriesPage />} />
           <Route path="skills" element={<SkillsPage />} />
           <Route path="skills/:slug" element={<SkillDetailPage />} />
-          <Route path="pipeline" element={<PipelineHealthPage />} />
+          <Route path="pipeline" element={<Navigate to="/" replace />} />
           <Route path="integrations/*" element={<IntegrationsPage />} />
           <Route path="settings/integrations/*" element={<RedirectSettingsIntegrations />} />
           <Route path="settings/*" element={<SettingsPage />} />

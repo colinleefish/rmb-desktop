@@ -2,7 +2,6 @@ package backpressure_test
 
 import (
 	"context"
-	"errors"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -10,79 +9,58 @@ import (
 	"github.com/colinleefish/rmb-desktop/internal/worker/backpressure"
 )
 
-func TestControllerAIMD(t *testing.T) {
+func TestControllerFollowsBacklog(t *testing.T) {
 	c := backpressure.New(1, 4)
 	if c.Limit() != 1 {
 		t.Fatalf("start=%d want 1", c.Limit())
 	}
 
-	// Healthy backlog → scale up one per cycle.
-	for want := 2; want <= 4; want++ {
-		c.Observe(backpressure.Outcome{})
-		c.Observe(backpressure.Outcome{})
-		_, next := c.EndCycle(20)
-		if next != want {
-			t.Fatalf("scale up next=%d want %d", next, want)
-		}
-	}
-
-	// Cap at max.
+	// Backlog exceeds max → jump straight to max (no additive ramp).
 	c.Observe(backpressure.Outcome{})
 	_, next := c.EndCycle(20)
 	if next != 4 {
-		t.Fatalf("capped next=%d want 4", next)
+		t.Fatalf("follow backlog next=%d want 4", next)
 	}
 
-	// Pressure → halve (4 → 2).
+	// Backlog between min and max → track it exactly.
+	c.Observe(backpressure.Outcome{})
+	_, next = c.EndCycle(3)
+	if next != 3 {
+		t.Fatalf("follow backlog next=%d want 3", next)
+	}
+
+	// Pressure → halve (3 → 1, floored at min).
 	c.Observe(backpressure.Outcome{Pressure: true})
 	_, next = c.EndCycle(20)
-	if next != 2 {
-		t.Fatalf("after pressure next=%d want 2", next)
+	if next != 1 {
+		t.Fatalf("after pressure next=%d want 1", next)
 	}
 
-	// 429-shaped error also counts as pressure (2 → 1).
-	c.Observe(backpressure.Outcome{Err: errors.New("llm http 429: rate limit")})
+	// No pressure → recover straight to backlog (20 → 4).
+	c.Observe(backpressure.Outcome{})
 	_, next = c.EndCycle(20)
-	if next != 1 {
-		t.Fatalf("after 429 next=%d want 1", next)
+	if next != 4 {
+		t.Fatalf("recover next=%d want 4", next)
 	}
 
-	// Quiet queue cools toward min (already min).
+	// Drained queue → clamp to min.
 	c.Observe(backpressure.Outcome{})
-	_, next = c.EndCycle(1)
+	_, next = c.EndCycle(0)
 	if next != 1 {
-		t.Fatalf("quiet next=%d want 1", next)
-	}
-}
-
-func TestControllerCoolDown(t *testing.T) {
-	c := backpressure.New(1, 8)
-	for i := 0; i < 3; i++ {
-		c.Observe(backpressure.Outcome{})
-		c.EndCycle(100)
-	}
-	if c.Limit() != 4 {
-		t.Fatalf("warm limit=%d want 4", c.Limit())
-	}
-	c.Observe(backpressure.Outcome{})
-	_, next := c.EndCycle(1) // pendingHint <= min → cool down
-	if next != 3 {
-		t.Fatalf("cooldown next=%d want 3", next)
+		t.Fatalf("drained next=%d want 1", next)
 	}
 }
 
 func TestControllerSeedFromBacklog(t *testing.T) {
 	c := backpressure.New(1, 8)
 	_, next := c.SeedFromBacklog(500)
-	if next < 4 {
-		t.Fatalf("large backlog seed=%d want >= 4", next)
+	if next != 8 {
+		t.Fatalf("large backlog seed=%d want 8", next)
 	}
-	if next > 8 {
-		t.Fatalf("seed=%d exceeds max", next)
-	}
-	_, next2 := c.SeedFromBacklog(500)
-	if next2 != next {
-		t.Fatalf("second seed should no-op, got %d want %d", next2, next)
+	// Seed tracks backlog directly on each call (no one-shot behavior).
+	_, next = c.SeedFromBacklog(3)
+	if next != 3 {
+		t.Fatalf("small backlog seed=%d want 3", next)
 	}
 }
 

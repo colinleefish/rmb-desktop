@@ -1,14 +1,12 @@
 package db
 
 import (
-	"context"
 	"database/sql"
 	"embed"
 	"fmt"
 	"os"
 	"path/filepath"
 
-	"github.com/colinleefish/rmb-desktop/internal/agentmemory"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/pressly/goose/v3"
 )
@@ -44,10 +42,6 @@ func Open(path string) (*sql.DB, error) {
 	if err := migrate(db); err != nil {
 		_ = db.Close()
 		return nil, err
-	}
-	if err := agentmemory.UpsertAgentGuide(context.Background(), db); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("seed agent guide: %w", err)
 	}
 	return db, nil
 }

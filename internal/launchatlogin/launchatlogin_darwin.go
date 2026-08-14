@@ -105,10 +105,16 @@ func plistPath() (string, error) {
 	return filepath.Join(home, "Library", "LaunchAgents", label+".plist"), nil
 }
 
+// installedAppPath is the /Applications install location preferred when
+// resolving the login-item binary. It is a var (not a const) so tests can
+// redirect it away from the host's real install and exercise the ~/.rmb/bin
+// fallback deterministically. The package tests run serially; do not mutate
+// concurrently.
+var installedAppPath = "/Applications/RMB Desktop.app/Contents/MacOS/RMB Desktop"
+
 func appBinaryPath(home string) string {
-	appInApplications := "/Applications/RMB Desktop.app/Contents/MacOS/RMB Desktop"
-	if fileExists(appInApplications) {
-		return appInApplications
+	if fileExists(installedAppPath) {
+		return installedAppPath
 	}
 	app := filepath.Join(home, ".rmb", "bin", "rmb-app")
 	if fileExists(app) {

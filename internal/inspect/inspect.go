@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/colinleefish/rmb-desktop/internal/agentmemory"
 	"github.com/colinleefish/rmb-desktop/internal/db"
 	"github.com/colinleefish/rmb-desktop/internal/skill"
 	"github.com/colinleefish/rmb-desktop/internal/uri"
@@ -32,9 +33,10 @@ func (s *Service) Cat(ctx context.Context, raw string, w io.Writer) error {
 	case uri.ScopeRoot:
 		_, err := fmt.Fprintln(w, "rmb root — use `rmb tree rmb://` to list scopes")
 		return err
-	case uri.ScopeProfile, uri.ScopeAgent:
-		return s.catMemoryByURI(ctx, u.String(), w, u.Scope)
-	case uri.ScopePrefs, uri.ScopeEntities, uri.ScopeEvents:
+	case uri.ScopeAgent:
+		_, err := io.WriteString(w, agentmemory.AgentGuideBody())
+		return err
+	case uri.ScopeProfile, uri.ScopePrefs, uri.ScopeEntities, uri.ScopeEvents:
 		return s.catMemoryByURI(ctx, u.String(), w, u.Scope)
 	case uri.ScopeScenes:
 		if len(u.Segments) == 0 {
@@ -90,7 +92,7 @@ func (s *Service) Meta(ctx context.Context, raw string, w io.Writer) error {
 	case uri.ScopeProfile:
 		payload, err = s.metaMemory(ctx, uri.BuildProfile())
 	case uri.ScopeAgent:
-		payload, err = s.metaMemory(ctx, uri.BuildAgent())
+		payload = s.metaAgent()
 	case uri.ScopePrefs, uri.ScopeEntities, uri.ScopeEvents:
 		payload, err = s.metaMemory(ctx, u.String())
 	case uri.ScopeScenes:
@@ -136,9 +138,7 @@ func (s *Service) treeRoot(w io.Writer) error {
 }
 
 func (s *Service) catMemoryByURI(ctx context.Context, target string, w io.Writer, scope string) error {
-	if scope == uri.ScopeAgent {
-		target = uri.BuildAgent()
-	} else if scope == uri.ScopeProfile {
+	if scope == uri.ScopeProfile {
 		target = uri.BuildProfile()
 	}
 	return s.catMemory(ctx, target, w)
@@ -292,14 +292,8 @@ func (s *Service) treeScope(ctx context.Context, u uri.URI, w io.Writer) error {
 		}
 		return nil
 	case uri.ScopeAgent:
-		var count int
-		_ = s.db.QueryRowContext(ctx, `
-			SELECT COUNT(*) FROM memories WHERE category = 'agent' AND superseded_at IS NULL`).Scan(&count)
-		if count > 0 {
-			_, err := fmt.Fprintln(w, uri.BuildAgent())
-			return err
-		}
-		return nil
+		_, err := fmt.Fprintln(w, uri.BuildAgent())
+		return err
 	case uri.ScopeScenes:
 		q := `SELECT id FROM scenes ORDER BY updated_at DESC LIMIT 200`
 		args := []any{}
@@ -419,6 +413,19 @@ func (s *Service) metaMemory(ctx context.Context, target string) (map[string]any
 		meta["slug"] = slug.String
 	}
 	return meta, nil
+}
+
+// metaAgent synthesizes the rmb://agent meta payload from the embedded bundle.
+// The agent guide is curated documentation, not a distilled memory, so it has
+// no version or timestamps — only uri/category/abstract/body.
+func (s *Service) metaAgent() map[string]any {
+	return map[string]any{
+		"uri":               uri.BuildAgent(),
+		"category":          uri.ScopeAgent,
+		"abstract":          agentmemory.AgentGuideAbstract(),
+		"body":              agentmemory.AgentGuideBody(),
+		"source_scene_uris": []string{},
+	}
 }
 
 func (s *Service) metaScene(ctx context.Context, u uri.URI) (map[string]any, error) {

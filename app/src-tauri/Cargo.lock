@@ -2383,7 +2383,7 @@ dependencies = [
 
 [[package]]
 name = "rmb-app"
-version = "0.1.17"
+version = "0.1.21"
 dependencies = [
  "dirs",
  "libc",

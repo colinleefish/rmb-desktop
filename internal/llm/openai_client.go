@@ -243,7 +243,7 @@ func (c *OpenAICompatibleClient) chatCompletion(ctx context.Context, reqBody cha
 	defer resp.Body.Close()
 	status = resp.StatusCode
 
-	body, readErr := io.ReadAll(io.LimitReader(resp.Body, maxErrorBodyBytes+1))
+	body, readErr := io.ReadAll(resp.Body)
 	respBytes = len(body)
 	if readErr != nil {
 		return "", status, reqBytes, respBytes, false, fmt.Errorf("read llm response: %w", readErr)
@@ -251,10 +251,11 @@ func (c *OpenAICompatibleClient) chatCompletion(ctx context.Context, reqBody cha
 
 	if status >= 400 {
 		retryable = status == http.StatusTooManyRequests || status >= 500
-		if respBytes > maxErrorBodyBytes {
-			body = body[:maxErrorBodyBytes]
+		errSnippet := body
+		if len(errSnippet) > maxErrorBodyBytes {
+			errSnippet = errSnippet[:maxErrorBodyBytes]
 		}
-		return "", status, reqBytes, respBytes, retryable, fmt.Errorf("llm http %d: %s", status, strings.TrimSpace(string(body)))
+		return "", status, reqBytes, respBytes, retryable, fmt.Errorf("llm http %d: %s", status, strings.TrimSpace(string(errSnippet)))
 	}
 
 	var completion chatCompletionResponse

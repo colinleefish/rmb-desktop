@@ -1,0 +1,44 @@
+---
+description: rmb-desktop release build, notarize, and auto-upload to GitHub
+alwaysApply: true
+---
+
+# rmb-desktop releases
+
+When the user asks to cut, ship, publish, or deploy a release — or when a fix is ready for the remote instance — **run the release pipeline yourself**. Do not ask permission to upload to GitHub.
+
+## One command
+
+```bash
+cd /Users/liguanghui/Virginia/colinleefish/rmb-desktop
+SIGN_KEYCHAIN_PASS='rmb-sign' make release VERSION=0.1.x
+```
+
+Or upload an already-built DMG:
+
+```bash
+UPLOAD_ONLY=1 make release VERSION=0.1.x
+```
+
+Credentials live in `~/.rmb/release.env` (see `scripts/release.env.example`). Prefer sourcing that file over prompting.
+
+## Pipeline (automatic)
+
+1. `make app-build` — signed Tauri build
+2. `make notarize` — Apple notarization + staple
+3. `scripts/release.sh` — verify staple, upload DMG to GitHub (create or clobber)
+
+Optional: `PUBLISH_R2=1` pushes to `releases.re-mem-ber.me` via sibling `rmb-website` repo.
+
+## Version bumps
+
+Before releasing, update `VERSION` in:
+- `Makefile` (default `VERSION ?=`)
+- `app/src-tauri/tauri.conf.json` (`package.version`)
+
+Commit the version bump only when the user asks.
+
+## After upload
+
+- Confirm release URL: `https://github.com/colinleefish/rmb-desktop/releases/tag/vX.Y.Z`
+- Remote test host (`10.254.24.7:19019`): user installs DMG manually unless they ask you to deploy via SSH

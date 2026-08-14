@@ -1,8 +1,8 @@
-.PHONY: test build build-all run-rmbd run-hook tidy app-dev app-build app-build-windows app-install app-icons webui-dev webui-build webui-embed-check icons-sync prepare-sidecars build-windows-sidecars notarize
+.PHONY: test build build-all run-rmbd run-hook tidy app-dev app-build app-build-windows app-install app-icons webui-dev webui-build webui-embed-check icons-sync prepare-sidecars build-windows-sidecars notarize release release-upload release-publish
 
 GO_TAGS := sqlite_fts5
 EMBED_INDEX := internal/http/static/web/index.html
-VERSION ?= 0.1.19
+VERSION ?= 0.1.20
 COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 GO_LDFLAGS := -X github.com/colinleefish/rmb-desktop/internal/version.Version=$(VERSION) -X github.com/colinleefish/rmb-desktop/internal/version.Commit=$(COMMIT)
 
@@ -55,15 +55,20 @@ SIGN_KEYCHAIN_PASS ?=
 NOTARY_PROFILE ?= rmb-notary
 GH := ALL_PROXY=$(PROXY_URL) HTTPS_PROXY=$(PROXY_URL) HTTP_PROXY=$(PROXY_URL) gh
 
-# Upload/publish GitHub release (uses proxy). VERSION=0.1.x NOTES=file.md optional.
-release-publish:
-	@test -n "$(VERSION)" || (echo "usage: make release-publish VERSION=0.1.x" >&2; exit 1)
-	@test -f "$(DMG_BUNDLE)" || (echo "missing $(DMG_BUNDLE); run make app-build" >&2; exit 1)
-	cp "$(DMG_BUNDLE)" "/tmp/RMB.Desktop_$(VERSION)_aarch64.dmg"
-	$(GH) release create "v$(VERSION)" "/tmp/RMB.Desktop_$(VERSION)_aarch64.dmg" \
-		--repo colinleefish/rmb-desktop \
-		--title "RMB Desktop $(VERSION)" \
-		$(if $(NOTES),--notes-file $(NOTES),)
+# Full pipeline: build → notarize → GitHub upload. SIGN_KEYCHAIN_PASS required unless UPLOAD_ONLY=1.
+# Optional: PUBLISH_R2=1 SKIP_NOTARIZE=1 UPLOAD_ONLY=1
+release:
+	@test -n "$(VERSION)" || (echo "usage: make release VERSION=0.1.x [SIGN_KEYCHAIN_PASS=...]" >&2; exit 1)
+	UPLOAD_ONLY=$(UPLOAD_ONLY) PUBLISH_R2=$(PUBLISH_R2) SKIP_NOTARIZE=$(SKIP_NOTARIZE) \
+		SIGN_KEYCHAIN_PASS="$(SIGN_KEYCHAIN_PASS)" bash scripts/release.sh "$(VERSION)"
+
+# Upload/publish GitHub release only (uses proxy). VERSION=0.1.x NOTES=file.md optional.
+release-upload:
+	@test -n "$(VERSION)" || (echo "usage: make release-upload VERSION=0.1.x" >&2; exit 1)
+	UPLOAD_ONLY=1 bash scripts/release.sh "$(VERSION)"
+
+# Deprecated alias — prefer make release or make release-upload.
+release-publish: release-upload
 
 release-upload-windows:
 	@test -n "$(VERSION)" || (echo "usage: make release-upload-windows VERSION=0.1.x" >&2; exit 1)

@@ -149,7 +149,7 @@ func (s *Server) handleDebugPipelineDryRun(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	chat, err := llm.NewOpenAICompatibleClient(cfg.LLM)
+	chat, err := llm.NewOpenAICompatibleClient(cfg.LLM, s.log)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -206,7 +206,7 @@ func (s *Server) handleDebugLLMBuildScenes(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	chat, err := llm.NewOpenAICompatibleClient(cfg.LLM)
+	chat, err := llm.NewOpenAICompatibleClient(cfg.LLM, s.log)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return

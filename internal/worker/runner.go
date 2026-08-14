@@ -54,7 +54,7 @@ func (r *Runner) Start(ctx context.Context) {
 		r.log.Warn("fts index rebuild failed", "err", err)
 	}
 
-	chat, err := llm.NewOpenAICompatibleClient(r.cfg.LLM)
+	chat, err := llm.NewOpenAICompatibleClient(r.cfg.LLM, r.log)
 	if err != nil {
 		r.log.Error("failed to create llm client", "err", err)
 		return

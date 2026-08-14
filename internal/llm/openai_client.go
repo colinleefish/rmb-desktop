@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -33,6 +35,7 @@ type OpenAICompatibleClient struct {
 	model      string
 	maxRetries int
 	httpClient *http.Client
+	log        *slog.Logger
 }
 
 type chatCompletionRequest struct {
@@ -54,7 +57,7 @@ type chatCompletionResponse struct {
 	} `json:"choices"`
 }
 
-func NewOpenAICompatibleClient(cfg config.LLMConfig) (*OpenAICompatibleClient, error) {
+func NewOpenAICompatibleClient(cfg config.LLMConfig, log *slog.Logger) (*OpenAICompatibleClient, error) {
 	base := strings.TrimSpace(cfg.APIBase)
 	key := strings.TrimSpace(cfg.APIKey)
 	model := strings.TrimSpace(cfg.Model)
@@ -67,6 +70,9 @@ func NewOpenAICompatibleClient(cfg config.LLMConfig) (*OpenAICompatibleClient, e
 	if model == "" {
 		return nil, errors.New("llm model is required")
 	}
+	if log == nil {
+		log = slog.Default()
+	}
 	timeout := cfg.RequestTimeout()
 	return &OpenAICompatibleClient{
 		baseURL:    strings.TrimRight(base, "/"),
@@ -74,6 +80,7 @@ func NewOpenAICompatibleClient(cfg config.LLMConfig) (*OpenAICompatibleClient, e
 		model:      model,
 		maxRetries: defaultMaxRetries,
 		httpClient: &http.Client{Timeout: timeout},
+		log:        log,
 	}, nil
 }
 
@@ -95,7 +102,7 @@ func (c *OpenAICompatibleClient) ExtractAtoms(ctx context.Context, messagesJSONL
 			{Role: "user", Content: buildExtractAtomsPrompt(messagesJSONL)},
 		},
 	}
-	out, err := c.completeWithRetry(ctx, req)
+	out, err := c.completeWithRetry(ctx, "extract_atoms", req)
 	if err != nil {
 		return "", fmt.Errorf("llm extract atoms failed: %w", err)
 	}
@@ -111,7 +118,7 @@ func (c *OpenAICompatibleClient) BuildScenes(ctx context.Context, atomsJSON stri
 			{Role: "user", Content: buildBuildScenesPrompt(atomsJSON)},
 		},
 	}
-	out, err := c.completeWithRetry(ctx, req)
+	out, err := c.completeWithRetry(ctx, "build_scenes", req)
 	if err != nil {
 		return "", fmt.Errorf("llm build scenes failed: %w", err)
 	}
@@ -127,7 +134,7 @@ func (c *OpenAICompatibleClient) SummarizeSessionAbstract(ctx context.Context, s
 			{Role: "user", Content: buildSessionAbstractPrompt(sceneAbstracts)},
 		},
 	}
-	out, err := c.completeWithRetry(ctx, req)
+	out, err := c.completeWithRetry(ctx, "session_abstract", req)
 	if err != nil {
 		return "", fmt.Errorf("llm summarize session abstract failed: %w", err)
 	}
@@ -149,17 +156,19 @@ func (c *OpenAICompatibleClient) DistillMemory(
 			{Role: "user", Content: buildDistillMemoryPrompt(category, slug, atomsJSON, corrections)},
 		},
 	}
-	out, err := c.completeWithRetry(ctx, req)
+	out, err := c.completeWithRetry(ctx, "distill_memory", req)
 	if err != nil {
 		return "", fmt.Errorf("llm distill memory failed: %w", err)
 	}
 	return out, nil
 }
 
-func (c *OpenAICompatibleClient) completeWithRetry(ctx context.Context, req chatCompletionRequest) (string, error) {
+func (c *OpenAICompatibleClient) completeWithRetry(ctx context.Context, operation string, req chatCompletionRequest) (string, error) {
 	var lastErr error
 	for attempt := 1; attempt <= c.maxRetries; attempt++ {
-		content, retryable, err := c.chatCompletion(ctx, req)
+		start := time.Now()
+		content, status, reqBytes, respBytes, retryable, err := c.chatCompletion(ctx, req)
+		c.logLLMRequest(operation, attempt, status, reqBytes, respBytes, time.Since(start), err)
 		if err == nil {
 			return content, nil
 		}
@@ -179,44 +188,88 @@ func (c *OpenAICompatibleClient) completeWithRetry(ctx context.Context, req chat
 	return "", lastErr
 }
 
-func (c *OpenAICompatibleClient) chatCompletion(ctx context.Context, reqBody chatCompletionRequest) (string, bool, error) {
+func (c *OpenAICompatibleClient) logLLMRequest(operation string, attempt, status, reqBytes, respBytes int, latency time.Duration, err error) {
+	if c.log == nil {
+		return
+	}
+	attrs := []any{
+		"op", operation,
+		"attempt", attempt,
+		"model", c.model,
+		"host", c.traceHost(),
+		"latency_ms", latency.Milliseconds(),
+		"req_bytes", reqBytes,
+	}
+	if status > 0 {
+		attrs = append(attrs, "status", status)
+	}
+	if respBytes > 0 {
+		attrs = append(attrs, "resp_bytes", respBytes)
+	}
+	if err != nil {
+		attrs = append(attrs, "err", err)
+		c.log.Warn("llm request failed", attrs...)
+		return
+	}
+	c.log.Info("llm request", attrs...)
+}
+
+func (c *OpenAICompatibleClient) traceHost() string {
+	u, err := url.Parse(c.baseURL)
+	if err != nil || u.Host == "" {
+		return c.baseURL
+	}
+	return u.Host
+}
+
+func (c *OpenAICompatibleClient) chatCompletion(ctx context.Context, reqBody chatCompletionRequest) (content string, status, reqBytes, respBytes int, retryable bool, err error) {
 	raw, err := json.Marshal(reqBody)
 	if err != nil {
-		return "", false, fmt.Errorf("marshal llm request: %w", err)
+		return "", 0, 0, 0, false, fmt.Errorf("marshal llm request: %w", err)
 	}
+	reqBytes = len(raw)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/chat/completions", bytes.NewReader(raw))
 	if err != nil {
-		return "", false, fmt.Errorf("build llm request: %w", err)
+		return "", 0, reqBytes, 0, false, fmt.Errorf("build llm request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return "", true, fmt.Errorf("perform llm request: %w", err)
+		return "", 0, reqBytes, 0, true, fmt.Errorf("perform llm request: %w", err)
 	}
 	defer resp.Body.Close()
+	status = resp.StatusCode
 
-	if resp.StatusCode >= 400 {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, maxErrorBodyBytes))
-		retryable := resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode >= 500
-		return "", retryable, fmt.Errorf("llm http %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	body, readErr := io.ReadAll(io.LimitReader(resp.Body, maxErrorBodyBytes+1))
+	respBytes = len(body)
+	if readErr != nil {
+		return "", status, reqBytes, respBytes, false, fmt.Errorf("read llm response: %w", readErr)
+	}
+
+	if status >= 400 {
+		retryable = status == http.StatusTooManyRequests || status >= 500
+		if respBytes > maxErrorBodyBytes {
+			body = body[:maxErrorBodyBytes]
+		}
+		return "", status, reqBytes, respBytes, retryable, fmt.Errorf("llm http %d: %s", status, strings.TrimSpace(string(body)))
 	}
 
 	var completion chatCompletionResponse
-	if err := json.NewDecoder(resp.Body).Decode(&completion); err != nil {
-		return "", false, fmt.Errorf("decode llm response: %w", err)
+	if err := json.Unmarshal(body, &completion); err != nil {
+		return "", status, reqBytes, respBytes, false, fmt.Errorf("decode llm response: %w", err)
 	}
 	if len(completion.Choices) == 0 {
-		return "", false, errors.New("llm response has no choices")
+		return "", status, reqBytes, respBytes, false, errors.New("llm response has no choices")
 	}
-	content := strings.TrimSpace(completion.Choices[0].Message.Content)
+	content = strings.TrimSpace(completion.Choices[0].Message.Content)
 	if content == "" {
 		content = strings.TrimSpace(completion.Choices[0].Message.ReasoningContent)
 	}
 	if content == "" {
-		return "", false, errors.New("llm response is empty")
+		return "", status, reqBytes, respBytes, false, errors.New("llm response is empty")
 	}
-	return content, false, nil
+	return content, status, reqBytes, respBytes, false, nil
 }

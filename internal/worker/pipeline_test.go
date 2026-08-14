@@ -65,7 +65,7 @@ func TestExtractOneCycle(t *testing.T) {
 	cfg.Pipeline.L1Warmup = false
 
 	locks := workerlock.NewSessionLocks()
-	w := extract.NewWorker(database, &mockLLM{}, cfg.Pipeline, locks, nil)
+	w := extract.NewWorker(database, &mockLLM{}, cfg.Pipeline, locks, nil, nil)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

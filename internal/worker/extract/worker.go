@@ -10,8 +10,10 @@ import (
 
 	"github.com/colinleefish/rmb-desktop/internal/config"
 	"github.com/colinleefish/rmb-desktop/internal/db"
+	"github.com/colinleefish/rmb-desktop/internal/debug"
 	"github.com/colinleefish/rmb-desktop/internal/llm"
 	"github.com/colinleefish/rmb-desktop/internal/model"
+	"github.com/colinleefish/rmb-desktop/internal/pipeline"
 	"github.com/colinleefish/rmb-desktop/internal/uri"
 	"github.com/colinleefish/rmb-desktop/internal/worker/backpressure"
 	"github.com/colinleefish/rmb-desktop/internal/workerlock"
@@ -30,9 +32,10 @@ type Worker struct {
 	log    *slog.Logger
 	now    func() time.Time
 	bp     *backpressure.Controller
+	reg    *debug.Registry
 }
 
-func NewWorker(database *sql.DB, llm AtomExtractor, cfg config.PipelineConfig, locks *workerlock.SessionLocks, log *slog.Logger) *Worker {
+func NewWorker(database *sql.DB, llm AtomExtractor, cfg config.PipelineConfig, locks *workerlock.SessionLocks, log *slog.Logger, reg *debug.Registry) *Worker {
 	if log == nil {
 		log = slog.Default()
 	}
@@ -44,6 +47,7 @@ func NewWorker(database *sql.DB, llm AtomExtractor, cfg config.PipelineConfig, l
 		log:   log,
 		now:   time.Now,
 		bp:    backpressure.New(cfg.L1MinConcurrency, cfg.L1MaxConcurrency),
+		reg:   reg,
 	}
 }
 
@@ -55,6 +59,8 @@ func (w *Worker) Run(ctx context.Context) error {
 	if interval <= 0 {
 		return fmt.Errorf("invalid l1 poll interval")
 	}
+	w.reg.WorkerStarted("l1")
+	defer w.reg.WorkerStopped("l1")
 	w.log.Info("l1 extract worker started",
 		"poll_interval", interval,
 		"min_concurrency", w.bp.Min(),
@@ -76,6 +82,9 @@ func (w *Worker) Run(ctx context.Context) error {
 }
 
 func (w *Worker) runOneCycle(ctx context.Context) {
+	endCycle := w.reg.BeginCycle("l1")
+	defer endCycle(nil)
+
 	ids, err := w.selectCandidateSessions(ctx)
 	if err != nil {
 		w.log.Error("l1 select candidates failed", "err", err)
@@ -93,6 +102,7 @@ func (w *Worker) runOneCycle(ctx context.Context) {
 	}
 
 	limit := w.bp.Limit()
+	w.reg.SetConcurrency("l1", limit)
 	w.log.Info("l1 cycle", "candidates", len(ids), "concurrency", limit)
 
 	remaining := ids
@@ -124,6 +134,7 @@ func (w *Worker) runOneCycle(ctx context.Context) {
 			pendingHint = n
 		}
 		prev, next := w.bp.EndCycle(pendingHint)
+		w.reg.SetBackpressure("l1", w.bp.Min(), w.bp.Max(), next, pendingHint)
 		if prev != next {
 			w.log.Info("l1 concurrency adjusted", "from", prev, "to", next, "pending", pendingHint)
 		}
@@ -188,10 +199,15 @@ func (w *Worker) processSession(ctx context.Context, sessionID string) error {
 	unlock := w.locks.Lock(sessionID)
 	defer unlock()
 
+	w.reg.BeginSession(sessionID, "", "l1", "prepare")
 	batch, err := w.prepareBatch(ctx, sessionID)
 	if err != nil || batch == nil {
+		w.reg.EndSession(sessionID, "l1")
 		return err
 	}
+
+	w.reg.BeginSession(sessionID, batch.SessionKey, "l1", "llm.extract_atoms")
+	defer w.reg.EndSession(sessionID, "l1")
 
 	raw, err := w.llm.ExtractAtoms(ctx, batch.MessagesJSONL)
 	if err != nil {
@@ -290,7 +306,14 @@ func (w *Worker) prepareBatch(ctx context.Context, sessionID string) (*extractBa
 		return nil, nil
 	}
 
-	_, err = tx.ExecContext(ctx, `UPDATE pipeline_state SET l1_status = 'running' WHERE session_id = ?`, sessionID)
+	nowMS := w.now().UTC().UnixMilli()
+	_, err = tx.ExecContext(ctx, `
+		UPDATE pipeline_state SET
+			l1_status = 'running',
+			l1_started_at = ?,
+			l1_last_error = NULL,
+			updated_at = ?
+		WHERE session_id = ?`, nowMS, nowMS, sessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -380,6 +403,8 @@ func (w *Worker) persistBatch(ctx context.Context, sessionID string, batch *extr
 			l1_status = 'idle',
 			l1_advanced_at = ?,
 			l1_turns_since_advanced = 0,
+			l1_started_at = NULL,
+			l1_last_error = NULL,
 			warmup_threshold = ?,
 			l2_status = 'pending',
 			updated_at = ?
@@ -400,10 +425,10 @@ func (w *Worker) persistBatch(ctx context.Context, sessionID string, batch *extr
 func (w *Worker) handleProcessError(ctx context.Context, sessionID string, cause error) error {
 	if llm.IsTransientError(cause) {
 		w.log.Warn("l1 transient error", "session_id", sessionID, "err", cause)
-		_, _ = w.db.ExecContext(ctx, `UPDATE pipeline_state SET l1_status = 'pending' WHERE session_id = ?`, sessionID)
+		_ = pipeline.MarkPending(ctx, w.db, sessionID, pipeline.StageL1, cause.Error(), w.now())
 		return cause
 	}
-	_, _ = w.db.ExecContext(ctx, `UPDATE pipeline_state SET l1_status = 'failed' WHERE session_id = ?`, sessionID)
+	_ = pipeline.MarkFailed(ctx, w.db, sessionID, pipeline.StageL1, cause.Error(), w.now())
 	return cause
 }
 

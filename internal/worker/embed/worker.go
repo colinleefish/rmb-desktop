@@ -9,6 +9,7 @@ import (
 
 	sqlite_vec "github.com/asg017/sqlite-vec-go-bindings/cgo"
 	"github.com/colinleefish/rmb-desktop/internal/config"
+	"github.com/colinleefish/rmb-desktop/internal/debug"
 	"github.com/colinleefish/rmb-desktop/internal/llm"
 )
 
@@ -22,16 +23,17 @@ type Worker struct {
 	cfg    config.PipelineConfig
 	dims   int
 	log    *slog.Logger
+	reg    *debug.Registry
 }
 
-func NewWorker(database *sql.DB, embedder Embedder, cfg config.PipelineConfig, dims int, log *slog.Logger) *Worker {
+func NewWorker(database *sql.DB, embedder Embedder, cfg config.PipelineConfig, dims int, log *slog.Logger, reg *debug.Registry) *Worker {
 	if log == nil {
 		log = slog.Default()
 	}
 	if dims <= 0 {
 		dims = 1024
 	}
-	return &Worker{db: database, llm: embedder, cfg: cfg, dims: dims, log: log}
+	return &Worker{db: database, llm: embedder, cfg: cfg, dims: dims, log: log, reg: reg}
 }
 
 func (w *Worker) Run(ctx context.Context) error {
@@ -42,6 +44,8 @@ func (w *Worker) Run(ctx context.Context) error {
 	if interval <= 0 {
 		return fmt.Errorf("invalid embed poll interval")
 	}
+	w.reg.WorkerStarted("embed")
+	defer w.reg.WorkerStopped("embed")
 	w.log.Info("embed worker started", "poll_interval", interval)
 	w.runOneCycle(ctx)
 
@@ -59,6 +63,9 @@ func (w *Worker) Run(ctx context.Context) error {
 }
 
 func (w *Worker) runOneCycle(ctx context.Context) {
+	endCycle := w.reg.BeginCycle("embed")
+	defer endCycle(nil)
+
 	for _, tier := range []struct {
 		name string
 		fn   func(context.Context) (int, error)

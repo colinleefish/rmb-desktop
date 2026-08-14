@@ -11,6 +11,7 @@ import (
 
 	"github.com/colinleefish/rmb-desktop/internal/config"
 	"github.com/colinleefish/rmb-desktop/internal/db"
+	"github.com/colinleefish/rmb-desktop/internal/debug"
 	"github.com/colinleefish/rmb-desktop/internal/httpserver"
 	"github.com/colinleefish/rmb-desktop/internal/launchatlogin"
 	"github.com/colinleefish/rmb-desktop/internal/worker"
@@ -76,7 +77,9 @@ func serve(args []string) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	logBuf := debug.NewLogBuffer(2000)
+	baseLog := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})
+	log := debug.NewLogger(logBuf, baseLog)
 
 	if cfg.LaunchAtLogin {
 		if err := launchatlogin.Set(true); err != nil {
@@ -84,11 +87,12 @@ func serve(args []string) int {
 		}
 	}
 
-	runner := worker.NewRunner(cfg, database, log)
+	reg := debug.NewRegistry()
+	runner := worker.NewRunner(cfg, database, log, reg)
 	runner.Start(ctx)
 	defer runner.Wait()
 
-	if err := httpserver.ListenAndServe(ctx, cfg.Addr, database, cfg, cfgFile, log); err != nil {
+	if err := httpserver.ListenAndServe(ctx, cfg.Addr, database, cfg, cfgFile, log, reg, logBuf); err != nil {
 		fmt.Fprintf(os.Stderr, "serve: %v\n", err)
 		return 1
 	}

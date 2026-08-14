@@ -21,7 +21,7 @@ func TestUpload_roundTrip(t *testing.T) {
 	defer database.Close()
 
 	cfg, _ := config.Default()
-	srv := httpserver.New(database, cfg, filepath.Join(t.TempDir(), "config.yaml"), nil)
+	srv := httpserver.New(database, cfg, filepath.Join(t.TempDir(), "config.yaml"), nil, nil, nil)
 
 	body, _ := json.Marshal(map[string]any{
 		"messages": []map[string]string{

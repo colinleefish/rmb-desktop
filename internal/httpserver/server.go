@@ -13,6 +13,7 @@ import (
 	"github.com/colinleefish/rmb-desktop/internal/browse"
 	"github.com/colinleefish/rmb-desktop/internal/config"
 	"github.com/colinleefish/rmb-desktop/internal/correction"
+	"github.com/colinleefish/rmb-desktop/internal/debug"
 	"github.com/colinleefish/rmb-desktop/internal/db"
 	"github.com/colinleefish/rmb-desktop/internal/http/static"
 	"github.com/colinleefish/rmb-desktop/internal/inspect"
@@ -26,6 +27,8 @@ import (
 type Server struct {
 	db          *sql.DB
 	log         *slog.Logger
+	reg         *debug.Registry
+	logBuf      *debug.LogBuffer
 	upload      *session.Service
 	recall      *recall.Service
 	recallStats *recallstats.Service
@@ -37,14 +40,22 @@ type Server struct {
 	mux         *http.ServeMux
 }
 
-func New(database *sql.DB, cfg config.Config, configPath string, log *slog.Logger) *Server {
+func New(database *sql.DB, cfg config.Config, configPath string, log *slog.Logger, reg *debug.Registry, logBuf *debug.LogBuffer) *Server {
 	if log == nil {
 		log = slog.Default()
+	}
+	if reg == nil {
+		reg = debug.NewRegistry()
+	}
+	if logBuf == nil {
+		logBuf = debug.NewLogBuffer(0)
 	}
 	recallStatsSvc := recallstats.NewService(database)
 	s := &Server{
 		db:          database,
 		log:         log,
+		reg:         reg,
+		logBuf:      logBuf,
 		upload:      session.NewService(database),
 		recall:      recall.NewService(database),
 		recallStats: recallStatsSvc,
@@ -128,6 +139,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/setup/status", s.handleSetupStatus)
 	s.mux.HandleFunc("GET /api/v1/setup/{agent}/preview", s.handleSetupPreview)
 	s.mux.HandleFunc("POST /api/v1/setup/{agent}/apply", s.handleSetupApply)
+	s.registerDebugRoutes()
 }
 
 func (s *Server) handleHealthz(w http.ResponseWriter, r *http.Request) {
@@ -209,10 +221,10 @@ func writeError(w http.ResponseWriter, code int, msg string) {
 }
 
 // ListenAndServe starts the HTTP server on addr.
-func ListenAndServe(ctx context.Context, addr string, database *sql.DB, cfg config.Config, configPath string, log *slog.Logger) error {
+func ListenAndServe(ctx context.Context, addr string, database *sql.DB, cfg config.Config, configPath string, log *slog.Logger, reg *debug.Registry, logBuf *debug.LogBuffer) error {
 	srv := &http.Server{
 		Addr:    addr,
-		Handler: New(database, cfg, configPath, log).Handler(),
+		Handler: New(database, cfg, configPath, log, reg, logBuf).Handler(),
 	}
 
 	go func() {

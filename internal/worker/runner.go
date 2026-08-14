@@ -7,7 +7,9 @@ import (
 	"sync"
 
 	"github.com/colinleefish/rmb-desktop/internal/config"
+	"github.com/colinleefish/rmb-desktop/internal/debug"
 	"github.com/colinleefish/rmb-desktop/internal/llm"
+	"github.com/colinleefish/rmb-desktop/internal/pipeline"
 	"github.com/colinleefish/rmb-desktop/internal/workerlock"
 	"github.com/colinleefish/rmb-desktop/internal/worker/embed"
 	"github.com/colinleefish/rmb-desktop/internal/worker/extract"
@@ -21,10 +23,11 @@ type Runner struct {
 	db    *sql.DB
 	log   *slog.Logger
 	locks *workerlock.SessionLocks
+	reg   *debug.Registry
 	wg    sync.WaitGroup
 }
 
-func NewRunner(cfg config.Config, database *sql.DB, log *slog.Logger) *Runner {
+func NewRunner(cfg config.Config, database *sql.DB, log *slog.Logger, reg *debug.Registry) *Runner {
 	if log == nil {
 		log = slog.Default()
 	}
@@ -33,6 +36,7 @@ func NewRunner(cfg config.Config, database *sql.DB, log *slog.Logger) *Runner {
 		db:    database,
 		log:   log,
 		locks: workerlock.NewSessionLocks(),
+		reg:   reg,
 	}
 }
 
@@ -57,13 +61,13 @@ func (r *Runner) Start(ctx context.Context) {
 	}
 
 	r.startWorker(ctx, "l1", func(ctx context.Context) error {
-		return extract.NewWorker(r.db, chat, r.cfg.Pipeline, r.locks, r.log).Run(ctx)
+		return extract.NewWorker(r.db, chat, r.cfg.Pipeline, r.locks, r.log, r.reg).Run(ctx)
 	})
 	r.startWorker(ctx, "l2", func(ctx context.Context) error {
-		return scene.NewWorker(r.db, chat, r.cfg.Pipeline, r.locks, r.log).Run(ctx)
+		return scene.NewWorker(r.db, chat, r.cfg.Pipeline, r.locks, r.log, r.reg).Run(ctx)
 	})
 	r.startWorker(ctx, "l3", func(ctx context.Context) error {
-		return memory.NewWorker(r.db, chat, r.cfg.Pipeline, r.log).Run(ctx)
+		return memory.NewWorker(r.db, chat, r.cfg.Pipeline, r.log, r.reg).Run(ctx)
 	})
 
 	if r.cfg.Embed.HasKey() {
@@ -72,7 +76,7 @@ func (r *Runner) Start(ctx context.Context) {
 			r.log.Error("failed to create embed client", "err", err)
 		} else {
 			r.startWorker(ctx, "embed", func(ctx context.Context) error {
-				return embed.NewWorker(r.db, embedClient, r.cfg.Pipeline, r.cfg.Embed.Dimensions, r.log).Run(ctx)
+				return embed.NewWorker(r.db, embedClient, r.cfg.Pipeline, r.cfg.Embed.Dimensions, r.log, r.reg).Run(ctx)
 			})
 		}
 	} else {
@@ -97,16 +101,12 @@ func (r *Runner) Wait() {
 
 // recoverPipelineState resets worker states left mid-flight after a crash or restart.
 func recoverPipelineState(ctx context.Context, db *sql.DB) error {
-	_, err := db.ExecContext(ctx, `
-		UPDATE pipeline_state SET l1_status = 'pending'
-		WHERE l1_status = 'running'`)
-	if err != nil {
-		return err
+	for _, stage := range []pipeline.Stage{pipeline.StageL1, pipeline.StageL2, pipeline.StageL3} {
+		if _, err := pipeline.ResetRunningToPending(ctx, db, stage); err != nil {
+			return err
+		}
 	}
-	_, err = db.ExecContext(ctx, `
-		UPDATE pipeline_state SET l2_status = 'pending'
-		WHERE l2_status = 'running'`)
-	return err
+	return nil
 }
 
 func rebuildFTSIndexes(ctx context.Context, db *sql.DB) error {

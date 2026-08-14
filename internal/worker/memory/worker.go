@@ -12,6 +12,7 @@ import (
 	"github.com/colinleefish/rmb-desktop/internal/config"
 	"github.com/colinleefish/rmb-desktop/internal/correction"
 	"github.com/colinleefish/rmb-desktop/internal/db"
+	"github.com/colinleefish/rmb-desktop/internal/debug"
 	"github.com/colinleefish/rmb-desktop/internal/llm"
 	"github.com/colinleefish/rmb-desktop/internal/model"
 	"github.com/colinleefish/rmb-desktop/internal/workerlock"
@@ -33,13 +34,14 @@ type Worker struct {
 	cfg config.PipelineConfig
 	log *slog.Logger
 	now func() time.Time
+	reg *debug.Registry
 }
 
-func NewWorker(database *sql.DB, llm MemoryDistiller, cfg config.PipelineConfig, log *slog.Logger) *Worker {
+func NewWorker(database *sql.DB, llm MemoryDistiller, cfg config.PipelineConfig, log *slog.Logger, reg *debug.Registry) *Worker {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Worker{db: database, llm: llm, cfg: cfg, log: log, now: time.Now}
+	return &Worker{db: database, llm: llm, cfg: cfg, log: log, now: time.Now, reg: reg}
 }
 
 func (w *Worker) Run(ctx context.Context) error {
@@ -50,6 +52,8 @@ func (w *Worker) Run(ctx context.Context) error {
 	if interval <= 0 {
 		return fmt.Errorf("invalid l3 poll interval")
 	}
+	w.reg.WorkerStarted("l3")
+	defer w.reg.WorkerStopped("l3")
 	w.log.Info("l3 memory worker started", "poll_interval", interval)
 	w.runOneCycle(ctx)
 
@@ -67,10 +71,15 @@ func (w *Worker) Run(ctx context.Context) error {
 }
 
 func (w *Worker) runOneCycle(ctx context.Context) {
+	endCycle := w.reg.BeginCycle("l3")
+	var cycleErr error
+	defer func() { endCycle(cycleErr) }()
+
 	workerlock.GlobalLock.Lock()
 	defer workerlock.GlobalLock.Unlock()
 	if err := w.rollup(ctx); err != nil {
 		w.log.Error("l3 rollup failed", "err", err)
+		cycleErr = err
 	}
 }
 

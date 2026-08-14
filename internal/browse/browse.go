@@ -707,15 +707,21 @@ func (s *Service) listScenesForSession(ctx context.Context, sessionID string) ([
 func (s *Service) loadPipelineState(ctx context.Context, sessionID string) (PipelineStateJSON, error) {
 	var ps PipelineStateJSON
 	var l1Adv, l2Adv, l3Adv sql.NullInt64
+	var l1Start, l2Start, l3Start sql.NullInt64
+	var l1Err, l2Err, l3Err sql.NullString
 	var updatedMS int64
 	err := s.db.QueryRowContext(ctx, `
 		SELECT session_id, l1_status, l2_status, l3_status,
 			l1_advanced_at, l2_advanced_at, l3_advanced_at,
+			l1_started_at, l2_started_at, l3_started_at,
+			l1_last_error, l2_last_error, l3_last_error,
 			l1_turns_since_advanced, warmup_threshold, updated_at
 		FROM pipeline_state WHERE session_id = ?`, sessionID,
 	).Scan(
 		&ps.SessionID, &ps.T1Status, &ps.T2Status, &ps.T3Status,
 		&l1Adv, &l2Adv, &l3Adv,
+		&l1Start, &l2Start, &l3Start,
+		&l1Err, &l2Err, &l3Err,
 		&ps.T1TurnsSinceAdvanced, &ps.WarmupThreshold, &updatedMS,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -727,6 +733,12 @@ func (s *Service) loadPipelineState(ctx context.Context, sessionID string) (Pipe
 	ps.T1AdvancedAt = nullMSPtr(l1Adv)
 	ps.T2AdvancedAt = nullMSPtr(l2Adv)
 	ps.T3AdvancedAt = nullMSPtr(l3Adv)
+	ps.T1StartedAt = nullMSPtr(l1Start)
+	ps.T2StartedAt = nullMSPtr(l2Start)
+	ps.T3StartedAt = nullMSPtr(l3Start)
+	ps.T1LastError = nullStringPtr(l1Err)
+	ps.T2LastError = nullStringPtr(l2Err)
+	ps.T3LastError = nullStringPtr(l3Err)
 	ps.UpdatedAt = formatMS(updatedMS)
 	return ps, nil
 }

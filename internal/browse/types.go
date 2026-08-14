@@ -105,6 +105,12 @@ type PipelineStateJSON struct {
 	T3AdvancedAt         *string `json:"t3_advanced_at,omitempty"`
 	T1TurnsSinceAdvanced int     `json:"t1_turns_since_advanced"`
 	WarmupThreshold      int     `json:"warmup_threshold"`
+	T1LastError          *string `json:"t1_last_error,omitempty"`
+	T2LastError          *string `json:"t2_last_error,omitempty"`
+	T3LastError          *string `json:"t3_last_error,omitempty"`
+	T1StartedAt          *string `json:"t1_started_at,omitempty"`
+	T2StartedAt          *string `json:"t2_started_at,omitempty"`
+	T3StartedAt          *string `json:"t3_started_at,omitempty"`
 	UpdatedAt            string  `json:"updated_at"`
 }
 

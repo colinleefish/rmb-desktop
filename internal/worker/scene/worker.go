@@ -9,8 +9,10 @@ import (
 
 	"github.com/colinleefish/rmb-desktop/internal/config"
 	"github.com/colinleefish/rmb-desktop/internal/db"
+	"github.com/colinleefish/rmb-desktop/internal/debug"
 	"github.com/colinleefish/rmb-desktop/internal/llm"
 	"github.com/colinleefish/rmb-desktop/internal/model"
+	"github.com/colinleefish/rmb-desktop/internal/pipeline"
 	"github.com/colinleefish/rmb-desktop/internal/worker/backpressure"
 	"github.com/colinleefish/rmb-desktop/internal/workerlock"
 )
@@ -28,9 +30,10 @@ type Worker struct {
 	log   *slog.Logger
 	now   func() time.Time
 	bp    *backpressure.Controller
+	reg   *debug.Registry
 }
 
-func NewWorker(database *sql.DB, llm SceneBuilder, cfg config.PipelineConfig, locks *workerlock.SessionLocks, log *slog.Logger) *Worker {
+func NewWorker(database *sql.DB, llm SceneBuilder, cfg config.PipelineConfig, locks *workerlock.SessionLocks, log *slog.Logger, reg *debug.Registry) *Worker {
 	if log == nil {
 		log = slog.Default()
 	}
@@ -42,6 +45,7 @@ func NewWorker(database *sql.DB, llm SceneBuilder, cfg config.PipelineConfig, lo
 		log:   log,
 		now:   time.Now,
 		bp:    backpressure.New(cfg.L2MinConcurrency, cfg.L2MaxConcurrency),
+		reg:   reg,
 	}
 }
 
@@ -53,6 +57,8 @@ func (w *Worker) Run(ctx context.Context) error {
 	if interval <= 0 {
 		return fmt.Errorf("invalid l2 poll interval")
 	}
+	w.reg.WorkerStarted("l2")
+	defer w.reg.WorkerStopped("l2")
 	w.log.Info("l2 scene worker started",
 		"poll_interval", interval,
 		"min_concurrency", w.bp.Min(),
@@ -74,6 +80,9 @@ func (w *Worker) Run(ctx context.Context) error {
 }
 
 func (w *Worker) runOneCycle(ctx context.Context) {
+	endCycle := w.reg.BeginCycle("l2")
+	defer endCycle(nil)
+
 	ids, err := w.selectCandidateSessions(ctx)
 	if err != nil {
 		w.log.Error("l2 select candidates failed", "err", err)
@@ -91,6 +100,7 @@ func (w *Worker) runOneCycle(ctx context.Context) {
 	}
 
 	limit := w.bp.Limit()
+	w.reg.SetConcurrency("l2", limit)
 	w.log.Info("l2 cycle", "candidates", len(ids), "concurrency", limit)
 
 	remaining := ids
@@ -122,6 +132,7 @@ func (w *Worker) runOneCycle(ctx context.Context) {
 			pendingHint = n
 		}
 		prev, next := w.bp.EndCycle(pendingHint)
+		w.reg.SetBackpressure("l2", w.bp.Min(), w.bp.Max(), next, pendingHint)
 		if prev != next {
 			w.log.Info("l2 concurrency adjusted", "from", prev, "to", next, "pending", pendingHint)
 		}
@@ -174,10 +185,13 @@ func (w *Worker) processSession(ctx context.Context, sessionID string) error {
 	unlock := w.locks.Lock(sessionID)
 	defer unlock()
 
+	w.reg.BeginSession(sessionID, "", "l2", "prepare")
 	batch, err := w.prepareBatch(ctx, sessionID)
 	if err != nil || batch == nil {
+		w.reg.EndSession(sessionID, "l2")
 		return err
 	}
+	defer w.reg.EndSession(sessionID, "l2")
 
 	groups := groupAtomsBySceneName(batch.Atoms)
 	chunks := chunkGroups(groups, w.cfg.L2MaxAtoms, w.cfg.L2MaxScenes)
@@ -189,10 +203,12 @@ func (w *Worker) processSession(ctx context.Context, sessionID string) error {
 		if err != nil {
 			return w.handleProcessError(ctx, sessionID, err)
 		}
+		w.reg.BeginSession(sessionID, batch.SessionKey, "l2", "llm.build_scenes")
 		raw, err := w.llm.BuildScenes(ctx, atomsJSON)
 		if err != nil {
 			return w.handleProcessError(ctx, sessionID, fmt.Errorf("llm build scenes: %w", err))
 		}
+		w.reg.BeginSession(sessionID, batch.SessionKey, "l2", "parse.build_scenes")
 		chunkScenes, err := parseBuildScenesResponse(raw, validURIs)
 		if err != nil {
 			return w.handleProcessError(ctx, sessionID, fmt.Errorf("parse build scenes: %w", err))
@@ -200,11 +216,13 @@ func (w *Worker) processSession(ctx context.Context, sessionID string) error {
 		parsed = append(parsed, chunkScenes...)
 	}
 
+	w.reg.BeginSession(sessionID, batch.SessionKey, "l2", "llm.session_abstract")
 	abstract, err := w.llm.SummarizeSessionAbstract(ctx, joinSceneAbstracts(parsed))
 	if err != nil {
 		return w.handleProcessError(ctx, sessionID, fmt.Errorf("llm session abstract: %w", err))
 	}
 
+	w.reg.BeginSession(sessionID, batch.SessionKey, "l2", "persist.scenes")
 	return w.persistScenes(ctx, batch, parsed, abstract)
 }
 
@@ -251,7 +269,14 @@ func (w *Worker) prepareBatch(ctx context.Context, sessionID string) (*sceneBatc
 		return nil, tx.Commit()
 	}
 
-	_, err = tx.ExecContext(ctx, `UPDATE pipeline_state SET l2_status = 'running' WHERE session_id = ?`, sessionID)
+	nowMS := w.now().UTC().UnixMilli()
+	_, err = tx.ExecContext(ctx, `
+		UPDATE pipeline_state SET
+			l2_status = 'running',
+			l2_started_at = ?,
+			l2_last_error = NULL,
+			updated_at = ?
+		WHERE session_id = ?`, nowMS, nowMS, sessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -383,7 +408,13 @@ func (w *Worker) persistScenes(ctx context.Context, batch *sceneBatch, scenes []
 	}
 
 	_, err = tx.ExecContext(ctx, `
-		UPDATE pipeline_state SET l2_status = 'idle', l2_advanced_at = ?, l3_status = 'pending', updated_at = ?
+		UPDATE pipeline_state SET
+			l2_status = 'idle',
+			l2_advanced_at = ?,
+			l2_started_at = NULL,
+			l2_last_error = NULL,
+			l3_status = 'pending',
+			updated_at = ?
 		WHERE session_id = ?`, nowMS, nowMS, batch.SessionID)
 	if err != nil {
 		return err
@@ -399,10 +430,10 @@ func (w *Worker) persistScenes(ctx context.Context, batch *sceneBatch, scenes []
 func (w *Worker) handleProcessError(ctx context.Context, sessionID string, cause error) error {
 	if llm.IsTransientError(cause) {
 		w.log.Warn("l2 transient error", "session_id", sessionID, "err", cause)
-		_, _ = w.db.ExecContext(ctx, `UPDATE pipeline_state SET l2_status = 'pending' WHERE session_id = ?`, sessionID)
+		_ = pipeline.MarkPending(ctx, w.db, sessionID, pipeline.StageL2, cause.Error(), w.now())
 		return cause
 	}
-	_, _ = w.db.ExecContext(ctx, `UPDATE pipeline_state SET l2_status = 'failed' WHERE session_id = ?`, sessionID)
+	_ = pipeline.MarkFailed(ctx, w.db, sessionID, pipeline.StageL2, cause.Error(), w.now())
 	return cause
 }
 

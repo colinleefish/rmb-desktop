@@ -155,7 +155,7 @@ func (s *Server) handleDebugPipelineDryRun(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(r.Context(), llm.DebugRequestBudget(cfg.LLM, 4))
 	defer cancel()
 
 	result, err := scene.DryRunT2(ctx, s.db, chat, cfg.Pipeline, sessionID)
@@ -212,7 +212,7 @@ func (s *Server) handleDebugLLMBuildScenes(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Minute)
+	ctx, cancel := context.WithTimeout(r.Context(), llm.DebugRequestBudget(cfg.LLM, 1))
 	defer cancel()
 
 	raw, scenes, steps, err := scene.BuildScenesProbe(ctx, chat, atomsJSON)

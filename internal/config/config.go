@@ -23,13 +23,24 @@ type Config struct {
 }
 
 type LLMConfig struct {
-	APIBase string `yaml:"api_base"`
-	APIKey  string `yaml:"api_key"`
-	Model   string `yaml:"model"`
+	APIBase string        `yaml:"api_base"`
+	APIKey  string        `yaml:"api_key"`
+	Model   string        `yaml:"model"`
+	Timeout time.Duration `yaml:"timeout"`
 }
+
+const DefaultLLMTimeout = 45 * time.Second
 
 func (c LLMConfig) HasKey() bool {
 	return strings.TrimSpace(c.APIKey) != ""
+}
+
+// RequestTimeout returns the per-LLM-call HTTP timeout.
+func (c LLMConfig) RequestTimeout() time.Duration {
+	if c.Timeout > 0 {
+		return c.Timeout
+	}
+	return DefaultLLMTimeout
 }
 
 type EmbedConfig struct {

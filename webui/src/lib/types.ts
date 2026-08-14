@@ -231,6 +231,7 @@ export interface ConfigView {
     api_key_set: boolean;
     api_key_suffix?: string;
     model: string;
+    timeout: string;
   };
   embed: {
     api_base: string;
@@ -267,6 +268,7 @@ export interface ConfigUpdateRequest {
     api_base?: string;
     api_key?: string;
     model?: string;
+    timeout?: string;
   };
   embed?: {
     api_base?: string;

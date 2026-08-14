@@ -96,3 +96,17 @@ func TestChunkGroupsZeroLimitsFallBack(t *testing.T) {
 		t.Fatalf("expected default scene split into 3 chunks, got %v", got)
 	}
 }
+
+func TestTrimSessionAtomsKeepsMostRecent(t *testing.T) {
+	atoms := make([]model.Atom, 5)
+	for i := range atoms {
+		atoms[i] = model.Atom{ID: string(rune('a' + i))}
+	}
+	got := trimSessionAtoms(atoms, 3)
+	if len(got) != 3 || got[0].ID != "c" || got[2].ID != "e" {
+		t.Fatalf("expected last 3 atoms, got %#v", got)
+	}
+	if len(trimSessionAtoms(atoms, 0)) != len(atoms) {
+		t.Fatalf("zero max should keep all atoms")
+	}
+}

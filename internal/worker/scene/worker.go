@@ -193,9 +193,10 @@ func (w *Worker) processSession(ctx context.Context, sessionID string) error {
 	}
 	defer w.reg.EndSession(sessionID, "l2")
 
-	groups := groupAtomsBySceneName(batch.Atoms)
+	atoms := trimSessionAtoms(batch.Atoms, w.cfg.L2MaxAtoms)
+	groups := groupAtomsBySceneName(atoms)
 	chunks := chunkGroups(groups, w.cfg.L2MaxAtoms, w.cfg.L2MaxScenes)
-	validURIs := atomURISet(batch.Atoms)
+	validURIs := atomURISet(atoms)
 
 	var parsed []ParsedScene
 	for _, chunk := range chunks {

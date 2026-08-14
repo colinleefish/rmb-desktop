@@ -91,6 +91,7 @@ func DryRunT2(
 	}); err != nil {
 		return result, nil
 	}
+	atoms = trimSessionAtoms(atoms, cfg.L2MaxAtoms)
 	result.AtomCount = len(atoms)
 	if len(atoms) == 0 {
 		result.Error = "no atoms to build scenes from"

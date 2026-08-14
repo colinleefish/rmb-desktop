@@ -16,7 +16,6 @@ import (
 
 const (
 	defaultMaxRetries = 2
-	defaultTimeout    = 120 * time.Second
 	maxErrorBodyBytes = 2048
 )
 
@@ -68,13 +67,23 @@ func NewOpenAICompatibleClient(cfg config.LLMConfig) (*OpenAICompatibleClient, e
 	if model == "" {
 		return nil, errors.New("llm model is required")
 	}
+	timeout := cfg.RequestTimeout()
 	return &OpenAICompatibleClient{
-		baseURL:      strings.TrimRight(base, "/"),
-		apiKey:       key,
-		model:        model,
-		maxRetries:   defaultMaxRetries,
-		httpClient:   &http.Client{Timeout: defaultTimeout},
+		baseURL:    strings.TrimRight(base, "/"),
+		apiKey:     key,
+		model:      model,
+		maxRetries: defaultMaxRetries,
+		httpClient: &http.Client{Timeout: timeout},
 	}, nil
+}
+
+// DebugRequestBudget estimates how long a debug endpoint should wait for N LLM calls.
+func DebugRequestBudget(cfg config.LLMConfig, llmCalls int) time.Duration {
+	if llmCalls < 1 {
+		llmCalls = 1
+	}
+	perCall := cfg.RequestTimeout() * time.Duration(defaultMaxRetries)
+	return perCall*time.Duration(llmCalls) + 15*time.Second
 }
 
 func (c *OpenAICompatibleClient) ExtractAtoms(ctx context.Context, messagesJSONL string) (string, error) {

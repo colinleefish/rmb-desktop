@@ -29,6 +29,7 @@ type LLMView struct {
 	APIKeySet    bool   `json:"api_key_set"`
 	APIKeySuffix string `json:"api_key_suffix,omitempty"`
 	Model        string `json:"model"`
+	Timeout      string `json:"timeout"`
 }
 
 type EmbedView struct {
@@ -70,9 +71,10 @@ type UpdateRequest struct {
 }
 
 type LLMUpdate struct {
-	APIBase string `json:"api_base"`
-	APIKey  string `json:"api_key"`
-	Model   string `json:"model"`
+	APIBase string  `json:"api_base"`
+	APIKey  string  `json:"api_key"`
+	Model   string  `json:"model"`
+	Timeout *string `json:"timeout"`
 }
 
 type EmbedUpdate struct {
@@ -114,6 +116,7 @@ func ToView(cfg Config, configPath string) View {
 			APIKeySet:    cfg.LLM.HasKey(),
 			APIKeySuffix: keySuffix(cfg.LLM.APIKey),
 			Model:        cfg.LLM.Model,
+			Timeout:      cfg.LLM.RequestTimeout().String(),
 		},
 		Embed: EmbedView{
 			APIBase:      cfg.Embed.APIBase,
@@ -165,6 +168,21 @@ func ApplyUpdate(cfg Config, req UpdateRequest) (Config, error) {
 		}
 		if k := strings.TrimSpace(req.LLM.APIKey); k != "" {
 			cfg.LLM.APIKey = k
+		}
+		if req.LLM.Timeout != nil {
+			v := strings.TrimSpace(*req.LLM.Timeout)
+			if v == "" {
+				cfg.LLM.Timeout = 0
+			} else {
+				d, err := time.ParseDuration(v)
+				if err != nil {
+					return Config{}, fmt.Errorf("invalid llm.timeout: %w", err)
+				}
+				if d < time.Second {
+					return Config{}, fmt.Errorf("llm.timeout must be at least 1s")
+				}
+				cfg.LLM.Timeout = d
+			}
 		}
 	}
 	if req.Embed != nil {

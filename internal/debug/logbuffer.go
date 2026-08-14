@@ -122,7 +122,7 @@ func (h *bufferHandler) Enabled(ctx context.Context, level slog.Level) bool {
 func (h *bufferHandler) Handle(ctx context.Context, r slog.Record) error {
 	attrs := map[string]any{}
 	r.Attrs(func(a slog.Attr) bool {
-		attrs[a.Key] = a.Value.Any()
+		attrs[a.Key] = attrToJSON(a)
 		return true
 	})
 	h.buf.append(LogEntry{
@@ -132,6 +132,46 @@ func (h *bufferHandler) Handle(ctx context.Context, r slog.Record) error {
 		Attrs:   attrs,
 	})
 	return h.next.Handle(ctx, r)
+}
+
+// attrToJSON converts slog attrs to JSON-safe values. Errors become err.Error()
+// strings so the debug log API does not emit empty {} objects.
+func attrToJSON(a slog.Attr) any {
+	if a.Equal(slog.Attr{}) {
+		return nil
+	}
+	switch a.Value.Kind() {
+	case slog.KindString:
+		return a.Value.String()
+	case slog.KindInt64:
+		return a.Value.Int64()
+	case slog.KindUint64:
+		return a.Value.Uint64()
+	case slog.KindFloat64:
+		return a.Value.Float64()
+	case slog.KindBool:
+		return a.Value.Bool()
+	case slog.KindDuration:
+		return a.Value.Duration().String()
+	case slog.KindTime:
+		return a.Value.Time().UTC().Format(time.RFC3339Nano)
+	case slog.KindAny:
+		return anyToJSON(a.Value.Any())
+	case slog.KindLogValuer:
+		return attrToJSON(slog.Any(a.Key, a.Value.LogValuer().LogValue()))
+	default:
+		return anyToJSON(a.Value.Any())
+	}
+}
+
+func anyToJSON(v any) any {
+	if v == nil {
+		return nil
+	}
+	if err, ok := v.(error); ok {
+		return err.Error()
+	}
+	return v
 }
 
 func (h *bufferHandler) WithAttrs(attrs []slog.Attr) slog.Handler {

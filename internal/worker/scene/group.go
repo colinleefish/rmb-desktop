@@ -131,3 +131,11 @@ func atomURISet(atoms []model.Atom) map[string]struct{} {
 	}
 	return out
 }
+
+// trimSessionAtoms keeps the most recent max atoms (load order is created_at ASC).
+func trimSessionAtoms(atoms []model.Atom, max int) []model.Atom {
+	if max <= 0 || len(atoms) <= max {
+		return atoms
+	}
+	return atoms[len(atoms)-max:]
+}

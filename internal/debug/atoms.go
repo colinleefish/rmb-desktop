@@ -68,7 +68,7 @@ func SerializeSessionAtoms(ctx context.Context, database *sql.DB, sessionID stri
 		maxAtoms = 60
 	}
 	if len(inputs) > maxAtoms {
-		inputs = inputs[:maxAtoms]
+		inputs = inputs[len(inputs)-maxAtoms:]
 	}
 
 	raw, err := json.Marshal(map[string]any{"atoms": inputs})

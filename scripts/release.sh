@@ -22,7 +22,7 @@ if [[ -f "$HOME/.rmb/release.env" ]]; then
   source "$HOME/.rmb/release.env"
 fi
 
-DMG="$ROOT/app/src-tauri/target/release/bundle/dmg/RMB Desktop_${VERSION}_aarch64.dmg"
+DMG="$ROOT/dist/RMB Desktop_${VERSION}_aarch64.dmg"
 DMG_TMP="/tmp/RMB.Desktop_${VERSION}_aarch64.dmg"
 NOTES_FILE="/tmp/rmb-release-notes-${VERSION}.md"
 REPO="colinleefish/rmb-desktop"

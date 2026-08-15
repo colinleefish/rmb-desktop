@@ -3,7 +3,7 @@
 set -euo pipefail
 
 DMG="${1:?usage: finish-dmg.sh <file.dmg> [icon.icns]}"
-ICNS="${2:-$(cd "$(dirname "$0")/.." && pwd)/app/src-tauri/icons/icon.icns}"
+ICNS="${2:-$(cd "$(dirname "$0")/.." && pwd)/icons/app.icns}"
 
 if [[ ! -f "$DMG" ]]; then
   echo "finish-dmg: missing dmg: $DMG" >&2

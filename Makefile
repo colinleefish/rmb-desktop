@@ -1,4 +1,4 @@
-.PHONY: test build build-all run-rmbd run-hook tidy app-dev app-build app-build-windows app-install app-icons webui-dev webui-build webui-embed-check icons-sync prepare-sidecars build-windows-sidecars notarize release release-upload release-publish
+.PHONY: test build build-all run-rmbd run-hook tidy app-dev app-build app-build-windows app-install webui-dev webui-build webui-embed-check icons-sync build-windows-sidecars notarize release release-upload release-publish
 
 GO_TAGS := sqlite_fts5
 EMBED_INDEX := internal/http/static/web/index.html
@@ -40,15 +40,12 @@ run-rmbd:
 tidy:
 	go mod tidy
 
-prepare-sidecars: build
-	bash scripts/prepare-sidecars.sh
-
 app-dev: build
 	RMBD_PATH=$(CURDIR)/bin/rmbd ./bin/rmb-app
 
-DMG_BUNDLE := app/src-tauri/target/release/bundle/dmg/RMB Desktop_$(VERSION)_aarch64.dmg
-WINDOWS_INSTALLER := app/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/RMB Desktop_$(VERSION)_x64-setup.exe
-APP_BUNDLE := app/src-tauri/target/release/bundle/macos/RMB Desktop.app
+DMG_BUNDLE := dist/RMB Desktop_$(VERSION)_aarch64.dmg
+WINDOWS_ZIP := dist/RMB-Desktop_$(VERSION)_x64.zip
+APP_BUNDLE := dist/RMB Desktop.app
 PROXY_URL ?= socks5://127.0.0.1:1080
 SIGN_IDENTITY ?= Developer ID Application: GUANGHUI LI (N4YPJBRBN4)
 SIGN_KEYCHAIN ?= $(HOME)/Library/Keychains/rmb-sign.keychain-db
@@ -73,39 +70,36 @@ release-publish: release-upload
 
 release-upload-windows:
 	@test -n "$(VERSION)" || (echo "usage: make release-upload-windows VERSION=0.1.x" >&2; exit 1)
-	@test -f "$(WINDOWS_INSTALLER)" || (echo "missing $(WINDOWS_INSTALLER); run make app-build-windows" >&2; exit 1)
-	cp "$(WINDOWS_INSTALLER)" "/tmp/RMB.Desktop_$(VERSION)_x64-setup.exe"
-	$(GH) release upload "v$(VERSION)" "/tmp/RMB.Desktop_$(VERSION)_x64-setup.exe" --repo colinleefish/rmb-desktop --clobber
+	@test -f "$(WINDOWS_ZIP)" || (echo "missing $(WINDOWS_ZIP); run make app-build-windows" >&2; exit 1)
+	$(GH) release upload "v$(VERSION)" "$(WINDOWS_ZIP)" --repo colinleefish/rmb-desktop --clobber
 
 build-windows-sidecars: webui-embed-check
 	VERSION=$(VERSION) COMMIT=$(COMMIT) bash scripts/build-windows-sidecars.sh
 
-app-build-windows: webui-build app-icons build-windows-sidecars
-	export PATH="$$HOME/.cargo/bin:/opt/homebrew/opt/llvm/bin:/opt/homebrew/bin:$$PATH"; \
-	cd app && npm run tauri build -- --runner cargo-xwin --target x86_64-pc-windows-msvc
+app-build-windows: webui-build build-windows-sidecars
+	bash scripts/build-windows-zip.sh "$(VERSION)" "$(COMMIT)"
 
-app-build: webui-build app-icons prepare-sidecars
+app-build: webui-build build
 	@# Unlock dedicated signing keychain (pass via SIGN_KEYCHAIN_PASS=... ; do not commit the password).
 	@if [ -z "$(SIGN_KEYCHAIN_PASS)" ]; then echo "warning: SIGN_KEYCHAIN_PASS empty — codesign may prompt for rmb-sign.keychain password" >&2; fi
 	-security unlock-keychain -p "$(SIGN_KEYCHAIN_PASS)" "$(SIGN_KEYCHAIN)"
-	cd app && RMB_APP_VERSION="$(VERSION)" RMB_APP_COMMIT="$(COMMIT)" APPLE_SIGNING_IDENTITY="$(SIGN_IDENTITY)" npm run build
-	bash scripts/finish-dmg.sh "$(DMG_BUNDLE)"
+	bash scripts/build-macos-app.sh "$(VERSION)" "$(COMMIT)" "$(SIGN_IDENTITY)"
+	bash scripts/build-dmg.sh "$(VERSION)"
 
 notarize:
 	xcrun notarytool submit "$(DMG_BUNDLE)" --keychain-profile "$(NOTARY_PROFILE)" --wait
 	xcrun stapler staple "$(DMG_BUNDLE)"
 
 app-install: app-build
+	osascript -e 'quit app "RMB Desktop"' 2>/dev/null || true; sleep 2
 	rm -rf "/Applications/RMB Desktop.app"
 	cp -R "$(APP_BUNDLE)" "/Applications/RMB Desktop.app"
 	cp "$(APP_BUNDLE)/Contents/MacOS/RMB Desktop" "$(HOME)/.rmb/bin/rmb-app"
 	chmod +x "$(HOME)/.rmb/bin/rmb-app"
 	cp "$(APP_BUNDLE)/Contents/MacOS/rmbd" "$(HOME)/.rmb/bin/rmbd-desktop"
 	chmod +x "$(HOME)/.rmb/bin/rmbd-desktop"
-	rm -rf "$(APP_BUNDLE)"
 	open "/Applications/RMB Desktop.app"
 
-app-icons:
-	cd app && npx @resvg/resvg-js-cli ../$(ICON_SRC) /tmp/rmb-app-icon.png --fit-width 1024 --fit-height 1024
-	cd app && npx tauri icon /tmp/rmb-app-icon.png -o src-tauri/icons
-	cd app && npx @resvg/resvg-js-cli ../$(TRAY_ICON_SRC) src-tauri/icons/tray-icon.png --fit-width 52 --fit-height 52
+# icons/app.icns is committed. To regenerate: rasterize $(ICON_SRC)
+# (resvg) at 16..1024px, then `iconutil -c icns`.
+# Tray icon: internal/appshell/assets/tray-icon.png (from $(TRAY_ICON_SRC)).

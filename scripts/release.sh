@@ -24,6 +24,9 @@ fi
 
 DMG="$ROOT/dist/RMB Desktop_${VERSION}_aarch64.dmg"
 DMG_TMP="/tmp/RMB.Desktop_${VERSION}_aarch64.dmg"
+MAC_BUNDLE="$ROOT/dist/rmb-desktop_${VERSION}_darwin_arm64.tar.gz"
+WIN_BUNDLE="$ROOT/dist/rmb-desktop_${VERSION}_windows_amd64.zip"
+MANIFEST="$ROOT/dist/manifest.json"
 NOTES_FILE="/tmp/rmb-release-notes-${VERSION}.md"
 REPO="colinleefish/rmb-desktop"
 PROXY_URL="${PROXY_URL:-socks5://127.0.0.1:1080}"
@@ -60,6 +63,8 @@ if [[ "$UPLOAD_ONLY" != "1" ]]; then
     echo "==> notarize v${VERSION}"
     make notarize VERSION="$VERSION"
   fi
+  echo "==> build sidecar bundles v${VERSION}"
+  make sidecar-bundles VERSION="$VERSION"
 fi
 
 if [[ ! -f "$DMG" ]]; then
@@ -76,12 +81,28 @@ fi
 cp "$DMG" "$DMG_TMP"
 write_release_notes
 
+# Collect release assets: the DMG always; sidecar bundles + signed manifest
+# when present (bundles are flat, matching the updater's URL derivation).
+ASSETS=("$DMG_TMP")
+FLAT_ASSETS=()
+for f in "$MANIFEST" "$MAC_BUNDLE" "$WIN_BUNDLE"; do
+  if [[ -f "$f" ]]; then
+    ASSETS+=("$f")
+    if [[ "$f" != "$MANIFEST" ]]; then
+      FLAT_ASSETS+=("$f")
+    fi
+  fi
+done
+if [[ ! -f "$MANIFEST" ]]; then
+  echo "release: WARNING $MANIFEST missing — updater feed will not be published" >&2
+fi
+
 echo "==> publish GitHub release v${VERSION}"
 if gh_cmd release view "v${VERSION}" --repo "$REPO" >/dev/null 2>&1; then
-  gh_cmd release upload "v${VERSION}" "$DMG_TMP" --repo "$REPO" --clobber
+  gh_cmd release upload "v${VERSION}" "${ASSETS[@]}" --repo "$REPO" --clobber
   echo "  uploaded to existing release"
 else
-  gh_cmd release create "v${VERSION}" "$DMG_TMP" \
+  gh_cmd release create "v${VERSION}" "${ASSETS[@]}" \
     --repo "$REPO" \
     --title "RMB Desktop ${VERSION}" \
     --notes-file "$NOTES_FILE"
@@ -92,7 +113,7 @@ if [[ "$PUBLISH_R2" == "1" ]]; then
   RMB_WEBSITE="${RMB_WEBSITE:-$ROOT/../rmb-website}"
   if [[ -x "$RMB_WEBSITE/scripts/publish-release.sh" ]]; then
     echo "==> publish R2 via rmb-website"
-    "$RMB_WEBSITE/scripts/publish-release.sh" "$VERSION" "$DMG_TMP"
+    "$RMB_WEBSITE/scripts/publish-release.sh" "$VERSION" "$MANIFEST" "$DMG_TMP" "${FLAT_ASSETS[@]}"
   else
     echo "release: PUBLISH_R2=1 but $RMB_WEBSITE/scripts/publish-release.sh not found" >&2
     exit 1

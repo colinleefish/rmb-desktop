@@ -76,6 +76,12 @@ release-upload-windows:
 build-windows-sidecars: webui-embed-check
 	VERSION=$(VERSION) COMMIT=$(COMMIT) bash scripts/build-windows-sidecars.sh
 
+# sidecar-bundles produces the self-updater payloads + signed manifest.json.
+# Requires the mingw cross toolchain for the Windows bundle (skip it for
+# mac-only dry runs: it tolerates missing windows sidecars).
+sidecar-bundles: build build-windows-sidecars
+	bash scripts/build-sidecar-bundles.sh "$(VERSION)" "$(COMMIT)"
+
 app-build-windows: webui-build build-windows-sidecars
 	bash scripts/build-windows-zip.sh "$(VERSION)" "$(COMMIT)"
 
@@ -85,7 +91,6 @@ app-build: webui-build build
 	-security unlock-keychain -p "$(SIGN_KEYCHAIN_PASS)" "$(SIGN_KEYCHAIN)"
 	bash scripts/build-macos-app.sh "$(VERSION)" "$(COMMIT)" "$(SIGN_IDENTITY)"
 	bash scripts/build-dmg.sh "$(VERSION)"
-
 notarize:
 	xcrun notarytool submit "$(DMG_BUNDLE)" --keychain-profile "$(NOTARY_PROFILE)" --wait
 	xcrun stapler staple "$(DMG_BUNDLE)"

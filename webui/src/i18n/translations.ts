@@ -213,6 +213,11 @@ export const translations = {
         captureHint:
           "Installs a TypeScript extension to ~/.pi/agent/extensions/. Restart Pi after applying.",
       },
+      workbuddy: {
+        captureTitle: "Configure Stop hook",
+        captureHint:
+          "Adds a Stop hook to ~/.workbuddy/settings.json. Restart WorkBuddy after applying.",
+      },
       fullyConnected: "Fully connected",
       setupIncomplete: "Setup incomplete",
       lastHook: "Last hook",
@@ -663,6 +668,11 @@ export const translations = {
         captureTitle: "安装采集扩展",
         captureHint:
           "将 TypeScript 扩展安装到 ~/.pi/agent/extensions/。应用后请重启 Pi。",
+      },
+      workbuddy: {
+        captureTitle: "配置 Stop 钩子",
+        captureHint:
+          "向 ~/.workbuddy/settings.json 添加 Stop 钩子。应用后请重启 WorkBuddy。",
       },
       fullyConnected: "已完全连接",
       setupIncomplete: "设置未完成",

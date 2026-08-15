@@ -38,9 +38,9 @@ Supports:
 4. Keep coding — RMB runs in the background
 
 
-### If macOS says the app is "damaged"
+### First launch on macOS
 
-The app is not notarized yet, so Gatekeeper blocks downloaded copies that carry the quarantine attribute. After dragging the app to `Applications`, run this in Terminal and open it again:
+Releases are signed and notarized (Developer ID), so macOS opens them normally after the usual first-launch confirmation. If you installed an early unsigned build and macOS calls it "damaged", run this in Terminal and open it again:
 
 ```bash
 xattr -dr com.apple.quarantine "/Applications/RMB Desktop.app"

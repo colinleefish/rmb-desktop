@@ -38,9 +38,9 @@ AI 助手一关掉对话就会忘掉一切。RMB 用三步解决这个问题：
 4. 继续写代码 — RMB 在后台自动工作
 
 
-### 如果提示「已损坏，无法打开」
+### 首次启动（macOS）
 
-当前版本未做 Apple 公证，浏览器下载带隔离属性时会被 Gatekeeper 按「已损坏」拦截。把应用拖进 `Applications` 后，在终端执行以下命令再重新打开即可：
+发布版本已签名并公证（Developer ID），首次打开只需按常规确认即可。如果安装的是早期未签名版本并被提示「已损坏」，在终端执行以下命令后重新打开：
 
 ```bash
 xattr -dr com.apple.quarantine "/Applications/RMB Desktop.app"

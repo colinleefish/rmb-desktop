@@ -29,7 +29,7 @@ type LLMConfig struct {
 	Timeout time.Duration `yaml:"timeout"`
 }
 
-const DefaultLLMTimeout = 45 * time.Second
+const DefaultLLMTimeout = 300 * time.Second
 
 func (c LLMConfig) HasKey() bool {
 	return strings.TrimSpace(c.APIKey) != ""

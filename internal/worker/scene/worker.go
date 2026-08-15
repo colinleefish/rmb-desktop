@@ -11,7 +11,6 @@ import (
 	"github.com/colinleefish/rmb-desktop/internal/config"
 	"github.com/colinleefish/rmb-desktop/internal/db"
 	"github.com/colinleefish/rmb-desktop/internal/debug"
-	"github.com/colinleefish/rmb-desktop/internal/llm"
 	"github.com/colinleefish/rmb-desktop/internal/model"
 	"github.com/colinleefish/rmb-desktop/internal/pipeline"
 	"github.com/colinleefish/rmb-desktop/internal/worker/backpressure"
@@ -72,63 +71,11 @@ func (w *Worker) Run(ctx context.Context) error {
 }
 
 func (w *Worker) runOneCycle(ctx context.Context) {
-	endCycle := w.reg.BeginCycle("l2")
-	defer endCycle(nil)
-
-	ids, err := w.selectCandidateSessions(ctx)
-	if err != nil {
-		w.log.Error("l2 select candidates failed", "err", err)
-		return
-	}
-	if len(ids) == 0 {
-		w.bp.EndCycle(0)
-		return
-	}
-
-	if n, err := w.countPendingSessions(ctx); err == nil {
-		if prev, next := w.bp.SeedFromBacklog(n); prev != next {
-			w.log.Info("l2 concurrency seeded", "from", prev, "to", next, "pending", n)
-		}
-	}
-
-	limit := w.bp.Limit()
-	w.reg.SetConcurrency("l2", limit)
-	w.log.Info("l2 cycle", "candidates", len(ids), "concurrency", limit)
-
-	remaining := ids
-	for len(remaining) > 0 {
-		if ctx.Err() != nil {
-			return
-		}
-		limit = w.bp.Limit()
-		n := limit
-		if n > len(remaining) {
-			n = len(remaining)
-		}
-		batch := remaining[:n]
-		remaining = remaining[n:]
-
-		backpressure.RunParallel(ctx, batch, limit, func(ctx context.Context, id string) {
-			err := w.processSession(ctx, id)
-			w.bp.Observe(backpressure.Outcome{Err: err})
-			if err != nil && !llm.IsTransientError(err) {
-				w.log.Error("l2 process session failed", "session_id", id, "err", err)
-			}
-		})
-
-		pendingHint := len(remaining)
-		if n, err := w.countPendingSessions(ctx); err == nil {
-			pendingHint = n
-		}
-		prev, next := w.bp.EndCycle(pendingHint)
-		w.reg.SetBackpressure("l2", w.bp.Min(), w.bp.Max(), next, pendingHint)
-		if prev != next {
-			w.log.Info("l2 concurrency adjusted", "from", prev, "to", next, "pending", pendingHint)
-		}
-		if next < prev {
-			return
-		}
-	}
+	shared.RunBackpressuredCycle(ctx, "l2", w.bp, w.reg, w.log, shared.CycleDeps{
+		SelectCandidates: w.selectCandidateSessions,
+		CountPending:     w.countPendingSessions,
+		ProcessSession:   w.processSession,
+	})
 }
 
 func (w *Worker) countPendingSessions(ctx context.Context) (int, error) {

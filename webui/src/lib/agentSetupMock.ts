@@ -273,6 +273,15 @@ export const MOCK_AGENTS: AgentSetupState[] = [
     recallStatus: "none",
     artifacts: [],
   },
+  {
+    id: "workbuddy",
+    name: "WorkBuddy",
+    description: "Stop hook in settings.json plus recall block in MEMORY.md.",
+    detected: false,
+    hookStatus: "none",
+    recallStatus: "none",
+    artifacts: [],
+  },
 ];
 
 export function getMockAgent(id: string): AgentSetupState | undefined {

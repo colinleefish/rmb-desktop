@@ -38,6 +38,8 @@ func Preview(id AgentID) (AgentState, error) {
 		return previewOpenCode(def)
 	case AgentPi:
 		return previewPi(def)
+	case AgentWorkBuddy:
+		return previewWorkBuddy(def)
 	default:
 		return AgentState{}, fmt.Errorf("unknown agent %q", id)
 	}
@@ -84,6 +86,8 @@ func applyArtifact(id AgentID, artifactID string) error {
 		return applyOpenCode(artifactID)
 	case AgentPi:
 		return applyPi(artifactID)
+	case AgentWorkBuddy:
+		return applyWorkBuddy(artifactID)
 	default:
 		return fmt.Errorf("unknown agent %q", id)
 	}

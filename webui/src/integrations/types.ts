@@ -6,7 +6,8 @@ export type IntegrationAgentId =
   | "claude-code"
   | "codex"
   | "opencode"
-  | "pi";
+  | "pi"
+  | "workbuddy";
 
 export type IntegrationSetupPanelProps = {
   agent: AgentSetupState;

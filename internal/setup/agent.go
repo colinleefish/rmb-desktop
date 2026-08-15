@@ -9,6 +9,7 @@ const (
 	AgentCodex      AgentID = "codex"
 	AgentOpenCode   AgentID = "opencode"
 	AgentPi         AgentID = "pi"
+	AgentWorkBuddy  AgentID = "workbuddy"
 )
 
 type agentDef struct {
@@ -61,11 +62,19 @@ var agentDefs = []agentDef{
 		HookSource:  "pi",
 		DetectPaths: []string{".pi"},
 	},
+	{
+		ID:          AgentWorkBuddy,
+		Name:        "WorkBuddy",
+		Label:       "WorkBuddy",
+		Description: "Stop hook in settings.json plus recall block in MEMORY.md.",
+		HookSource:  "workbuddy",
+		DetectPaths: []string{".workbuddy"},
+	},
 }
 
 func parseAgentID(raw string) (AgentID, bool) {
 	switch AgentID(raw) {
-	case AgentCursor, AgentClaudeCode, AgentCodex, AgentOpenCode, AgentPi:
+	case AgentCursor, AgentClaudeCode, AgentCodex, AgentOpenCode, AgentPi, AgentWorkBuddy:
 		return AgentID(raw), true
 	case "cc", "claude":
 		return AgentClaudeCode, true

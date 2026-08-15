@@ -40,7 +40,6 @@ type trayUI struct {
 	open   *systray.MenuItem
 	quit   *systray.MenuItem
 }
-
 func onTrayReady(daemon *DaemonManager) {
 	systray.SetTemplateIcon(trayIcon, trayIcon)
 	systray.SetTooltip("RMB Desktop")
@@ -49,13 +48,16 @@ func onTrayReady(daemon *DaemonManager) {
 		daemon: daemon,
 		status: systray.AddMenuItem("Starting…", "RMB status"),
 		open:   systray.AddMenuItem("Open Dashboard", "Open the RMB web dashboard"),
-		quit:   systray.AddMenuItem("Quit RMB", "Shut down RMB and quit"),
 	}
 	systray.AddSeparator()
+	updater := newUpdaterUI(daemon)
+	ui.quit = systray.AddMenuItem("Quit RMB", "Shut down RMB and quit")
 	ui.status.Disable()
 	ui.open.Disable()
 
 	go ui.watchMenu()
+	go updater.watch()
+	go updater.background()
 	go ui.startup()
 }
 

@@ -20,6 +20,13 @@ type Config struct {
 	Embed         EmbedConfig    `yaml:"embed"`
 	Pipeline      PipelineConfig `yaml:"pipeline"`
 	LaunchAtLogin bool           `yaml:"launch_at_login"`
+	Update        UpdateConfig   `yaml:"update"`
+}
+
+// UpdateConfig configures the self-updater (appshell Phase 2). Mirrors are
+// user-defined feed URLs tried before the R2/GitHub defaults.
+type UpdateConfig struct {
+	Mirrors []string `yaml:"mirrors"`
 }
 
 type LLMConfig struct {

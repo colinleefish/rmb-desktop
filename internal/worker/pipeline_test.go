@@ -10,8 +10,8 @@ import (
 	"github.com/colinleefish/rmb-desktop/internal/config"
 	"github.com/colinleefish/rmb-desktop/internal/db"
 	"github.com/colinleefish/rmb-desktop/internal/model"
-	"github.com/colinleefish/rmb-desktop/internal/workerlock"
 	"github.com/colinleefish/rmb-desktop/internal/worker/extract"
+	"github.com/colinleefish/rmb-desktop/internal/workerlock"
 	"github.com/google/uuid"
 )
 

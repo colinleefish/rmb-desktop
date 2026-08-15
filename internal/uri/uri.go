@@ -26,7 +26,7 @@ var (
 		`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`,
 	)
 	skillNamePattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$`)
-	reservedSlug = map[string]struct{}{
+	reservedSlug     = map[string]struct{}{
 		"atoms": {}, "scenes": {}, "profile": {}, "preferences": {},
 		"entities": {}, "events": {}, "sessions": {}, "turns": {},
 		"skills": {}, "agent": {}, "corrections": {},

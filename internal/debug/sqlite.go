@@ -8,15 +8,15 @@ import (
 
 // SQLiteStats is returned by GET /api/v1/debug/sqlite.
 type SQLiteStats struct {
-	Version       string `json:"version"`
-	JournalMode   string `json:"journal_mode"`
-	PageCount     int64  `json:"page_count"`
-	PageSize      int64  `json:"page_size"`
-	WALPages      int64  `json:"wal_pages,omitempty"`
-	MaxOpenConns  int    `json:"max_open_conns"`
-	OpenConns     int    `json:"open_conns"`
-	InUse         int    `json:"in_use"`
-	Idle          int    `json:"idle"`
+	Version      string `json:"version"`
+	JournalMode  string `json:"journal_mode"`
+	PageCount    int64  `json:"page_count"`
+	PageSize     int64  `json:"page_size"`
+	WALPages     int64  `json:"wal_pages,omitempty"`
+	MaxOpenConns int    `json:"max_open_conns"`
+	OpenConns    int    `json:"open_conns"`
+	InUse        int    `json:"in_use"`
+	Idle         int    `json:"idle"`
 }
 
 // SQLiteStats collects SQLite and pool diagnostics.

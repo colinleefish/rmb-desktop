@@ -10,11 +10,11 @@ import (
 	"github.com/colinleefish/rmb-desktop/internal/debug"
 	"github.com/colinleefish/rmb-desktop/internal/llm"
 	"github.com/colinleefish/rmb-desktop/internal/pipeline"
-	"github.com/colinleefish/rmb-desktop/internal/workerlock"
 	"github.com/colinleefish/rmb-desktop/internal/worker/embed"
 	"github.com/colinleefish/rmb-desktop/internal/worker/extract"
 	"github.com/colinleefish/rmb-desktop/internal/worker/memory"
 	"github.com/colinleefish/rmb-desktop/internal/worker/scene"
+	"github.com/colinleefish/rmb-desktop/internal/workerlock"
 )
 
 // Runner starts background distillation workers.

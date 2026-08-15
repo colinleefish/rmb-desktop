@@ -4,9 +4,9 @@ package setup
 type ChangeType string
 
 const (
-	ChangeCreate   ChangeType = "create"
-	ChangeModify   ChangeType = "modify"
-	ChangeAppend   ChangeType = "append"
+	ChangeCreate    ChangeType = "create"
+	ChangeModify    ChangeType = "modify"
+	ChangeAppend    ChangeType = "append"
 	ChangeUnchanged ChangeType = "unchanged"
 )
 
@@ -14,16 +14,16 @@ const (
 type ApplyMode string
 
 const (
-	ApplyWrite     ApplyMode = "write"
-	ApplyCopyOnly  ApplyMode = "copy_only"
+	ApplyWrite    ApplyMode = "write"
+	ApplyCopyOnly ApplyMode = "copy_only"
 )
 
 // DisplayMode controls how the integration UI presents an artifact.
 type DisplayMode string
 
 const (
-	DisplayDiff     DisplayMode = "diff"
-	DisplayReplace  DisplayMode = "replace"
+	DisplayDiff    DisplayMode = "diff"
+	DisplayReplace DisplayMode = "replace"
 )
 
 // Artifact is one file or config target shown in the integration UI.
@@ -44,12 +44,12 @@ type Artifact struct {
 
 // AgentState is the preview payload for one coding agent.
 type AgentState struct {
-	ID           string   `json:"id"`
-	Name         string   `json:"name"`
-	Description  string   `json:"description"`
-	Detected     bool     `json:"detected"`
-	HookStatus   string   `json:"hook_status"`
-	RecallStatus string   `json:"recall_status"`
+	ID           string     `json:"id"`
+	Name         string     `json:"name"`
+	Description  string     `json:"description"`
+	Detected     bool       `json:"detected"`
+	HookStatus   string     `json:"hook_status"`
+	RecallStatus string     `json:"recall_status"`
 	Artifacts    []Artifact `json:"artifacts"`
 }
 

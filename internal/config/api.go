@@ -14,14 +14,14 @@ import (
 
 // View is the config shape returned to the web UI (secrets masked).
 type View struct {
-	Addr                 string         `json:"addr"`
-	DBPath               string         `json:"db_path"`
-	ConfigPath           string         `json:"config_path"`
-	LLM                  LLMView        `json:"llm"`
-	Embed                EmbedView      `json:"embed"`
-	Pipeline             PipelineView   `json:"pipeline"`
-	LaunchAtLogin        bool           `json:"launch_at_login"`
-	DistillationEnabled  bool           `json:"distillation_enabled"`
+	Addr                string       `json:"addr"`
+	DBPath              string       `json:"db_path"`
+	ConfigPath          string       `json:"config_path"`
+	LLM                 LLMView      `json:"llm"`
+	Embed               EmbedView    `json:"embed"`
+	Pipeline            PipelineView `json:"pipeline"`
+	LaunchAtLogin       bool         `json:"launch_at_login"`
+	DistillationEnabled bool         `json:"distillation_enabled"`
 }
 
 type LLMView struct {
@@ -63,11 +63,11 @@ type PipelineView struct {
 
 // UpdateRequest is the PUT body from the settings page.
 type UpdateRequest struct {
-	Addr          *string           `json:"addr,omitempty"`
-	LLM           *LLMUpdate        `json:"llm,omitempty"`
-	Embed         *EmbedUpdate      `json:"embed,omitempty"`
-	Pipeline      *PipelineUpdate   `json:"pipeline,omitempty"`
-	LaunchAtLogin *bool             `json:"launch_at_login,omitempty"`
+	Addr          *string         `json:"addr,omitempty"`
+	LLM           *LLMUpdate      `json:"llm,omitempty"`
+	Embed         *EmbedUpdate    `json:"embed,omitempty"`
+	Pipeline      *PipelineUpdate `json:"pipeline,omitempty"`
+	LaunchAtLogin *bool           `json:"launch_at_login,omitempty"`
 }
 
 type LLMUpdate struct {
@@ -125,7 +125,7 @@ func ToView(cfg Config, configPath string) View {
 			Model:        cfg.Embed.Model,
 			Dimensions:   cfg.Embed.Dimensions,
 		},
-		Pipeline: pipelineToView(cfg.Pipeline),
+		Pipeline:      pipelineToView(cfg.Pipeline),
 		LaunchAtLogin: cfg.LaunchAtLogin,
 	}
 }

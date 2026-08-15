@@ -699,10 +699,10 @@ func TestMergeClaudeRecallMarkdownFixtures(t *testing.T) {
 			wantHeading: true,
 		},
 		{
-			name:       "legacy html comment markers detected",
-			current:    "# x\n\n" + recallStart + "\nold\n" + recallEnd,
-			wantChange: ChangeUnchanged,
-			wantBlock:  true,
+			name:        "legacy html comment markers detected",
+			current:     "# x\n\n" + recallStart + "\nold\n" + recallEnd,
+			wantChange:  ChangeUnchanged,
+			wantBlock:   true,
 			wantHeading: false,
 		},
 	}

@@ -14,22 +14,22 @@ import (
 
 // DryRunStep is one step in a T2 dry-run trace.
 type DryRunStep struct {
-	Name        string `json:"name"`
-	MS          int64  `json:"ms"`
-	OK          bool   `json:"ok"`
-	Detail      string `json:"detail,omitempty"`
-	RawPreview  string `json:"raw_preview,omitempty"`
-	Error       string `json:"error,omitempty"`
+	Name       string `json:"name"`
+	MS         int64  `json:"ms"`
+	OK         bool   `json:"ok"`
+	Detail     string `json:"detail,omitempty"`
+	RawPreview string `json:"raw_preview,omitempty"`
+	Error      string `json:"error,omitempty"`
 }
 
 // DryRunResult is returned by T2 dry-run endpoints.
 type DryRunResult struct {
-	SessionKey  string       `json:"session_key"`
-	SessionID   string       `json:"session_id"`
-	AtomCount   int          `json:"atom_count"`
-	SceneCount  int          `json:"scene_count"`
-	Steps       []DryRunStep `json:"steps"`
-	Error       string       `json:"error,omitempty"`
+	SessionKey string       `json:"session_key"`
+	SessionID  string       `json:"session_id"`
+	AtomCount  int          `json:"atom_count"`
+	SceneCount int          `json:"scene_count"`
+	Steps      []DryRunStep `json:"steps"`
+	Error      string       `json:"error,omitempty"`
 }
 
 // DryRunT2 runs the T2 LLM pipeline for one session without persisting scenes.

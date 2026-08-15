@@ -17,7 +17,7 @@ const (
 	StageL3 Stage = "l3"
 )
 
-func (s Stage) statusCol() string { return string(s) + "_status" }
+func (s Stage) statusCol() string  { return string(s) + "_status" }
 func (s Stage) startedCol() string { return string(s) + "_started_at" }
 func (s Stage) errorCol() string   { return string(s) + "_last_error" }
 

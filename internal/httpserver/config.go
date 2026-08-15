@@ -10,8 +10,8 @@ import (
 
 	"github.com/colinleefish/rmb-desktop/internal/config"
 	"github.com/colinleefish/rmb-desktop/internal/launchatlogin"
-	"github.com/colinleefish/rmb-desktop/internal/reembed"
 	"github.com/colinleefish/rmb-desktop/internal/llm"
+	"github.com/colinleefish/rmb-desktop/internal/reembed"
 )
 
 type configTestSide struct {

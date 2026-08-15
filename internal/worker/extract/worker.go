@@ -25,14 +25,14 @@ type AtomExtractor interface {
 }
 
 type Worker struct {
-	db     *sql.DB
-	llm    AtomExtractor
-	cfg    config.PipelineConfig
-	locks  *workerlock.SessionLocks
-	log    *slog.Logger
-	now    func() time.Time
-	bp     *backpressure.Controller
-	reg    *debug.Registry
+	db    *sql.DB
+	llm   AtomExtractor
+	cfg   config.PipelineConfig
+	locks *workerlock.SessionLocks
+	log   *slog.Logger
+	now   func() time.Time
+	bp    *backpressure.Controller
+	reg   *debug.Registry
 }
 
 func NewWorker(database *sql.DB, llm AtomExtractor, cfg config.PipelineConfig, locks *workerlock.SessionLocks, log *slog.Logger, reg *debug.Registry) *Worker {

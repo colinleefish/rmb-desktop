@@ -18,12 +18,12 @@ type Embedder interface {
 }
 
 type Worker struct {
-	db     *sql.DB
-	llm    Embedder
-	cfg    config.PipelineConfig
-	dims   int
-	log    *slog.Logger
-	reg    *debug.Registry
+	db   *sql.DB
+	llm  Embedder
+	cfg  config.PipelineConfig
+	dims int
+	log  *slog.Logger
+	reg  *debug.Registry
 }
 
 func NewWorker(database *sql.DB, embedder Embedder, cfg config.PipelineConfig, dims int, log *slog.Logger, reg *debug.Registry) *Worker {

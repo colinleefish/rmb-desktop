@@ -8,24 +8,24 @@ import (
 
 // Registry tracks worker health and in-flight session work for HTTP debug endpoints.
 type Registry struct {
-	mu         sync.RWMutex
-	startedAt  time.Time
-	pid        int
-	workers    map[string]*workerState
-	inFlight   map[string]*InFlightSession
+	mu           sync.RWMutex
+	startedAt    time.Time
+	pid          int
+	workers      map[string]*workerState
+	inFlight     map[string]*InFlightSession
 	backpressure map[string]backpressureSnap
 }
 
 type workerState struct {
-	Name              string     `json:"name"`
-	Alive             bool       `json:"alive"`
-	LastCycleAt       *time.Time `json:"last_cycle_at,omitempty"`
-	LastCycleMS       int64      `json:"last_cycle_duration_ms,omitempty"`
-	InFlight          int        `json:"in_flight"`
-	LastError         string     `json:"last_error,omitempty"`
-	Concurrency       int        `json:"concurrency,omitempty"`
-	BlockedSince      *time.Time `json:"blocked_since,omitempty"`
-	CycleCount        int64      `json:"cycle_count"`
+	Name         string     `json:"name"`
+	Alive        bool       `json:"alive"`
+	LastCycleAt  *time.Time `json:"last_cycle_at,omitempty"`
+	LastCycleMS  int64      `json:"last_cycle_duration_ms,omitempty"`
+	InFlight     int        `json:"in_flight"`
+	LastError    string     `json:"last_error,omitempty"`
+	Concurrency  int        `json:"concurrency,omitempty"`
+	BlockedSince *time.Time `json:"blocked_since,omitempty"`
+	CycleCount   int64      `json:"cycle_count"`
 }
 
 // InFlightSession is one session job currently running inside a worker.
@@ -53,9 +53,9 @@ type ProcessInfo struct {
 
 // WorkersResponse is returned by GET /api/v1/debug/workers.
 type WorkersResponse struct {
-	Workers   map[string]workerState `json:"workers"`
-	Process   ProcessInfo            `json:"process"`
-	InFlight  []InFlightSession      `json:"in_flight"`
+	Workers  map[string]workerState `json:"workers"`
+	Process  ProcessInfo            `json:"process"`
+	InFlight []InFlightSession      `json:"in_flight"`
 }
 
 // NewRegistry creates a debug registry. Pass nil from tests to disable instrumentation.

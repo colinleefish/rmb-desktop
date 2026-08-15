@@ -340,15 +340,22 @@ func (w *Worker) persistScenes(ctx context.Context, batch *sceneBatch, scenes []
 			return err
 		}
 
-		var existingCreated int64
-		err = tx.QueryRowContext(ctx, `SELECT created_at FROM scenes WHERE id = ?`, sceneID).Scan(&existingCreated)
+		// Preserve the original created_at on updates; default to now for new rows.
+		var existingCreatedAt int64
+		err = tx.QueryRowContext(ctx, `SELECT created_at FROM scenes WHERE id = ?`, sceneID).Scan(&existingCreatedAt)
 		createdAt := nowMS
 		if err == nil {
-			createdAt = existingCreated
+			createdAt = existingCreatedAt
 		} else if err != sql.ErrNoRows {
 			return err
 		}
 
+		// Upsert the scene row. The scenes_fts index is kept in sync by AFTER
+		// INSERT/UPDATE/DELETE triggers (see migration 00009), so no manual FTS
+		// management is needed here. This avoids the FTS5 external-content pitfall
+		// where a hand-issued 'delete' for a never-indexed rowid returns
+		// SQLITE_CORRUPT ("database disk image is malformed") and rolls back the
+		// whole persist transaction.
 		_, err = tx.ExecContext(ctx, `
 			INSERT INTO scenes (id, session_id, display_name, abstract, body, source_atoms, embedding, created_at, updated_at)
 			VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?)
@@ -363,23 +370,6 @@ func (w *Worker) persistScenes(ctx context.Context, batch *sceneBatch, scenes []
 		)
 		if err != nil {
 			return fmt.Errorf("upsert scene: %w", err)
-		}
-
-		var sceneRowID int64
-		if err := tx.QueryRowContext(ctx, `SELECT rowid FROM scenes WHERE id = ?`, sceneID).Scan(&sceneRowID); err != nil {
-			return fmt.Errorf("scene rowid: %w", err)
-		}
-
-		// FTS5 external-content tables: use the documented delete command instead of DELETE FROM.
-		if _, err = tx.ExecContext(ctx, `INSERT INTO scenes_fts(scenes_fts, rowid) VALUES('delete', ?)`, sceneRowID); err != nil {
-			return fmt.Errorf("clear scene fts: %w", err)
-		}
-		_, err = tx.ExecContext(ctx, `
-			INSERT INTO scenes_fts(rowid, abstract, body) VALUES (?, ?, ?)`,
-			sceneRowID, s.Abstract, s.Body,
-		)
-		if err != nil {
-			return fmt.Errorf("index scene fts: %w", err)
 		}
 	}
 

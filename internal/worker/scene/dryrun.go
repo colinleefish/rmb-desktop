@@ -105,11 +105,13 @@ func DryRunT2(
 	var parsed []ParsedScene
 	for i, chunk := range chunks {
 		chunkName := fmt.Sprintf("chunk_%d", i+1)
+		var atomsJSON string
 		if err := step("serialize_"+chunkName, func() (string, error) {
 			raw, err := serializeAtomsForLLM(chunk)
 			if err != nil {
 				return "", err
 			}
+			atomsJSON = raw
 			return fmt.Sprintf("%d bytes", len(raw)), nil
 		}); err != nil {
 			return result, nil
@@ -117,10 +119,6 @@ func DryRunT2(
 
 		var llmRaw string
 		if err := step("llm.build_scenes_"+chunkName, func() (string, error) {
-			atomsJSON, err := serializeAtomsForLLM(chunk)
-			if err != nil {
-				return "", err
-			}
 			raw, err := llm.BuildScenes(ctx, atomsJSON)
 			if err != nil {
 				return "", err

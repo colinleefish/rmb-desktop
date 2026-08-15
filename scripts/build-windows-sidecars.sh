@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# Cross-compile Go sidecars for Windows x86_64 (MSVC target / Tauri externalBin).
+# Cross-compile Go sidecars for Windows x86_64.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-BIN_DIR="$ROOT/app/src-tauri/binaries"
 TARGET="${TARGET:-x86_64-pc-windows-msvc}"
 VERSION="${VERSION:-0.1.12}"
 COMMIT="${COMMIT:-$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown)}"
@@ -23,11 +22,10 @@ export CC=x86_64-w64-mingw32-gcc
 export CXX=x86_64-w64-mingw32-g++
 export CGO_CFLAGS="-I$TMPINC"
 
-mkdir -p "$ROOT/bin" "$BIN_DIR"
+mkdir -p "$ROOT/bin"
 
 for name in rmb rmbd; do
   out="$ROOT/bin/${name}-windows-amd64.exe"
   go build -C "$ROOT" -tags sqlite_fts5 -ldflags "$GO_LDFLAGS" -o "$out" "./cmd/${name}"
-  cp "$out" "$BIN_DIR/${name}-${TARGET}.exe"
-  echo "build-windows-sidecars: $BIN_DIR/${name}-${TARGET}.exe"
+  echo "build-windows-sidecars: $out"
 done

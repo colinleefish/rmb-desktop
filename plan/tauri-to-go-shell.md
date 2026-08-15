@@ -1,6 +1,6 @@
 # Replace the Tauri shell with a pure-Go tray app + self-updater
 
-> Migration plan. Status: **Phase 1 + Phase 3 (packaging) complete; Phase 2 updater next**.
+> Migration plan. Status: **Phase 1–4 complete (merged to main 2026-08-15); Phase 5 (0.2.0 release & verification) next**.
 > D1–D4 resolved 2026-08-15: zip · ed25519 now · v0.2.0 · split status/Open Dashboard.
 
 ## 0. Context & goal
@@ -165,7 +165,7 @@ bootstrap refresh, login-item continuity.
 - **Fix current rot:** `latest.json` still points at 0.1.0 — first 0.2.0 release
   must regenerate everything
 
-## 5. Phase 4 — Deletion & docs (est. 0.5 day)
+## 5. Phase 4 — Deletion & docs ✅ (2026-08-15)
 
 - `git rm -r app/` (src-tauri, node_modules, dist, tauri.conf.json)
 - Makefile: remove `prepare-sidecars`, `app-icons` (tauri variant), tauri paths in

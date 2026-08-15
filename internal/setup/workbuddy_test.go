@@ -41,9 +41,13 @@ func TestMergeWorkBuddyHooksPreservesSettings(t *testing.T) {
 	if !strings.Contains(proposed, "~/.dws") {
 		t.Fatalf("lost sandbox config: %s", proposed)
 	}
-	// Existing RMB command (with env prefix) must be preserved verbatim.
-	if !strings.Contains(proposed, "env RMB_URL=https://rmb.colinleefish.com") {
-		t.Fatalf("lost existing RMB_URL prefix: %s", proposed)
+	// Existing RMB command must be normalized to the canonical dynamic command:
+	// no env prefix / hardcoded URL — the CLI resolves the endpoint itself.
+	if strings.Contains(proposed, "RMB_URL") {
+		t.Fatalf("RMB_URL env prefix must be stripped: %s", proposed)
+	}
+	if !strings.Contains(proposed, "\"command\": \"/bin/rmb hook-submit --source=workbuddy\"") {
+		t.Fatalf("expected normalized canonical command: %s", proposed)
 	}
 }
 

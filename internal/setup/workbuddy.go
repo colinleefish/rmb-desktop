@@ -164,8 +164,9 @@ func workbuddyHookConfigured(current string) bool {
 
 // mergeWorkBuddyHooks merges the rmb Stop hook into a WorkBuddy settings.json
 // while preserving every other setting (enabledPlugins, sandbox, claw, ...).
-// Existing rmb hook commands are kept as-is (including any env prefix such as
-// RMB_URL=...) and only get a timeout if missing.
+// rmb hook commands are normalized to the canonical CLI command (no env prefix
+// such as RMB_URL=...): the CLI resolves its endpoint dynamically (defaults to
+// the local rmbd on 127.0.0.1:19019, overridable via config or --url).
 func mergeWorkBuddyHooks(current, cmd string) (string, bool, error) {
 	root := map[string]any{}
 	if strings.TrimSpace(current) != "" {
@@ -201,6 +202,9 @@ func mergeWorkBuddyHooks(current, cmd string) (string, bool, error) {
 			if isRMBHookCommand(command) {
 				configured = true
 				hm["type"] = "command"
+				// Normalize to the canonical dynamic command: strip any env prefix
+				// (e.g. RMB_URL=https://...) so the hook never hardcodes an endpoint.
+				hm["command"] = cmd
 				if _, ok := hm["timeout"]; !ok {
 					hm["timeout"] = 15
 				}

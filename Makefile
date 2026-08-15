@@ -2,7 +2,7 @@
 
 GO_TAGS := sqlite_fts5
 EMBED_INDEX := internal/http/static/web/index.html
-VERSION ?= 0.1.21
+VERSION ?= 0.1.22
 COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 GO_LDFLAGS := -X github.com/colinleefish/rmb-desktop/internal/version.Version=$(VERSION) -X github.com/colinleefish/rmb-desktop/internal/version.Commit=$(COMMIT)
 
@@ -15,6 +15,7 @@ test: webui-embed-check
 build: webui-embed-check
 	CGO_ENABLED=1 go build -tags "$(GO_TAGS)" -ldflags "$(GO_LDFLAGS)" -o bin/rmbd ./cmd/rmbd
 	CGO_ENABLED=1 go build -tags "$(GO_TAGS)" -ldflags "$(GO_LDFLAGS)" -o bin/rmb ./cmd/rmb
+	CGO_ENABLED=1 go build -tags "$(GO_TAGS)" -ldflags "$(GO_LDFLAGS)" -o bin/rmb-app ./cmd/rmb-app
 
 build-all: webui-build build
 
@@ -42,8 +43,8 @@ tidy:
 prepare-sidecars: build
 	bash scripts/prepare-sidecars.sh
 
-app-dev: prepare-sidecars
-	cd app && RMBD_PATH=$(CURDIR)/bin/rmbd npm run dev
+app-dev: build
+	RMBD_PATH=$(CURDIR)/bin/rmbd ./bin/rmb-app
 
 DMG_BUNDLE := app/src-tauri/target/release/bundle/dmg/RMB Desktop_$(VERSION)_aarch64.dmg
 WINDOWS_INSTALLER := app/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/RMB Desktop_$(VERSION)_x64-setup.exe

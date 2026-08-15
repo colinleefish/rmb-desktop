@@ -15,6 +15,7 @@ import (
 	"github.com/colinleefish/rmb-desktop/internal/debug"
 	"github.com/colinleefish/rmb-desktop/internal/llm"
 	"github.com/colinleefish/rmb-desktop/internal/model"
+	"github.com/colinleefish/rmb-desktop/internal/worker/shared"
 	"github.com/colinleefish/rmb-desktop/internal/workerlock"
 	"github.com/google/uuid"
 )
@@ -52,22 +53,15 @@ func (w *Worker) Run(ctx context.Context) error {
 	if interval <= 0 {
 		return fmt.Errorf("invalid l3 poll interval")
 	}
-	w.reg.WorkerStarted("l3")
-	defer w.reg.WorkerStopped("l3")
-	w.log.Info("l3 memory worker started", "poll_interval", interval)
-	w.runOneCycle(ctx)
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			w.log.Info("l3 memory worker stopped")
-			return nil
-		case <-ticker.C:
-			w.runOneCycle(ctx)
-		}
-	}
+	shared.RunPoll(ctx, shared.PollOptions{
+		Name:     "l3",
+		Label:    "l3 memory",
+		Interval: interval,
+		Registry: w.reg,
+		Log:      w.log,
+		Cycle:    w.runOneCycle,
+	})
+	return nil
 }
 
 func (w *Worker) runOneCycle(ctx context.Context) {

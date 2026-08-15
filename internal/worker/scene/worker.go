@@ -59,26 +59,16 @@ func (w *Worker) Run(ctx context.Context) error {
 	if interval <= 0 {
 		return fmt.Errorf("invalid l2 poll interval")
 	}
-	w.reg.WorkerStarted("l2")
-	defer w.reg.WorkerStopped("l2")
-	w.log.Info("l2 scene worker started",
-		"poll_interval", interval,
-		"min_concurrency", w.bp.Min(),
-		"max_concurrency", w.bp.Max(),
-	)
-	w.runOneCycle(ctx)
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			w.log.Info("l2 scene worker stopped")
-			return nil
-		case <-ticker.C:
-			w.runOneCycle(ctx)
-		}
-	}
+	shared.RunPoll(ctx, shared.PollOptions{
+		Name:       "l2",
+		Label:      "l2 scene",
+		Interval:   interval,
+		Registry:   w.reg,
+		Log:        w.log,
+		StartAttrs: []any{"min_concurrency", w.bp.Min(), "max_concurrency", w.bp.Max()},
+		Cycle:      w.runOneCycle,
+	})
+	return nil
 }
 
 func (w *Worker) runOneCycle(ctx context.Context) {

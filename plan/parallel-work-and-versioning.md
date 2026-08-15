@@ -135,12 +135,15 @@ curl https://releases.re-mem-ber.me/latest.json   # 必须等于 v0.2.0，且签
 
 ## 5. 当前待办清单（2026-08-15 快照，按依赖排序）
 
-1. **决策**：0.2.0 是否包含 WorkBuddy 集成（若含，先合并 phase2 再合并 workbuddy，见 §2.4）。
-2. 合并 `phase2-self-updater` → main（含 updater 核心 + 发布侧）。
-3. 合并 `feat/workbuddy-integration` → main（依赖 2 的 6aad673，已包含，顺序无关）。
-4. 重新构建并安装 `~/.rmb/bin/{rmb,rmbd-desktop,rmb-app}`（当前 20:57 的二进制不含 updater 与 workbuddy）。
-5. Phase 4：`git rm -r app/`（清 4.4GB target）+ 清理 Makefile 残留目标。
-6. 更新 `plan/tauri-to-go-shell.md` 状态行（Phase 2 已完成）与 `.cursor/rules/release.mdc`（新发布流程）。
-7. Phase 5：0.2.0 发布矩阵、登录项自启验证（机器重启后未自动拉起，需确认）、打 `v0.1.21-tauri-final` tag。
-8. 清理：主 checkout 未提交的 `icon.icns` / `tauri.conf.json` 改动（要么丢弃要么按 2.3 收尾）。
-9. 核实 Cursor `rmb setup status` 显示 hook=none 的假阴性（hooks.json 用的是 `rmb-hook-dual` wrapper，检测不识别）——非阻塞，可顺带修。
+> ✅ = 已完成（2026-08-15 集成会话执行）
+
+1. ✅ **决策**：0.2.0 包含 WorkBuddy 集成（已确认，两分支均已合入）
+2. ✅ 合并 `phase2-self-updater` → main（含 updater 核心 + 发布侧）
+3. ✅ 合并 `feat/workbuddy-integration` → main
+4. ✅ 重新构建并安装 `~/.rmb/bin/{rmb,rmbd-desktop,rmb-app}` 与 /Applications 的 .app（现为 0.2.0 / b93641c）
+5. ✅ Phase 4：`git rm -r app/`（清 4.4GB target）+ 清理脚本残留
+6. ✅ 更新 `plan/tauri-to-go-shell.md` 状态行与 `.cursor/rules/release.mdc`（新发布流程）
+7. ⏳ Phase 5：0.2.0 发布矩阵（DMG/notarize/sidecar-bundles/签名 feed）、登录项自启验证（机器重启后未自动拉起）、发布到 GitHub + R2、`v0.1.21-tauri-final` 回滚 tag 已打
+8. ✅ 清理：主 checkout 未提交的 `icon.icns` / `tauri.conf.json` 改动（已丢弃；app/ 已删除）
+9. ✅ 核实 Cursor `hook=none` 假阴性（hooks.json 用 `rmb-hook-dual` wrapper，检测不识别）——遗留项：可选改为标准 hook 命令；WorkBuddy recall 块已用 `rmb setup --apply` 补齐为标准格式
+10. ⏳ 待确认：WorkBuddy hook 当前指向托管服务 `RMB_URL=https://rmb.colinleefish.com`（而非本地 19019）——是保留（托管常在线）还是改本地，需用户拍板

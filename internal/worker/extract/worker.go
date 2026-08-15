@@ -120,10 +120,7 @@ func (w *Worker) runOneCycle(ctx context.Context) {
 
 		backpressure.RunParallel(ctx, batch, limit, func(ctx context.Context, id string) {
 			err := w.processSession(ctx, id)
-			w.bp.Observe(backpressure.Outcome{
-				Err:      err,
-				Pressure: llm.IsTransientError(err),
-			})
+			w.bp.Observe(backpressure.Outcome{Err: err})
 			if err != nil && !llm.IsTransientError(err) {
 				w.log.Error("l1 process session failed", "session_id", id, "err", err)
 			}

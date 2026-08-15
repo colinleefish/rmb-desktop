@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/colinleefish/rmb-desktop/internal/config"
@@ -382,7 +383,7 @@ func (w *Worker) persistScenes(ctx context.Context, batch *sceneBatch, scenes []
 			placeholders[i] = "?"
 			args = append(args, id)
 		}
-		query := fmt.Sprintf(`DELETE FROM scenes WHERE session_id = ? AND id NOT IN (%s)`, joinPlaceholders(placeholders))
+		query := fmt.Sprintf(`DELETE FROM scenes WHERE session_id = ? AND id NOT IN (%s)`, strings.Join(placeholders, ","))
 		if _, err := tx.ExecContext(ctx, query, args...); err != nil {
 			return fmt.Errorf("prune scenes: %w", err)
 		}
@@ -426,15 +427,4 @@ func (w *Worker) handleProcessError(ctx context.Context, sessionID string, cause
 	}
 	_ = pipeline.MarkFailed(ctx, w.db, sessionID, pipeline.StageL2, cause.Error(), w.now())
 	return cause
-}
-
-func joinPlaceholders(parts []string) string {
-	out := ""
-	for i, p := range parts {
-		if i > 0 {
-			out += ","
-		}
-		out += p
-	}
-	return out
 }

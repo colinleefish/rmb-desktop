@@ -102,15 +102,6 @@ func pathExists(path string) bool {
 	return err == nil
 }
 
-func anyPathExists(paths []string) bool {
-	for _, p := range paths {
-		if pathExists(p) {
-			return true
-		}
-	}
-	return false
-}
-
 func artifactFromStrings(id, title, path, desc, current, proposed string, exists bool, apply ApplyMode, warnings []string, lang string) Artifact {
 	change := changeTypeFor(current, proposed, exists)
 	return Artifact{

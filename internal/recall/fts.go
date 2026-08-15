@@ -20,20 +20,6 @@ func EscapeFTSQuery(query string) string {
 	return strings.Join(parts, " ")
 }
 
-func snippet160(abstract, body sql.NullString) string {
-	text := ""
-	if abstract.Valid && strings.TrimSpace(abstract.String) != "" {
-		text = abstract.String
-	} else if body.Valid {
-		text = body.String
-	}
-	text = strings.TrimSpace(text)
-	if len(text) > 160 {
-		return text[:160]
-	}
-	return text
-}
-
 func FTSMemories(ctx context.Context, db *sql.DB, query string, k int) ([]Match, error) {
 	if k <= 0 {
 		k = 5

@@ -1,6 +1,6 @@
 # Replace the Tauri shell with a pure-Go tray app + self-updater
 
-> Migration plan. Status: **Phase 1 in progress**.
+> Migration plan. Status: **Phase 1 + Phase 3 (packaging) complete; Phase 2 updater next**.
 > D1–D4 resolved 2026-08-15: zip · ed25519 now · v0.2.0 · split status/Open Dashboard.
 
 ## 0. Context & goal
@@ -122,7 +122,15 @@ Recommendation: sign now — mirrors then can serve bytes but never tamper.
 Version comparison: semver-ish (`internal/update`), dev builds (commit `dev`)
 never auto-update.
 
-## 4. Phase 3 — Packaging & pipeline (est. 1 day)
+## 4. Phase 3 — Packaging & pipeline ✅ (2026-08-15)
+
+Implemented: `scripts/build-macos-app.sh` (hand-rolled .app; executable keeps
+the name `RMB Desktop` so existing login items keep working; ad-hoc sign when
+no identity given), `scripts/build-dmg.sh`, `scripts/app-template-Info.plist`
+(LSUIElement, min 12.0), `icons/app.icns` committed, Windows zip flow
+(`build-windows-zip.sh` + `install-windows.ps1`, decision D1), Makefile +
+release.sh re-pointed to `dist/`. Verified by local install: orphan adoption,
+bootstrap refresh, login-item continuity.
 
 ### macOS
 

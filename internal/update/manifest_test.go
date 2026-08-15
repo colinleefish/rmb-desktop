@@ -124,7 +124,7 @@ func TestCheckAgainstTestServer(t *testing.T) {
 	if rel.Manifest.Version != "0.9.0" {
 		t.Fatalf("version = %s", rel.Manifest.Version)
 	}
-	if want := srv.URL + "/0.9.0/rmb-desktop_0.9.0_darwin_arm64.tar.gz"; rel.BundleURL() != want {
+	if want := srv.URL + "/rmb-desktop_0.9.0_darwin_arm64.tar.gz"; rel.BundleURL() != want {
 		t.Fatalf("bundle url = %s, want %s", rel.BundleURL(), want)
 	}
 

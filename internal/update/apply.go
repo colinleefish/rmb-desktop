@@ -26,7 +26,7 @@ type Release struct {
 
 // BundleURL is the absolute download URL for the release bundle.
 func (r *Release) BundleURL() string {
-	return BundleURL(r.FeedURL, r.Manifest.Version, r.Bundle.Sidecars)
+	return BundleURL(r.FeedURL, r.Bundle.Sidecars)
 }
 
 // Check fetches feeds in order and returns the first verified manifest that

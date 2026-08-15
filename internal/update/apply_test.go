@@ -265,7 +265,7 @@ func TestCheckAndApplyViaServer(t *testing.T) {
 		switch r.URL.Path {
 		case "/latest.json":
 			w.Write(feed)
-		case "/9.9.9/" + bundleName:
+		case "/" + bundleName:
 			data, _ := os.ReadFile(bundlePath)
 			w.Write(data)
 		default:

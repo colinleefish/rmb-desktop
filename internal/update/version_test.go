@@ -39,25 +39,25 @@ func TestIsNewer(t *testing.T) {
 }
 
 func TestBundleURL(t *testing.T) {
-	cases := []struct{ feed, version, file, want string }{
+	cases := []struct{ feed, file, want string }{
 		{
 			"https://releases.re-mem-ber.me/latest.json",
-			"0.2.0", "b.tar.gz",
-			"https://releases.re-mem-ber.me/0.2.0/b.tar.gz",
+			"b.tar.gz",
+			"https://releases.re-mem-ber.me/b.tar.gz",
 		},
 		{
 			"https://github.com/c/rd/releases/latest/download/manifest.json",
-			"0.2.0", "b.zip",
-			"https://github.com/c/rd/releases/latest/download/0.2.0/b.zip",
+			"b.zip",
+			"https://github.com/c/rd/releases/latest/download/b.zip",
 		},
 		{
 			"https://mirror.cn/rmb/manifest.json",
-			"0.2.0", "b.tar.gz",
-			"https://mirror.cn/rmb/0.2.0/b.tar.gz",
+			"b.tar.gz",
+			"https://mirror.cn/rmb/b.tar.gz",
 		},
 	}
 	for _, tc := range cases {
-		if got := BundleURL(tc.feed, tc.version, tc.file); got != tc.want {
+		if got := BundleURL(tc.feed, tc.file); got != tc.want {
 			t.Errorf("BundleURL(%q) = %q, want %q", tc.feed, got, tc.want)
 		}
 	}

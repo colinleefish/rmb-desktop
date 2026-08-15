@@ -24,10 +24,12 @@ func Feeds(mirrors []string) []string {
 	return append(out, DefaultFeeds...)
 }
 
-// BundleURL derives the absolute download URL for a manifest artifact:
-// relative to the feed's directory plus /<version>/, so any host serving
-// .../latest.json or .../manifest.json (R2, GitHub, mirrors) resolves.
-func BundleURL(feedURL, version, file string) string {
+// BundleURL derives the absolute download URL for a manifest artifact: the
+// feed's directory plus the artifact's file name. Bundles are stored FLAT on
+// every host (the file name itself carries the version), so a single signed
+// manifest resolves identically on R2 (https://host/), GitHub
+// (.../releases/latest/download/), and user mirrors.
+func BundleURL(feedURL, file string) string {
 	dir := feedURL
 	for _, name := range []string{"latest.json", "manifest.json"} {
 		if strings.HasSuffix(dir, "/"+name) {
@@ -41,5 +43,5 @@ func BundleURL(feedURL, version, file string) string {
 			dir += "/"
 		}
 	}
-	return dir + version + "/" + file
+	return dir + file
 }

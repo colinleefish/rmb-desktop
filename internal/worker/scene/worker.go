@@ -15,6 +15,7 @@ import (
 	"github.com/colinleefish/rmb-desktop/internal/model"
 	"github.com/colinleefish/rmb-desktop/internal/pipeline"
 	"github.com/colinleefish/rmb-desktop/internal/worker/backpressure"
+	"github.com/colinleefish/rmb-desktop/internal/worker/shared"
 	"github.com/colinleefish/rmb-desktop/internal/workerlock"
 )
 
@@ -396,11 +397,5 @@ func (w *Worker) persistScenes(ctx context.Context, batch *sceneBatch, scenes []
 }
 
 func (w *Worker) handleProcessError(ctx context.Context, sessionID string, cause error) error {
-	if llm.IsTransientError(cause) {
-		w.log.Warn("l2 transient error", "session_id", sessionID, "err", cause)
-		_ = pipeline.MarkPending(ctx, w.db, sessionID, pipeline.StageL2, cause.Error(), w.now())
-		return cause
-	}
-	_ = pipeline.MarkFailed(ctx, w.db, sessionID, pipeline.StageL2, cause.Error(), w.now())
-	return cause
+	return shared.MarkProcessError(ctx, w.db, w.log, pipeline.StageL2, sessionID, cause, w.now())
 }

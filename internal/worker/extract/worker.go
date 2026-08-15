@@ -16,6 +16,7 @@ import (
 	"github.com/colinleefish/rmb-desktop/internal/pipeline"
 	"github.com/colinleefish/rmb-desktop/internal/uri"
 	"github.com/colinleefish/rmb-desktop/internal/worker/backpressure"
+	"github.com/colinleefish/rmb-desktop/internal/worker/shared"
 	"github.com/colinleefish/rmb-desktop/internal/workerlock"
 	"github.com/google/uuid"
 )
@@ -420,13 +421,7 @@ func (w *Worker) persistBatch(ctx context.Context, sessionID string, batch *extr
 }
 
 func (w *Worker) handleProcessError(ctx context.Context, sessionID string, cause error) error {
-	if llm.IsTransientError(cause) {
-		w.log.Warn("l1 transient error", "session_id", sessionID, "err", cause)
-		_ = pipeline.MarkPending(ctx, w.db, sessionID, pipeline.StageL1, cause.Error(), w.now())
-		return cause
-	}
-	_ = pipeline.MarkFailed(ctx, w.db, sessionID, pipeline.StageL1, cause.Error(), w.now())
-	return cause
+	return shared.MarkProcessError(ctx, w.db, w.log, pipeline.StageL1, sessionID, cause, w.now())
 }
 
 func mergeTurnMessages(turns []model.SessionTurn, maxChars int) string {

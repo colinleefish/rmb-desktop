@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/colinleefish/rmb-desktop/internal/db"
 	"github.com/google/uuid"
 )
 
@@ -77,7 +78,7 @@ func (s *Service) Upload(ctx context.Context, in UploadInput) (UploadResult, err
 		_, err = tx.ExecContext(ctx, `
 			INSERT INTO sessions (id, session_key, source, created_at, updated_at)
 			VALUES (?, ?, ?, ?, ?)`,
-			sessionID, sessionKey, nullIfEmpty(source), nowMS, nowMS,
+			sessionID, sessionKey, db.NullIfEmpty(source), nowMS, nowMS,
 		)
 		if err != nil {
 			return UploadResult{}, fmt.Errorf("insert session: %w", err)
@@ -143,11 +144,4 @@ func (s *Service) Upload(ctx context.Context, in UploadInput) (UploadResult, err
 		TurnURI:   "rmb://turns/" + turnID,
 		CreatedAt: time.UnixMilli(turnMS).UTC(),
 	}, nil
-}
-
-func nullIfEmpty(s string) any {
-	if s == "" {
-		return nil
-	}
-	return s
 }

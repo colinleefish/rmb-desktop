@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+
+	"github.com/colinleefish/rmb-desktop/internal/llm"
 )
 
 type llmMemoryResponse struct {
@@ -17,19 +19,9 @@ type ParsedMemory struct {
 }
 
 func parseDistillResponse(raw string) (ParsedMemory, error) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return ParsedMemory{}, fmt.Errorf("empty llm response")
-	}
-	if strings.HasPrefix(raw, "```") {
-		lines := strings.Split(raw, "\n")
-		if len(lines) >= 2 {
-			end := len(lines)
-			if strings.TrimSpace(lines[end-1]) == "```" {
-				end--
-			}
-			raw = strings.Join(lines[1:end], "\n")
-		}
+	raw, err := llm.StripCodeFence(raw)
+	if err != nil {
+		return ParsedMemory{}, err
 	}
 
 	var resp llmMemoryResponse

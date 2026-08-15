@@ -64,8 +64,12 @@ func ftsMatches(t *testing.T, d *sql.DB, term string) []int64 {
 // invoke the LLM, so these methods are never called in these tests.
 type stubSceneBuilder struct{}
 
-func (stubSceneBuilder) BuildScenes(context.Context, string) (string, error)         { return `{"scenes":[]}`, nil }
-func (stubSceneBuilder) SummarizeSessionAbstract(context.Context, string) (string, error) { return "", nil }
+func (stubSceneBuilder) BuildScenes(context.Context, string) (string, error) {
+	return `{"scenes":[]}`, nil
+}
+func (stubSceneBuilder) SummarizeSessionAbstract(context.Context, string) (string, error) {
+	return "", nil
+}
 
 func newWorker(t *testing.T, d *sql.DB) *Worker {
 	t.Helper()

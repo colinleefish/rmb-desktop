@@ -5,15 +5,16 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/colinleefish/rmb-desktop/internal/config"
 	"github.com/colinleefish/rmb-desktop/internal/db"
 	"github.com/colinleefish/rmb-desktop/internal/debug"
-	"github.com/colinleefish/rmb-desktop/internal/llm"
 	"github.com/colinleefish/rmb-desktop/internal/model"
 	"github.com/colinleefish/rmb-desktop/internal/pipeline"
 	"github.com/colinleefish/rmb-desktop/internal/worker/backpressure"
+	"github.com/colinleefish/rmb-desktop/internal/worker/shared"
 	"github.com/colinleefish/rmb-desktop/internal/workerlock"
 )
 
@@ -57,89 +58,24 @@ func (w *Worker) Run(ctx context.Context) error {
 	if interval <= 0 {
 		return fmt.Errorf("invalid l2 poll interval")
 	}
-	w.reg.WorkerStarted("l2")
-	defer w.reg.WorkerStopped("l2")
-	w.log.Info("l2 scene worker started",
-		"poll_interval", interval,
-		"min_concurrency", w.bp.Min(),
-		"max_concurrency", w.bp.Max(),
-	)
-	w.runOneCycle(ctx)
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			w.log.Info("l2 scene worker stopped")
-			return nil
-		case <-ticker.C:
-			w.runOneCycle(ctx)
-		}
-	}
+	shared.RunPoll(ctx, shared.PollOptions{
+		Name:       "l2",
+		Label:      "l2 scene",
+		Interval:   interval,
+		Registry:   w.reg,
+		Log:        w.log,
+		StartAttrs: []any{"min_concurrency", w.bp.Min(), "max_concurrency", w.bp.Max()},
+		Cycle:      w.runOneCycle,
+	})
+	return nil
 }
 
 func (w *Worker) runOneCycle(ctx context.Context) {
-	endCycle := w.reg.BeginCycle("l2")
-	defer endCycle(nil)
-
-	ids, err := w.selectCandidateSessions(ctx)
-	if err != nil {
-		w.log.Error("l2 select candidates failed", "err", err)
-		return
-	}
-	if len(ids) == 0 {
-		w.bp.EndCycle(0)
-		return
-	}
-
-	if n, err := w.countPendingSessions(ctx); err == nil {
-		if prev, next := w.bp.SeedFromBacklog(n); prev != next {
-			w.log.Info("l2 concurrency seeded", "from", prev, "to", next, "pending", n)
-		}
-	}
-
-	limit := w.bp.Limit()
-	w.reg.SetConcurrency("l2", limit)
-	w.log.Info("l2 cycle", "candidates", len(ids), "concurrency", limit)
-
-	remaining := ids
-	for len(remaining) > 0 {
-		if ctx.Err() != nil {
-			return
-		}
-		limit = w.bp.Limit()
-		n := limit
-		if n > len(remaining) {
-			n = len(remaining)
-		}
-		batch := remaining[:n]
-		remaining = remaining[n:]
-
-		backpressure.RunParallel(ctx, batch, limit, func(ctx context.Context, id string) {
-			err := w.processSession(ctx, id)
-			w.bp.Observe(backpressure.Outcome{
-				Err:      err,
-				Pressure: llm.IsTransientError(err),
-			})
-			if err != nil && !llm.IsTransientError(err) {
-				w.log.Error("l2 process session failed", "session_id", id, "err", err)
-			}
-		})
-
-		pendingHint := len(remaining)
-		if n, err := w.countPendingSessions(ctx); err == nil {
-			pendingHint = n
-		}
-		prev, next := w.bp.EndCycle(pendingHint)
-		w.reg.SetBackpressure("l2", w.bp.Min(), w.bp.Max(), next, pendingHint)
-		if prev != next {
-			w.log.Info("l2 concurrency adjusted", "from", prev, "to", next, "pending", pendingHint)
-		}
-		if next < prev {
-			return
-		}
-	}
+	shared.RunBackpressuredCycle(ctx, "l2", w.bp, w.reg, w.log, shared.CycleDeps{
+		SelectCandidates: w.selectCandidateSessions,
+		CountPending:     w.countPendingSessions,
+		ProcessSession:   w.processSession,
+	})
 }
 
 func (w *Worker) countPendingSessions(ctx context.Context) (int, error) {
@@ -295,28 +231,7 @@ func loadSessionAtoms(ctx context.Context, tx *sql.Tx, sessionID string) ([]mode
 		return nil, err
 	}
 	defer rows.Close()
-
-	var out []model.Atom
-	for rows.Next() {
-		var a model.Atom
-		var sceneName, slug sql.NullString
-		var sourceJSON string
-		if err := rows.Scan(&a.ID, &a.SessionID, &a.Category, &a.Priority, &sceneName, &slug, &a.Content, &sourceJSON, &a.CreatedAt, &a.UpdatedAt); err != nil {
-			return nil, err
-		}
-		if sceneName.Valid {
-			a.SceneName = &sceneName.String
-		}
-		if slug.Valid {
-			a.Slug = &slug.String
-		}
-		a.SourceTurnIDs, err = db.UnmarshalStringArray(sourceJSON)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, a)
-	}
-	return out, rows.Err()
+	return db.ScanAtomRows(rows)
 }
 
 func (w *Worker) persistScenes(ctx context.Context, batch *sceneBatch, scenes []ParsedScene, sessionAbstract string) error {
@@ -382,7 +297,7 @@ func (w *Worker) persistScenes(ctx context.Context, batch *sceneBatch, scenes []
 			placeholders[i] = "?"
 			args = append(args, id)
 		}
-		query := fmt.Sprintf(`DELETE FROM scenes WHERE session_id = ? AND id NOT IN (%s)`, joinPlaceholders(placeholders))
+		query := fmt.Sprintf(`DELETE FROM scenes WHERE session_id = ? AND id NOT IN (%s)`, strings.Join(placeholders, ","))
 		if _, err := tx.ExecContext(ctx, query, args...); err != nil {
 			return fmt.Errorf("prune scenes: %w", err)
 		}
@@ -419,22 +334,5 @@ func (w *Worker) persistScenes(ctx context.Context, batch *sceneBatch, scenes []
 }
 
 func (w *Worker) handleProcessError(ctx context.Context, sessionID string, cause error) error {
-	if llm.IsTransientError(cause) {
-		w.log.Warn("l2 transient error", "session_id", sessionID, "err", cause)
-		_ = pipeline.MarkPending(ctx, w.db, sessionID, pipeline.StageL2, cause.Error(), w.now())
-		return cause
-	}
-	_ = pipeline.MarkFailed(ctx, w.db, sessionID, pipeline.StageL2, cause.Error(), w.now())
-	return cause
-}
-
-func joinPlaceholders(parts []string) string {
-	out := ""
-	for i, p := range parts {
-		if i > 0 {
-			out += ","
-		}
-		out += p
-	}
-	return out
+	return shared.MarkProcessError(ctx, w.db, w.log, pipeline.StageL2, sessionID, cause, w.now())
 }

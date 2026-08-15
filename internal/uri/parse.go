@@ -6,11 +6,11 @@ import (
 )
 
 const (
-	ScopeRoot     = ""
-	ScopeSessions = "sessions"
-	ScopeTurns    = "turns"
-	ScopeAgent    = "agent"
-	ScopeSkills     = "skills"
+	ScopeRoot        = ""
+	ScopeSessions    = "sessions"
+	ScopeTurns       = "turns"
+	ScopeAgent       = "agent"
+	ScopeSkills      = "skills"
 	ScopeCorrections = "corrections"
 )
 

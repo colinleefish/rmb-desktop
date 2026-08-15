@@ -65,15 +65,15 @@ type Detail struct {
 
 // SkillMeta is skill row metadata without file bodies.
 type SkillMeta struct {
-	URI          string `json:"uri"`
-	Slug         string `json:"slug"`
-	Name         string `json:"name"`
-	Description  string `json:"description"`
+	URI          string   `json:"uri"`
+	Slug         string   `json:"slug"`
+	Name         string   `json:"name"`
+	Description  string   `json:"description"`
 	Tags         []string `json:"tags"`
-	Version      int    `json:"version"`
-	BundleSHA256 string `json:"bundle_sha256"`
-	CreatedAt    string `json:"created_at"`
-	UpdatedAt    string `json:"updated_at"`
+	Version      int      `json:"version"`
+	BundleSHA256 string   `json:"bundle_sha256"`
+	CreatedAt    string   `json:"created_at"`
+	UpdatedAt    string   `json:"updated_at"`
 }
 
 // ReplaceResult is returned after a successful put.
@@ -137,10 +137,10 @@ func ReplaceBundle(ctx context.Context, database *sql.DB, slug string, input Bun
 	defer func() { _ = tx.Rollback() }()
 
 	var (
-		activeID       string
-		activeVersion  int
-		activeHash     string
-		hasActive      bool
+		activeID      string
+		activeVersion int
+		activeHash    string
+		hasActive     bool
 	)
 	err = tx.QueryRowContext(ctx, `
 		SELECT id, version, bundle_sha256

@@ -152,19 +152,18 @@ func sourceSceneURIsFor(bucket Bucket, index map[string][]string) []string {
 }
 
 func equalStringSets(a, b []string) bool {
-	seen := make(map[string]struct{}, len(a))
+	counts := make(map[string]int, len(a))
 	for _, s := range a {
-		seen[s] = struct{}{}
+		counts[s] = 1
 	}
-	other := make(map[string]struct{}, len(b))
 	for _, s := range b {
-		other[s] = struct{}{}
+		if _, ok := counts[s]; !ok {
+			return false
+		}
+		counts[s] = 0 // mark matched; duplicates in b just re-mark
 	}
-	if len(seen) != len(other) {
-		return false
-	}
-	for s := range seen {
-		if _, ok := other[s]; !ok {
+	for _, v := range counts {
+		if v != 0 {
 			return false
 		}
 	}

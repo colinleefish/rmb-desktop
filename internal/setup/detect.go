@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 func detectAgent(def agentDef) bool {
@@ -36,14 +35,4 @@ func redactSettingsJSON(raw string) string {
 		return raw
 	}
 	return string(out)
-}
-
-func redactSecretsInPreview(content string) string {
-	if strings.TrimSpace(content) == "" {
-		return content
-	}
-	if strings.Contains(content, `"env"`) {
-		return redactSettingsJSON(content)
-	}
-	return content
 }

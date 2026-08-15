@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/colinleefish/rmb-desktop/internal/llm"
 	"github.com/colinleefish/rmb-desktop/internal/uri"
 )
 
@@ -29,19 +30,9 @@ type ParsedScene struct {
 }
 
 func parseBuildScenesResponse(raw string, validURIs map[string]struct{}) ([]ParsedScene, error) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return nil, fmt.Errorf("empty llm response")
-	}
-	if strings.HasPrefix(raw, "```") {
-		lines := strings.Split(raw, "\n")
-		if len(lines) >= 2 {
-			end := len(lines)
-			if strings.TrimSpace(lines[end-1]) == "```" {
-				end--
-			}
-			raw = strings.Join(lines[1:end], "\n")
-		}
+	raw, err := llm.StripCodeFence(raw)
+	if err != nil {
+		return nil, err
 	}
 
 	var resp llmBuildScenesResponse

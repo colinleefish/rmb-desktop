@@ -11,11 +11,11 @@ import (
 	"github.com/colinleefish/rmb-desktop/internal/config"
 	"github.com/colinleefish/rmb-desktop/internal/db"
 	"github.com/colinleefish/rmb-desktop/internal/debug"
-	"github.com/colinleefish/rmb-desktop/internal/llm"
 	"github.com/colinleefish/rmb-desktop/internal/model"
 	"github.com/colinleefish/rmb-desktop/internal/pipeline"
 	"github.com/colinleefish/rmb-desktop/internal/uri"
 	"github.com/colinleefish/rmb-desktop/internal/worker/backpressure"
+	"github.com/colinleefish/rmb-desktop/internal/worker/shared"
 	"github.com/colinleefish/rmb-desktop/internal/workerlock"
 	"github.com/google/uuid"
 )
@@ -25,14 +25,14 @@ type AtomExtractor interface {
 }
 
 type Worker struct {
-	db     *sql.DB
-	llm    AtomExtractor
-	cfg    config.PipelineConfig
-	locks  *workerlock.SessionLocks
-	log    *slog.Logger
-	now    func() time.Time
-	bp     *backpressure.Controller
-	reg    *debug.Registry
+	db    *sql.DB
+	llm   AtomExtractor
+	cfg   config.PipelineConfig
+	locks *workerlock.SessionLocks
+	log   *slog.Logger
+	now   func() time.Time
+	bp    *backpressure.Controller
+	reg   *debug.Registry
 }
 
 func NewWorker(database *sql.DB, llm AtomExtractor, cfg config.PipelineConfig, locks *workerlock.SessionLocks, log *slog.Logger, reg *debug.Registry) *Worker {
@@ -59,90 +59,24 @@ func (w *Worker) Run(ctx context.Context) error {
 	if interval <= 0 {
 		return fmt.Errorf("invalid l1 poll interval")
 	}
-	w.reg.WorkerStarted("l1")
-	defer w.reg.WorkerStopped("l1")
-	w.log.Info("l1 extract worker started",
-		"poll_interval", interval,
-		"min_concurrency", w.bp.Min(),
-		"max_concurrency", w.bp.Max(),
-	)
-	w.runOneCycle(ctx)
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			w.log.Info("l1 extract worker stopped")
-			return nil
-		case <-ticker.C:
-			w.runOneCycle(ctx)
-		}
-	}
+	shared.RunPoll(ctx, shared.PollOptions{
+		Name:       "l1",
+		Label:      "l1 extract",
+		Interval:   interval,
+		Registry:   w.reg,
+		Log:        w.log,
+		StartAttrs: []any{"min_concurrency", w.bp.Min(), "max_concurrency", w.bp.Max()},
+		Cycle:      w.runOneCycle,
+	})
+	return nil
 }
 
 func (w *Worker) runOneCycle(ctx context.Context) {
-	endCycle := w.reg.BeginCycle("l1")
-	defer endCycle(nil)
-
-	ids, err := w.selectCandidateSessions(ctx)
-	if err != nil {
-		w.log.Error("l1 select candidates failed", "err", err)
-		return
-	}
-	if len(ids) == 0 {
-		w.bp.EndCycle(0)
-		return
-	}
-
-	if n, err := w.countPendingSessions(ctx); err == nil {
-		if prev, next := w.bp.SeedFromBacklog(n); prev != next {
-			w.log.Info("l1 concurrency seeded", "from", prev, "to", next, "pending", n)
-		}
-	}
-
-	limit := w.bp.Limit()
-	w.reg.SetConcurrency("l1", limit)
-	w.log.Info("l1 cycle", "candidates", len(ids), "concurrency", limit)
-
-	remaining := ids
-	for len(remaining) > 0 {
-		if ctx.Err() != nil {
-			return
-		}
-		limit = w.bp.Limit()
-		n := limit
-		if n > len(remaining) {
-			n = len(remaining)
-		}
-		batch := remaining[:n]
-		remaining = remaining[n:]
-
-		backpressure.RunParallel(ctx, batch, limit, func(ctx context.Context, id string) {
-			err := w.processSession(ctx, id)
-			w.bp.Observe(backpressure.Outcome{
-				Err:      err,
-				Pressure: llm.IsTransientError(err),
-			})
-			if err != nil && !llm.IsTransientError(err) {
-				w.log.Error("l1 process session failed", "session_id", id, "err", err)
-			}
-		})
-
-		pendingHint := len(remaining)
-		if n, err := w.countPendingSessions(ctx); err == nil {
-			pendingHint = n
-		}
-		prev, next := w.bp.EndCycle(pendingHint)
-		w.reg.SetBackpressure("l1", w.bp.Min(), w.bp.Max(), next, pendingHint)
-		if prev != next {
-			w.log.Info("l1 concurrency adjusted", "from", prev, "to", next, "pending", pendingHint)
-		}
-		// Stop this cycle on pressure so we don't keep hammering the LLM.
-		if next < prev {
-			return
-		}
-	}
+	shared.RunBackpressuredCycle(ctx, "l1", w.bp, w.reg, w.log, shared.CycleDeps{
+		SelectCandidates: w.selectCandidateSessions,
+		CountPending:     w.countPendingSessions,
+		ProcessSession:   w.processSession,
+	})
 }
 
 func (w *Worker) countPendingSessions(ctx context.Context) (int, error) {
@@ -423,13 +357,7 @@ func (w *Worker) persistBatch(ctx context.Context, sessionID string, batch *extr
 }
 
 func (w *Worker) handleProcessError(ctx context.Context, sessionID string, cause error) error {
-	if llm.IsTransientError(cause) {
-		w.log.Warn("l1 transient error", "session_id", sessionID, "err", cause)
-		_ = pipeline.MarkPending(ctx, w.db, sessionID, pipeline.StageL1, cause.Error(), w.now())
-		return cause
-	}
-	_ = pipeline.MarkFailed(ctx, w.db, sessionID, pipeline.StageL1, cause.Error(), w.now())
-	return cause
+	return shared.MarkProcessError(ctx, w.db, w.log, pipeline.StageL1, sessionID, cause, w.now())
 }
 
 func mergeTurnMessages(turns []model.SessionTurn, maxChars int) string {

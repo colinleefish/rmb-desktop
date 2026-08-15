@@ -5,12 +5,12 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
-	"time"
 
 	sqlite_vec "github.com/asg017/sqlite-vec-go-bindings/cgo"
 	"github.com/colinleefish/rmb-desktop/internal/config"
 	"github.com/colinleefish/rmb-desktop/internal/debug"
 	"github.com/colinleefish/rmb-desktop/internal/llm"
+	"github.com/colinleefish/rmb-desktop/internal/worker/shared"
 )
 
 type Embedder interface {
@@ -18,12 +18,12 @@ type Embedder interface {
 }
 
 type Worker struct {
-	db     *sql.DB
-	llm    Embedder
-	cfg    config.PipelineConfig
-	dims   int
-	log    *slog.Logger
-	reg    *debug.Registry
+	db   *sql.DB
+	llm  Embedder
+	cfg  config.PipelineConfig
+	dims int
+	log  *slog.Logger
+	reg  *debug.Registry
 }
 
 func NewWorker(database *sql.DB, embedder Embedder, cfg config.PipelineConfig, dims int, log *slog.Logger, reg *debug.Registry) *Worker {
@@ -44,22 +44,15 @@ func (w *Worker) Run(ctx context.Context) error {
 	if interval <= 0 {
 		return fmt.Errorf("invalid embed poll interval")
 	}
-	w.reg.WorkerStarted("embed")
-	defer w.reg.WorkerStopped("embed")
-	w.log.Info("embed worker started", "poll_interval", interval)
-	w.runOneCycle(ctx)
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			w.log.Info("embed worker stopped")
-			return nil
-		case <-ticker.C:
-			w.runOneCycle(ctx)
-		}
-	}
+	shared.RunPoll(ctx, shared.PollOptions{
+		Name:     "embed",
+		Label:    "embed",
+		Interval: interval,
+		Registry: w.reg,
+		Log:      w.log,
+		Cycle:    w.runOneCycle,
+	})
+	return nil
 }
 
 func (w *Worker) runOneCycle(ctx context.Context) {

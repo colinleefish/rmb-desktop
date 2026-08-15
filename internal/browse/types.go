@@ -82,8 +82,8 @@ type PipelineProblem struct {
 
 // PipelineHealth is the global distillation dashboard payload.
 type PipelineHealth struct {
-	DistillationEnabled bool `json:"distillation_enabled"`
-	TrackedSessions     int64 `json:"tracked_sessions"`
+	DistillationEnabled bool   `json:"distillation_enabled"`
+	TrackedSessions     int64  `json:"tracked_sessions"`
 	GeneratedAt         string `json:"generated_at"`
 	Stages              struct {
 		T1 PipelineStatusCounts `json:"t1"`
@@ -131,15 +131,15 @@ type AtomJSON struct {
 
 // SceneJSON is an L2 scene for list/detail views.
 type SceneJSON struct {
-	ID          string   `json:"id"`
-	SessionID   string   `json:"session_id"`
-	DisplayName *string  `json:"display_name,omitempty"`
-	Abstract    *string  `json:"abstract,omitempty"`
-	Body        *string  `json:"body,omitempty"`
-	SourceAtoms []string `json:"source_atoms"`
-	CreatedAt   string   `json:"created_at"`
-	UpdatedAt   string   `json:"updated_at"`
-	URI         string   `json:"uri,omitempty"`
+	ID          string       `json:"id"`
+	SessionID   string       `json:"session_id"`
+	DisplayName *string      `json:"display_name,omitempty"`
+	Abstract    *string      `json:"abstract,omitempty"`
+	Body        *string      `json:"body,omitempty"`
+	SourceAtoms []string     `json:"source_atoms"`
+	CreatedAt   string       `json:"created_at"`
+	UpdatedAt   string       `json:"updated_at"`
+	URI         string       `json:"uri,omitempty"`
 	RecallStats *RecallStats `json:"recall_stats,omitempty"`
 }
 
@@ -157,17 +157,17 @@ type RecallStats struct {
 
 // MemoryJSON is an active L3 memory row.
 type MemoryJSON struct {
-	ID                   string   `json:"id"`
-	URI                  string   `json:"uri"`
-	Category             string   `json:"category"`
-	Slug                 *string  `json:"slug,omitempty"`
-	Version              int      `json:"version"`
-	Abstract             *string  `json:"abstract,omitempty"`
-	Body                 *string  `json:"body,omitempty"`
-	SourceSceneURIs      []string `json:"source_scene_uris"`
-	SourceCorrectionURIs []string `json:"source_correction_uris"`
-	CreatedAt            string   `json:"created_at"`
-	UpdatedAt            string   `json:"updated_at"`
+	ID                   string       `json:"id"`
+	URI                  string       `json:"uri"`
+	Category             string       `json:"category"`
+	Slug                 *string      `json:"slug,omitempty"`
+	Version              int          `json:"version"`
+	Abstract             *string      `json:"abstract,omitempty"`
+	Body                 *string      `json:"body,omitempty"`
+	SourceSceneURIs      []string     `json:"source_scene_uris"`
+	SourceCorrectionURIs []string     `json:"source_correction_uris"`
+	CreatedAt            string       `json:"created_at"`
+	UpdatedAt            string       `json:"updated_at"`
 	RecallStats          *RecallStats `json:"recall_stats,omitempty"`
 }
 
@@ -182,13 +182,13 @@ type SessionDetail struct {
 
 // SkillRow is one row in the skills catalog.
 type SkillRow struct {
-	Slug        string   `json:"slug"`
-	Name        string   `json:"name"`
-	Description string   `json:"description"`
-	Tags        []string `json:"tags"`
-	URI         string   `json:"uri"`
-	Version     int      `json:"version"`
-	UpdatedAt   string   `json:"updated_at"`
+	Slug        string       `json:"slug"`
+	Name        string       `json:"name"`
+	Description string       `json:"description"`
+	Tags        []string     `json:"tags"`
+	URI         string       `json:"uri"`
+	Version     int          `json:"version"`
+	UpdatedAt   string       `json:"updated_at"`
 	RecallStats *RecallStats `json:"recall_stats,omitempty"`
 }
 

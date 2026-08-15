@@ -1,10 +1,5 @@
 package setup
 
-import (
-	"os"
-	"path/filepath"
-)
-
 // AgentID identifies a supported coding agent integration.
 type AgentID string
 
@@ -86,16 +81,4 @@ func agentDefByID(id AgentID) (agentDef, bool) {
 		}
 	}
 	return agentDef{}, false
-}
-
-func homePaths(rel ...string) []string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil
-	}
-	out := make([]string, len(rel))
-	for i, r := range rel {
-		out[i] = filepath.Join(home, r)
-	}
-	return out
 }

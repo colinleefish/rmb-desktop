@@ -247,8 +247,8 @@ func (s *Service) loadSessionSummaries(ctx context.Context, sessionIDs []string)
 func (s *Service) GetSession(ctx context.Context, sessionKey string) (SessionDetail, error) {
 	sessionKey = strings.ToLower(strings.TrimSpace(sessionKey))
 	var (
-		id, key string
-		abstract sql.NullString
+		id, key              string
+		abstract             sql.NullString
 		createdMS, updatedMS int64
 	)
 	err := s.db.QueryRowContext(ctx, `

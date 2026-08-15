@@ -15,6 +15,7 @@ import (
 	"github.com/colinleefish/rmb-desktop/internal/debug"
 	"github.com/colinleefish/rmb-desktop/internal/llm"
 	"github.com/colinleefish/rmb-desktop/internal/model"
+	"github.com/colinleefish/rmb-desktop/internal/worker/shared"
 	"github.com/colinleefish/rmb-desktop/internal/workerlock"
 	"github.com/google/uuid"
 )
@@ -52,22 +53,15 @@ func (w *Worker) Run(ctx context.Context) error {
 	if interval <= 0 {
 		return fmt.Errorf("invalid l3 poll interval")
 	}
-	w.reg.WorkerStarted("l3")
-	defer w.reg.WorkerStopped("l3")
-	w.log.Info("l3 memory worker started", "poll_interval", interval)
-	w.runOneCycle(ctx)
-
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			w.log.Info("l3 memory worker stopped")
-			return nil
-		case <-ticker.C:
-			w.runOneCycle(ctx)
-		}
-	}
+	shared.RunPoll(ctx, shared.PollOptions{
+		Name:     "l3",
+		Label:    "l3 memory",
+		Interval: interval,
+		Registry: w.reg,
+		Log:      w.log,
+		Cycle:    w.runOneCycle,
+	})
+	return nil
 }
 
 func (w *Worker) runOneCycle(ctx context.Context) {
@@ -403,7 +397,7 @@ func loadAllAtoms(ctx context.Context, database *sql.DB) ([]model.Atom, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	return scanAtoms(rows)
+	return db.ScanAtomRows(rows)
 }
 
 func loadAllScenes(ctx context.Context, database *sql.DB) ([]model.Scene, error) {
@@ -436,31 +430,6 @@ func loadAllScenes(ctx context.Context, database *sql.DB) ([]model.Scene, error)
 			return nil, err
 		}
 		out = append(out, s)
-	}
-	return out, rows.Err()
-}
-
-func scanAtoms(rows *sql.Rows) ([]model.Atom, error) {
-	var out []model.Atom
-	for rows.Next() {
-		var a model.Atom
-		var sceneName, slug sql.NullString
-		var sourceJSON string
-		if err := rows.Scan(&a.ID, &a.SessionID, &a.Category, &a.Priority, &sceneName, &slug, &a.Content, &sourceJSON, &a.CreatedAt, &a.UpdatedAt); err != nil {
-			return nil, err
-		}
-		if sceneName.Valid {
-			a.SceneName = &sceneName.String
-		}
-		if slug.Valid {
-			a.Slug = &slug.String
-		}
-		var err error
-		a.SourceTurnIDs, err = db.UnmarshalStringArray(sourceJSON)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, a)
 	}
 	return out, rows.Err()
 }

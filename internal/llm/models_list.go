@@ -36,7 +36,7 @@ type modelsListItem struct {
 }
 
 func buildModelsURLCandidates(baseURL string) []string {
-trimmed := strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	trimmed := strings.TrimRight(strings.TrimSpace(baseURL), "/")
 	if trimmed == "" {
 		return nil
 	}

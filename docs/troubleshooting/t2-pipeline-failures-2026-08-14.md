@@ -65,7 +65,7 @@ Reset via debug API or SQL (see Repair below).
 
 ### 4. LLM gateway timeouts
 
-On slower paths to `stargate.youxi123.com`, `llm.timeout` (default **45s**) may be too
+On slower paths to `stargate.youxi123.com`, `llm.timeout` (default **300s**) may be too
 short for `build_scenes`, producing header/body deadline errors unrelated to SQLite.
 
 ## Diagnostics

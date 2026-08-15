@@ -48,20 +48,11 @@ make prepare-sidecars   # bin/rmb + bin/rmbd → app/src-tauri/binaries/*-<targe
 
 ## Login item (optional)
 
-Use **one** approach — not both:
+**Recommended:** enable **Launch at login** in the web UI (Settings → General). The app manages the agent itself — it writes `~/Library/LaunchAgents/me.remember.rmb.login.plist` and cleans up the legacy `me.remember.rmb` agent on toggle.
 
-| LaunchAgent | Purpose |
-|-------------|---------|
-| [`com.remember.rmb.plist`](../install/macos/com.remember.rmb.plist) | **Recommended:** menu bar app at login (starts `rmbd` with the app) |
-| [`com.remember.rmbd.plist`](../install/macos/com.remember.rmbd.plist) | Headless `rmbd` only — do not use alongside the menu bar app |
-
-The `rmbd` LaunchAgent uses `KeepAlive` and will restart the daemon if you quit it manually. The menu bar app disables that agent when it runs.
-
-```bash
-# Menu bar app at login (recommended)
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/me.remember.rmb.plist
-
-# Stop the headless daemon agent if you no longer need it
-launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/me.remember.rmbd.plist
-launchctl disable gui/$(id -u)/me.remember.rmbd
-```
+For headless setups (no menu bar app), the repo ships a template at
+[`install/macos/com.remember.rmbd.plist`](../install/macos/com.remember.rmbd.plist)
+(label `me.remember.rmbd`). Do not run it alongside the menu bar app — the app
+disables that agent while it runs. [`install/macos/com.remember.rmb.plist`](../install/macos/com.remember.rmb.plist)
+is the template the login feature is based on; prefer the in-app toggle over
+installing either plist by hand.

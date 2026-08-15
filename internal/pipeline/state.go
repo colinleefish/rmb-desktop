@@ -4,8 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strings"
 	"time"
+
+	rdb "github.com/colinleefish/rmb-desktop/internal/db"
 )
 
 // Stage is a distillation tier column prefix in pipeline_state.
@@ -49,7 +50,7 @@ func MarkPending(ctx context.Context, db *sql.DB, sessionID string, stage Stage,
 		WHERE session_id = ?`,
 		stage.statusCol(), stage.startedCol(), stage.errorCol(),
 	)
-	_, err := db.ExecContext(ctx, query, nullIfEmpty(errMsg), nowMS, sessionID)
+	_, err := db.ExecContext(ctx, query, rdb.NullIfEmpty(errMsg), nowMS, sessionID)
 	return err
 }
 
@@ -64,7 +65,7 @@ func MarkFailed(ctx context.Context, db *sql.DB, sessionID string, stage Stage, 
 		WHERE session_id = ?`,
 		stage.statusCol(), stage.errorCol(),
 	)
-	_, err := db.ExecContext(ctx, query, nullIfEmpty(errMsg), nowMS, sessionID)
+	_, err := db.ExecContext(ctx, query, rdb.NullIfEmpty(errMsg), nowMS, sessionID)
 	return err
 }
 
@@ -127,12 +128,4 @@ func Requeue(ctx context.Context, db *sql.DB, sessionID string, stage Stage) err
 	)
 	_, err := db.ExecContext(ctx, query, nowMS, sessionID)
 	return err
-}
-
-func nullIfEmpty(s string) any {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return nil
-	}
-	return s
 }

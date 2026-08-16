@@ -121,14 +121,26 @@ func (d *DaemonManager) Start() error {
 	}
 	cmd := exec.Command(d.rmbdPath, d.serveArgs()...)
 	logFile := openDaemonLog()
-	daemonOut := io.Writer(io.Discard)
 	if logFile != nil {
-		daemonOut = logFile
 		fmt.Fprintf(logFile, "=== %s spawn %s %s ===\n",
 			time.Now().Format(time.RFC3339), d.rmbdPath, strings.Join(d.serveArgs(), " "))
+		// Hand the child the log fd directly (no pipe): a daemon spawned by
+		// the headless installer — or orphaned by a shell crash — must not
+		// die of SIGPIPE once its parent exits and the pipe breaks. The
+		// parent keeps its own rotating handle for the spawn/exit headers.
+		// Trade-off: parent-side mid-stream rotation now only moves headers;
+		// child bytes keep flowing to the renamed file until the next spawn.
+		if f := logFile.File(); f != nil {
+			cmd.Stdout = f
+			cmd.Stderr = f
+		} else {
+			cmd.Stdout = logFile
+			cmd.Stderr = logFile
+		}
+	} else {
+		cmd.Stdout = io.Discard
+		cmd.Stderr = io.Discard
 	}
-	cmd.Stdout = daemonOut
-	cmd.Stderr = daemonOut
 	started := time.Now()
 	if err := cmd.Start(); err != nil {
 		d.mu.Unlock()
@@ -492,6 +504,14 @@ func (w *daemonLogWriter) Close() error {
 	err := w.f.Close()
 	w.f = nil
 	return err
+}
+
+// File exposes the underlying log fd so a spawned child can write to it
+// directly (bypassing the pipe that would SIGPIPE it when we exit).
+func (w *daemonLogWriter) File() *os.File {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.f
 }
 
 // appendDaemonLog appends one diagnostic line to the daemon log; best-effort,

@@ -9,6 +9,9 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
+
+	"github.com/colinleefish/rmb-desktop/internal/platform"
 )
 
 // TestUpdateStopThenRestartRespawnsDaemon is the regression test for the
@@ -80,6 +83,59 @@ func TestUpdateStopThenRestartRespawnsDaemon(t *testing.T) {
 		t.Fatalf("EnsureRunning after update: %v", err)
 	}
 	d.StopManaged()
+}
+
+// TestSpawnedDaemonStdioIsLogFdNotPipe is the regression guard for the
+// 2026-08-16 v0.2.5 headless-install incident: the daemon's stdout/stderr
+// were pipes owned by the spawning shell. The headless installer exits
+// right after the swap — the next daemon log write then hit EPIPE and the
+// Go runtime SIGPIPE-killed the freshly updated daemon. The child must
+// hold the log file fd directly so it outlives its parent.
+func TestSpawnedDaemonStdioIsLogFdNotPipe(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("fake daemon is a unix shell script")
+	}
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	script := filepath.Join(home, "fake-rmbd")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\necho daemon-mark\nsleep 60\n"), 0o755); err != nil {
+		t.Fatalf("write fake daemon: %v", err)
+	}
+	t.Setenv("RMBD_PATH", script)
+
+	d := NewDaemonManager()
+	if err := d.Start(); err != nil {
+		t.Fatalf("start: %v", err)
+	}
+	defer d.StopManaged()
+
+	d.mu.Lock()
+	stdout, stderr := d.child.Stdout, d.child.Stderr
+	d.mu.Unlock()
+	for _, io := range []struct {
+		name string
+		v    any
+	}{{"stdout", stdout}, {"stderr", stderr}} {
+		if _, ok := io.v.(*os.File); !ok {
+			t.Errorf("daemon %s must be the log *os.File (direct fd), got %T", io.name, io.v)
+		}
+	}
+
+	// The child's own write must land in the log file with no parent pipe.
+	path, err := platform.DaemonLogPath()
+	if err != nil {
+		t.Fatalf("log path: %v", err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		data, err := os.ReadFile(path)
+		if err == nil && strings.Contains(string(data), "daemon-mark") {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	t.Error("child write via direct fd never reached the daemon log")
 }
 
 // TestShutdownStillBlocksRestart pins the app-quit semantics: after

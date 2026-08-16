@@ -67,10 +67,12 @@ func InstallUpdate(daemon *DaemonManager, rel *update.Release, onStage func(stri
 }
 
 // installUpdate applies a release: stop the daemon (files may be locked on
-// Windows), swap sidecars, restart. On swap failure the updater rolls files
-// back and we restart the previous daemon.
+// Windows), swap sidecars, restart. StopForUpdate (not Shutdown) is
+// essential: Shutdown latches the quit flag and the restart below would be
+// a silent no-op. On swap failure the updater rolls files back and we
+// restart the previous daemon.
 func installUpdate(daemon *DaemonManager, rel *update.Release, onStage func(string)) error {
-	daemon.Shutdown()
+	daemon.StopForUpdate()
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
 	if err := update.Apply(ctx, rel, installDir(), onStage); err != nil {

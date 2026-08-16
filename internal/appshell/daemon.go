@@ -23,6 +23,12 @@ import (
 // the shell detaches it so only its own managed child serves.
 const launchdLabel = "me.remember.rmbd"
 
+// Sentinel lifecycle errors, matched by the tray poller via errors.Is.
+var (
+	errShuttingDown = errors.New("shutting down")
+	errUpdateBusy   = errors.New("update in progress")
+)
+
 // DaemonManager supervises the rmbd sidecar process. Port of daemon.rs.
 type DaemonManager struct {
 	mu      sync.Mutex
@@ -33,6 +39,11 @@ type DaemonManager struct {
 	rmbdPath string
 
 	shuttingDown atomic.Bool
+	// updating latches while the self-updater owns daemon lifecycle (sidecar
+	// swap): Start/EnsureRunning defer to it so the health poller cannot
+	// respawn the old binary mid-swap. Unlike shuttingDown it is cleared by
+	// RestartAfterUpdate, whose spawn must succeed.
+	updating atomic.Bool
 
 	expectedVersion string
 	expectedCommit  string
@@ -94,7 +105,10 @@ func (d *DaemonManager) ManagedRunning() bool {
 // Start spawns the managed rmbd. Port of start().
 func (d *DaemonManager) Start() error {
 	if d.shuttingDown.Load() {
-		return errors.New("shutting down")
+		return errShuttingDown
+	}
+	if d.updating.Load() {
+		return errUpdateBusy
 	}
 	if d.ManagedRunning() {
 		return nil
@@ -180,6 +194,9 @@ func (d *DaemonManager) EnsureRunning() error {
 	if d.shuttingDown.Load() {
 		return nil
 	}
+	if d.updating.Load() {
+		return errUpdateBusy
+	}
 	if d.ManagedRunning() {
 		if d.runningMatchesExpected() {
 			return nil
@@ -218,6 +235,11 @@ func (d *DaemonManager) RestartAfterUpdate() error {
 	if d.shuttingDown.Load() {
 		return nil
 	}
+	// The updater owns the daemon across a swap; clear its latch so this
+	// spawn (and subsequent polls) may proceed. Regression 2026-08-16:
+	// installUpdate used Shutdown(), whose shuttingDown latch made this
+	// method a silent no-op — sidecars were swapped but rmbd never respawned.
+	d.updating.Store(false)
 	d.StopManaged()
 	detachExternalDaemon()
 	waitForHealth(false, 3*time.Second)
@@ -237,13 +259,27 @@ func (d *DaemonManager) RestartAfterUpdate() error {
 }
 
 // Shutdown stops the managed daemon, unloads launchd, and kills listeners on
-// the configured port. Port of shutdown.
+// the configured port. Port of shutdown. App-quit path only: it latches
+// shuttingDown forever. The self-updater must use StopForUpdate instead.
 func (d *DaemonManager) Shutdown() {
 	d.shuttingDown.Store(true)
 	d.StopManaged()
 	detachExternalDaemon()
 	waitForHealth(false, 5*time.Second)
 	// Last resort: anything still on the port.
+	killListenersOnPort(DaemonPort())
+	waitForHealth(false, 2*time.Second)
+}
+
+// StopForUpdate stops the daemon for a sidecar swap WITHOUT latching the
+// app-quit flag, so RestartAfterUpdate can bring the new binary up right
+// after. While latched (updating), Start/EnsureRunning defer to the updater
+// so the tray health poller cannot respawn the old binary mid-swap.
+func (d *DaemonManager) StopForUpdate() {
+	d.updating.Store(true)
+	d.StopManaged()
+	detachExternalDaemon()
+	waitForHealth(false, 5*time.Second)
 	killListenersOnPort(DaemonPort())
 	waitForHealth(false, 2*time.Second)
 }

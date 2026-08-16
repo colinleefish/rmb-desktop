@@ -2,6 +2,7 @@ package appshell
 
 import (
 	_ "embed"
+	"errors"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -98,8 +99,8 @@ func (ui *trayUI) healthPoller() {
 		sleep(5)
 		if !HealthOK(BaseURL()) {
 			if err := ui.daemon.EnsureRunning(); err != nil {
-				// Expected once Quit has begun shutting the daemon down.
-				if err.Error() != "shutting down" {
+				// Expected while Quit or a self-update owns the daemon.
+				if !errors.Is(err, errShuttingDown) && !errors.Is(err, errUpdateBusy) {
 					stderrPrintf("ensure rmbd: %v\n", err)
 				}
 			}

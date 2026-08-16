@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/colinleefish/rmb-desktop/internal/config"
-	"github.com/colinleefish/rmb-desktop/internal/launchatlogin"
 	"github.com/colinleefish/rmb-desktop/internal/llm"
 	"github.com/colinleefish/rmb-desktop/internal/reembed"
 )
@@ -259,10 +258,10 @@ func (s *Server) handlePutConfig(w http.ResponseWriter, r *http.Request) {
 		}
 		s.log.Info("embed settings changed; cleared stored vectors for re-embedding")
 	}
-	if err := launchatlogin.Set(updated.LaunchAtLogin); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
+	// Note: launch_at_login is persisted here as desired state; the app
+	// bundle process (appshell login-item coordinator) applies it via
+	// SMAppService — rmbd itself is not inside an .app bundle and cannot
+	// register mainApp. Migration note in plan/local-first-desktop.md.
 	if err := config.Save(s.configPath, updated); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return

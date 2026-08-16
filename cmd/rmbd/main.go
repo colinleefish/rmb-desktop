@@ -13,7 +13,6 @@ import (
 	"github.com/colinleefish/rmb-desktop/internal/db"
 	"github.com/colinleefish/rmb-desktop/internal/debug"
 	"github.com/colinleefish/rmb-desktop/internal/httpserver"
-	"github.com/colinleefish/rmb-desktop/internal/launchatlogin"
 	"github.com/colinleefish/rmb-desktop/internal/worker"
 )
 
@@ -81,11 +80,8 @@ func serve(args []string) int {
 	baseLog := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})
 	log := debug.NewLogger(logBuf, baseLog)
 
-	if cfg.LaunchAtLogin {
-		if err := launchatlogin.Set(true); err != nil {
-			log.Warn("launch at login sync failed", "err", err)
-		}
-	}
+	// LaunchAtLogin is desired state only; the app bundle process applies it
+	// via SMAppService (appshell login-item coordinator).
 
 	reg := debug.NewRegistry()
 	runner := worker.NewRunner(cfg, database, log, reg)

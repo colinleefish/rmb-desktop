@@ -28,6 +28,8 @@ func main() {
 	}
 	defer release()
 
+	// Login-item reconcile must run inside the bundle process (SMAppService).
+	go appshell.RunLoginItemCoordinator()
 	appshell.Run()
 }
 

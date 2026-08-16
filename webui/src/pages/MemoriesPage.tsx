@@ -21,6 +21,37 @@ function memoryTitle(memory: MemoryRow): string {
   );
 }
 
+function SortableTh({
+  label,
+  k,
+  sort,
+  order,
+  onSort,
+}: {
+  label: string;
+  k: string;
+  sort: string;
+  order: "asc" | "desc";
+  onSort: (k: string) => void;
+}) {
+  const active = sort === k;
+  return (
+    <th className="px-4 py-3 font-medium">
+      <button
+        type="button"
+        onClick={() => onSort(k)}
+        className={`inline-flex items-center gap-1 transition hover:text-rmb-dark ${
+          active ? "text-rmb-dark" : ""
+        }`}
+        title={active ? (order === "asc" ? "sorted ascending" : "sorted descending") : "click to sort"}
+      >
+        {label}
+        {active && <span aria-hidden>{order === "asc" ? "↑" : "↓"}</span>}
+      </button>
+    </th>
+  );
+}
+
 function MemoryDetailModal({
   memory,
   onClose,
@@ -99,6 +130,8 @@ function MemoryListView({
   const [selected, setSelected] = useState<MemoryRow | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sort, setSort] = useState("updated");
+  const [order, setOrder] = useState<"asc" | "desc">("desc");
 
   useEffect(() => {
     setLoading(true);
@@ -107,8 +140,8 @@ function MemoryListView({
       offset,
       category,
       q: query || undefined,
-      sort: "updated",
-      order: "desc",
+      sort,
+      order,
     })
       .then((page) => {
         setRows(page.items);
@@ -116,12 +149,21 @@ function MemoryListView({
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [category, query, limit, offset]);
+  }, [category, query, limit, offset, sort, order]);
 
   useEffect(() => {
     setOffset(0);
     setSelected(null);
-  }, [query, category]);
+  }, [query, category, sort]);
+
+  function handleSort(k: string) {
+    if (sort === k) {
+      setOrder(order === "asc" ? "desc" : "asc");
+    } else {
+      setSort(k);
+      setOrder("desc");
+    }
+  }
 
   if (loading && !rows.length) {
     return <p className="text-rmb-gray">{t.memories.loading}</p>;
@@ -149,19 +191,23 @@ function MemoryListView({
         ) : (
           <table className="w-full table-fixed text-left text-sm">
             <colgroup>
-              <col className="w-[24%]" />
+              <col className="w-[22%]" />
               <col />
               <col className="w-16" />
-              <col className="w-40" />
-              <col className="w-40" />
+              <col className="w-16" />
+              <col className="w-16" />
+              <col className="w-16" />
+              <col className="w-36" />
             </colgroup>
             <thead className="border-b border-rmb-gray/15 bg-rmb-light text-rmb-gray">
               <tr>
                 <th className="px-4 py-3 font-medium">{t.memories.colTitle}</th>
                 <th className="px-4 py-3 font-medium">{t.memories.colAbstract}</th>
-                <th className="px-4 py-3 font-medium">{t.memories.colVersion}</th>
-                <th className="px-4 py-3 font-medium">{t.memories.colRecall}</th>
-                <th className="px-4 py-3 font-medium">{t.memories.colUpdated}</th>
+                <SortableTh label={t.memories.colVersion} k="version" sort={sort} order={order} onSort={handleSort} />
+                <SortableTh label={t.memories.colSearch} k="search" sort={sort} order={order} onSort={handleSort} />
+                <SortableTh label={t.memories.colCat} k="cat" sort={sort} order={order} onSort={handleSort} />
+                <SortableTh label={t.memories.colMeta} k="meta" sort={sort} order={order} onSort={handleSort} />
+                <SortableTh label={t.memories.colUpdated} k="updated" sort={sort} order={order} onSort={handleSort} />
               </tr>
             </thead>
             <tbody>
@@ -200,8 +246,23 @@ function MemoryListView({
                   <td className="px-4 align-middle tabular-nums text-rmb-gray">
                     v{memory.version}
                   </td>
-                  <td className="px-4 align-middle">
-                    <RecallStatsLabel stats={memory.recall_stats} />
+                  <td
+                    className="px-4 align-middle tabular-nums text-rmb-gray"
+                    title={`${t.memories.recallSearch} (rmb search)`}
+                  >
+                    {memory.recall_stats?.search_count ?? 0}
+                  </td>
+                  <td
+                    className="px-4 align-middle tabular-nums text-rmb-gray"
+                    title={`${t.memories.recallCat} (rmb cat)`}
+                  >
+                    {memory.recall_stats?.cat_count ?? 0}
+                  </td>
+                  <td
+                    className="px-4 align-middle tabular-nums text-rmb-gray"
+                    title={`${t.memories.recallMeta} (rmb meta)`}
+                  >
+                    {memory.recall_stats?.meta_count ?? 0}
                   </td>
                   <td className="px-4 align-middle text-xs text-rmb-gray">
                     {formatDateTime(memory.updated_at)}

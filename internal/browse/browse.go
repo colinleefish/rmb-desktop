@@ -358,19 +358,29 @@ func (s *Service) ListScenes(ctx context.Context, p ListParams) (Page[SceneJSON]
 func (s *Service) ListMemories(ctx context.Context, p ListParams) (Page[MemoryJSON], error) {
 	limit := clampLimit(p.Limit)
 	where, args := memoryListWhere(p)
+	// Recall stats live in a separate table, 1:1 by uri (PK). LEFT JOIN so
+	// search/cat/meta sorts also cover memories that were never recalled
+	// (COALESCE 0). scanMemory columns are unchanged — only table-qualified.
 	order := sortClause(map[string]string{
-		"updated": "updated_at", "category": "category", "version": "version",
+		"updated":  "m.updated_at",
+		"category": "m.category",
+		"version":  "m.version",
+		"search":   "COALESCE(rs.search_count, 0)",
+		"cat":      "COALESCE(rs.cat_count, 0)",
+		"meta":     "COALESCE(rs.meta_count, 0)",
 	}, "updated", p.Sort, p.Order)
 
 	var total int64
-	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM memories`+where, args...).Scan(&total); err != nil {
+	if err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM memories m
+		LEFT JOIN recall_stats rs ON rs.uri = m.uri`+where, args...).Scan(&total); err != nil {
 		return Page[MemoryJSON]{}, err
 	}
 
 	query := `
-		SELECT id, uri, category, slug, version, abstract, body,
-			source_scene_uris, source_correction_uris, created_at, updated_at
-		FROM memories` + where + `
+		SELECT m.id, m.uri, m.category, m.slug, m.version, m.abstract, m.body,
+			m.source_scene_uris, m.source_correction_uris, m.created_at, m.updated_at
+		FROM memories m
+		LEFT JOIN recall_stats rs ON rs.uri = m.uri` + where + `
 		ORDER BY ` + order + `
 		LIMIT ? OFFSET ?`
 	listArgs := append(append([]any{}, args...), limit, p.Offset)
@@ -839,15 +849,15 @@ func (s *Service) scanCounts(ctx context.Context, sql string, args []any, fn fun
 }
 
 func memoryListWhere(p ListParams) (string, []any) {
-	conds := []string{"superseded_at IS NULL"}
+	conds := []string{"m.superseded_at IS NULL"}
 	var args []any
 
 	if cat := strings.TrimSpace(p.Category); cat != "" {
-		conds = append(conds, "category = ?")
+		conds = append(conds, "m.category = ?")
 		args = append(args, cat)
 	}
 	if qWhere, qArgs := searchWhere(p.Query, []string{
-		"abstract", "body", "slug", "uri", "category",
+		"m.abstract", "m.body", "m.slug", "m.uri", "m.category",
 	}); qWhere != "" {
 		conds = append(conds, strings.TrimPrefix(qWhere, " WHERE "))
 		args = append(args, qArgs...)

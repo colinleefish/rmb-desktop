@@ -149,10 +149,10 @@ function MemoryListView({
         ) : (
           <table className="w-full table-fixed text-left text-sm">
             <colgroup>
-              <col className="w-[34%]" />
+              <col className="w-[24%]" />
               <col />
               <col className="w-16" />
-              <col className="w-24" />
+              <col className="w-40" />
               <col className="w-40" />
             </colgroup>
             <thead className="border-b border-rmb-gray/15 bg-rmb-light text-rmb-gray">

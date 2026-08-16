@@ -46,12 +46,21 @@ sed -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD/" \
 echo "==> codesign"
 if [[ -n "$SIGN_IDENTITY" ]]; then
   CODESIGN_ID="$SIGN_IDENTITY"
+  TIMESTAMP=(--timestamp)
 else
   echo "  (no identity given — ad-hoc signing, for local use only)"
   CODESIGN_ID="-"
+  TIMESTAMP=()  # secure timestamps need a real identity
 fi
+# Nested sidecars are separate Mach-O images: sign each one first (hardened
+# runtime + secure timestamp), then seal the bundle. Otherwise notary rejects
+# the DMG with "binary is not signed with a valid Developer ID certificate".
+for helper in rmb rmbd; do
+  codesign --force --identifier "me.remember.rmb.$helper" --options runtime \
+    "${TIMESTAMP[@]}" --sign "$CODESIGN_ID" "$MACOS_DIR/$helper"
+done
 codesign --force --identifier "me.remember.rmb" --options runtime \
-  --sign "$CODESIGN_ID" "$APP_DIR"
+  "${TIMESTAMP[@]}" --sign "$CODESIGN_ID" "$APP_DIR"
 codesign --verify --verbose=1 "$APP_DIR"
 
 echo "build-macos-app: $APP_DIR"

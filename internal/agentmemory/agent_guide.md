@@ -50,6 +50,19 @@ Narrow scope when you know the tier: `--scope=memory`, `--scope=scene`, or `--sc
 Local cache (for script execution): `rmb skill pull <name>` → `~/.rmb/skills/<name>/`.
 Push edits back: `rmb skill put <name>` from `~/.rmb/skills/<name>/`.
 
+## Choosing a query tool
+
+| Question | Command | Ordering |
+|----------|---------|----------|
+| semantic lookup ("what is X", "how does Y work") | `rmb search "<query>"` | relevance only — no time factor |
+| latest / timeline / "what happened recently" | `rmb tree rmb://events/` (scenes: `rmb://scenes/`) | `updated_at DESC`, newest first (≤200) |
+| single item detail | `rmb cat <uri>` | full body |
+| timestamps / version of one memory | `rmb meta <uri>` | created_at, updated_at |
+
+Never infer "latest" from search top-k: ranking ignores time entirely, so recent events
+may rank below older ones. For "what's new / recently", browse with tree, then cat the
+interesting uris.
+
 ## CLI rules
 
 - Running `rmb` with no arguments prints profile and this guide from the local daemon.

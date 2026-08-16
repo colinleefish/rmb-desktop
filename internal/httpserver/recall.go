@@ -79,8 +79,8 @@ func (s *Server) handleInspect(w http.ResponseWriter, r *http.Request, kind stri
 	switch kind {
 	case "cat":
 		err = s.inspect.Cat(r.Context(), rawURI, w)
-	case "tree":
-		err = s.inspect.Tree(r.Context(), rawURI, w)
+	case "ls":
+		err = s.inspect.Ls(r.Context(), rawURI, w)
 	case "meta":
 		err = s.inspect.Meta(r.Context(), rawURI, w)
 	default:

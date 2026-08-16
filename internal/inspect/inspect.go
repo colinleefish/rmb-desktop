@@ -31,7 +31,7 @@ func (s *Service) Cat(ctx context.Context, raw string, w io.Writer) error {
 	}
 	switch u.Scope {
 	case uri.ScopeRoot:
-		_, err := fmt.Fprintln(w, "rmb root — use `rmb tree rmb://` to list scopes")
+		_, err := fmt.Fprintln(w, "rmb root — use `rmb ls rmb://` to list scopes")
 		return err
 	case uri.ScopeAgent:
 		_, err := io.WriteString(w, agentmemory.AgentGuideBody())
@@ -40,17 +40,17 @@ func (s *Service) Cat(ctx context.Context, raw string, w io.Writer) error {
 		return s.catMemoryByURI(ctx, u.String(), w, u.Scope)
 	case uri.ScopeScenes:
 		if len(u.Segments) == 0 {
-			return fmt.Errorf("scene id required; use `tree %s`", u.String())
+			return fmt.Errorf("scene id required; use `ls %s`", u.String())
 		}
 		return s.catScene(ctx, u.Segments[0], w)
 	case uri.ScopeAtoms:
 		if len(u.Segments) == 0 {
-			return fmt.Errorf("atom id required; use `tree %s`", u.String())
+			return fmt.Errorf("atom id required; use `ls %s`", u.String())
 		}
 		return s.catAtom(ctx, u.Segments[0], w)
 	case uri.ScopeTurns:
 		if len(u.Segments) == 0 {
-			return fmt.Errorf("turn id required; use `tree %s`", u.String())
+			return fmt.Errorf("turn id required; use `ls %s`", u.String())
 		}
 		return s.catTurn(ctx, u.Segments[0], w)
 	case uri.ScopeSessions:
@@ -62,23 +62,23 @@ func (s *Service) Cat(ctx context.Context, raw string, w io.Writer) error {
 	}
 }
 
-func (s *Service) Tree(ctx context.Context, raw string, w io.Writer) error {
+func (s *Service) Ls(ctx context.Context, raw string, w io.Writer) error {
 	u, err := uri.Parse(raw)
 	if err != nil {
 		return err
 	}
 	if u.IsRoot() && !u.IsContainer() {
-		return s.treeRoot(w)
+		return s.lsRoot(w)
 	}
 	switch u.Scope {
 	case uri.ScopeSessions:
-		return s.treeSession(ctx, u, w)
+		return s.lsSession(ctx, u, w)
 	case uri.ScopeScenes, uri.ScopeAtoms, uri.ScopeTurns, uri.ScopePrefs, uri.ScopeEntities, uri.ScopeEvents, uri.ScopeProfile, uri.ScopeAgent:
-		return s.treeScope(ctx, u, w)
+		return s.lsScope(ctx, u, w)
 	case uri.ScopeSkills:
-		return s.treeSkill(ctx, u, w)
+		return s.lsSkill(ctx, u, w)
 	default:
-		return fmt.Errorf("unsupported tree prefix %q", u.String())
+		return fmt.Errorf("unsupported ls prefix %q", u.String())
 	}
 }
 
@@ -116,7 +116,7 @@ func (s *Service) Meta(ctx context.Context, raw string, w io.Writer) error {
 	return enc.Encode(payload)
 }
 
-func (s *Service) treeRoot(w io.Writer) error {
+func (s *Service) lsRoot(w io.Writer) error {
 	scopes := []string{
 		uri.BuildProfile(),
 		uri.BuildAgent(),
@@ -215,7 +215,7 @@ func (s *Service) catSession(ctx context.Context, u uri.URI, w io.Writer) error 
 	return err
 }
 
-func (s *Service) treeSession(ctx context.Context, u uri.URI, w io.Writer) error {
+func (s *Service) lsSession(ctx context.Context, u uri.URI, w io.Writer) error {
 	if len(u.Segments) == 0 {
 		rows, err := s.db.QueryContext(ctx, `SELECT session_key FROM sessions ORDER BY updated_at DESC LIMIT 200`)
 		if err != nil {
@@ -277,10 +277,10 @@ func (s *Service) treeSession(ctx context.Context, u uri.URI, w io.Writer) error
 		}
 		return atomRows.Close()
 	}
-	return fmt.Errorf("tree not supported for %q", u.String())
+	return fmt.Errorf("ls not supported for %q", u.String())
 }
 
-func (s *Service) treeScope(ctx context.Context, u uri.URI, w io.Writer) error {
+func (s *Service) lsScope(ctx context.Context, u uri.URI, w io.Writer) error {
 	switch u.Scope {
 	case uri.ScopeProfile:
 		var count int
@@ -543,7 +543,7 @@ func nullStr(v sql.NullString) any {
 
 func (s *Service) catSkill(ctx context.Context, u uri.URI, w io.Writer) error {
 	if len(u.Segments) == 0 {
-		return fmt.Errorf("skill name required; use `tree %s` to list skills", u.String())
+		return fmt.Errorf("skill name required; use `ls %s` to list skills", u.String())
 	}
 	slug := u.Segments[0]
 	relPath := skill.ManifestPath
@@ -558,7 +558,7 @@ func (s *Service) catSkill(ctx context.Context, u uri.URI, w io.Writer) error {
 	return err
 }
 
-func (s *Service) treeSkill(ctx context.Context, u uri.URI, w io.Writer) error {
+func (s *Service) lsSkill(ctx context.Context, u uri.URI, w io.Writer) error {
 	if len(u.Segments) == 0 {
 		catalog, err := skill.ListCatalog(ctx, s.db)
 		if err != nil {

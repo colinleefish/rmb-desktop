@@ -88,8 +88,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/inspect/cat", func(w http.ResponseWriter, r *http.Request) {
 		s.handleInspect(w, r, "cat")
 	})
-	s.mux.HandleFunc("GET /api/v1/inspect/tree", func(w http.ResponseWriter, r *http.Request) {
-		s.handleInspect(w, r, "tree")
+	s.mux.HandleFunc("GET /api/v1/inspect/ls", func(w http.ResponseWriter, r *http.Request) {
+		s.handleInspect(w, r, "ls")
 	})
 	s.mux.HandleFunc("GET /api/v1/inspect/meta", func(w http.ResponseWriter, r *http.Request) {
 		s.handleInspect(w, r, "meta")

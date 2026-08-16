@@ -31,12 +31,14 @@ func run() int {
 		return search(os.Args[2:])
 	case "cat":
 		return inspectCmd("cat", os.Args[2:])
-	case "tree":
-		return inspectCmd("tree", os.Args[2:])
+	case "ls":
+		return inspectCmd("ls", os.Args[2:])
 	case "meta":
 		return inspectCmd("meta", os.Args[2:])
-	case "skill":
-		return skillCmd(os.Args[2:])
+	case "pull":
+		return pullCmd(os.Args[2:])
+	case "put":
+		return putCmd(os.Args[2:])
 	case "setup":
 		return setupCmd(os.Args[2:])
 	case "version":
@@ -194,13 +196,11 @@ func usageText() string {
 	return `Usage:
   rmb hook-submit --source=<cursor> [--url=http://127.0.0.1:19019]
   rmb search "<query>" [--scope=memory,scene,skill] [--k=n]
+  rmb ls <uri-prefix>            # list container contents (e.g. rmb://events/)
   rmb cat <uri>
-  rmb tree <uri-prefix>
   rmb meta <uri>
-  rmb skill ls
-  rmb skill put <name> [--dir=<path>]
-  rmb skill pull <name> [--out=<dir>]
-  rmb skill pull --all [--out=<base>]
+  rmb pull <uri> [--out=<dir>]   # rmb://skills/<name> | rmb://skills/ (all)
+  rmb put rmb://skills/<name> [--dir=<path>]
   rmb setup status [--json] [--agent=<name>]
   rmb setup --agent=<name> [--dry-run] [--apply=<ids>]
   rmb version

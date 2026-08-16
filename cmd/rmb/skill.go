@@ -13,66 +13,102 @@ import (
 	"github.com/colinleefish/rmb-desktop/internal/uri"
 )
 
-func skillCmd(args []string) int {
-	if len(args) == 0 {
-		fmt.Fprintln(os.Stderr, "usage: rmb skill <ls|put|pull> ...")
+// pullCmd implements `rmb pull <uri> [--out=<dir>]`.
+//
+// Supported uris (skills are the only pullable container for now):
+//
+//	rmb://skills/            → pull every skill into --out/<name>
+//	rmb://skills/<name>      → pull one skill into --out/<name>
+//
+// --out is a base directory (default ~/.rmb/skills); each skill lands in
+// <out>/<name>. `rmb pull rmb://skills/` with no extra flag pulls all skills.
+func pullCmd(args []string) int {
+	pos := positionalArgs(args)
+	if len(pos) == 0 {
+		fmt.Fprintln(os.Stderr, `usage: rmb pull <uri> [--out=<dir>]
+  rmb pull rmb://skills/<name>   one skill → <out>/<name>
+  rmb pull rmb://skills/         every skill → <out>/<name>`)
 		return 2
 	}
-	switch args[0] {
-	case "ls":
-		return skillList()
-	case "put":
-		return skillPut(args[1:])
-	case "pull":
-		return skillPull(args[1:])
-	default:
-		fmt.Fprintf(os.Stderr, "unknown skill action %q (use ls|put|pull)\n", args[0])
+	target, err := uri.Parse(pos[0])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "pull: %v\n", err)
 		return 2
 	}
-}
+	if target.Scope != uri.ScopeSkills || len(target.Segments) > 1 {
+		fmt.Fprintln(os.Stderr, "pull: only rmb://skills/<name> and rmb://skills/ are supported")
+		return 2
+	}
 
-func skillList() int {
+	outBase := strings.TrimSpace(parseFlagValue(args, "--out"))
+	if outBase == "" {
+		base, err := skillsRoot()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "pull: %v\n", err)
+			return 1
+		}
+		outBase = base
+	}
+
 	cl, err := apiClient()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "skill ls: %v\n", err)
+		fmt.Fprintf(os.Stderr, "pull: %v\n", err)
 		return 1
 	}
-	items, err := cl.ListSkills(context.Background())
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "skill ls: %v\n", err)
-		return 1
-	}
-	if len(items) == 0 {
-		fmt.Println("no skills")
+
+	if len(target.Segments) == 0 {
+		items, err := cl.ListSkills(context.Background())
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "pull: %v\n", err)
+			return 1
+		}
+		for _, it := range items {
+			parsed, err := uri.Parse(it.URI)
+			if err != nil || len(parsed.Segments) == 0 {
+				continue
+			}
+			dest := filepath.Join(outBase, parsed.Segments[0])
+			if err := materializeSkill(cl, parsed.Segments[0], dest); err != nil {
+				fmt.Fprintf(os.Stderr, "pull: %v\n", err)
+				return 1
+			}
+		}
 		return 0
 	}
-	for _, it := range items {
-		tags := strings.Join(it.Tags, ", ")
-		if tags == "" {
-			tags = "-"
-		}
-		fmt.Printf("%s\t[%s]\t%s\n", it.URI, tags, it.Description)
+
+	name := target.Segments[0]
+	dest := filepath.Join(outBase, name)
+	if err := materializeSkill(cl, name, dest); err != nil {
+		fmt.Fprintf(os.Stderr, "pull: %v\n", err)
+		return 1
 	}
 	return 0
 }
 
-func skillPut(args []string) int {
+// putCmd implements `rmb put rmb://skills/<name> [--dir=<path>]` — upload a
+// local skill directory (default ~/.rmb/skills/<name>) as a new skill version.
+func putCmd(args []string) int {
 	pos := positionalArgs(args)
 	if len(pos) == 0 {
-		fmt.Fprintln(os.Stderr, "usage: rmb skill put <name> [--dir=<path>]")
+		fmt.Fprintln(os.Stderr, "usage: rmb put rmb://skills/<name> [--dir=<path>]")
 		return 2
 	}
-	name := pos[0]
-	if err := uri.ValidateSkillName(name); err != nil {
-		fmt.Fprintf(os.Stderr, "skill put: %v\n", err)
-		return 1
+	target, err := uri.Parse(pos[0])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "put: %v\n", err)
+		return 2
 	}
+	if target.Scope != uri.ScopeSkills || len(target.Segments) != 1 {
+		fmt.Fprintln(os.Stderr, "put: uri must be rmb://skills/<name>")
+		return 2
+	}
+	name := target.Segments[0]
 
 	dir := strings.TrimSpace(parseFlagValue(args, "--dir"))
 	if dir == "" {
 		defaultDir, err := skillDir(name)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "skill put: %v\n", err)
+			fmt.Fprintf(os.Stderr, "put: %v\n", err)
 			return 1
 		}
 		if st, err := os.Stat(defaultDir); err != nil || !st.IsDir() {
@@ -84,18 +120,18 @@ func skillPut(args []string) int {
 
 	files, err := walkSkillDir(dir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "skill put: %v\n", err)
+		fmt.Fprintf(os.Stderr, "put: %v\n", err)
 		return 1
 	}
 
 	cl, err := apiClient()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "skill put: %v\n", err)
+		fmt.Fprintf(os.Stderr, "put: %v\n", err)
 		return 1
 	}
 	result, err := cl.PutSkill(context.Background(), name, files)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "skill put: %v\n", err)
+		fmt.Fprintf(os.Stderr, "put: %v\n", err)
 		return 1
 	}
 	if result.NoOp {
@@ -103,73 +139,6 @@ func skillPut(args []string) int {
 		return 0
 	}
 	fmt.Printf("uploaded: %s (version %d)\n", result.URI, result.Version)
-	return 0
-}
-
-func skillPull(args []string) int {
-	all := false
-	for _, a := range args {
-		if a == "--all" {
-			all = true
-		}
-	}
-	pos := positionalArgs(args)
-	outBase := strings.TrimSpace(parseFlagValue(args, "--out"))
-	if outBase == "" {
-		base, err := skillsRoot()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "skill pull: %v\n", err)
-			return 1
-		}
-		outBase = base
-	}
-
-	cl, err := apiClient()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "skill pull: %v\n", err)
-		return 1
-	}
-
-	if all {
-		items, err := cl.ListSkills(context.Background())
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "skill pull: %v\n", err)
-			return 1
-		}
-		for _, it := range items {
-			parsed, err := uri.Parse(it.URI)
-			if err != nil || len(parsed.Segments) == 0 {
-				continue
-			}
-			dest := filepath.Join(outBase, parsed.Segments[0])
-			if err := materializeSkill(cl, parsed.Segments[0], dest); err != nil {
-				fmt.Fprintf(os.Stderr, "skill pull: %v\n", err)
-				return 1
-			}
-		}
-		return 0
-	}
-
-	if len(pos) == 0 {
-		fmt.Fprintln(os.Stderr, "usage: rmb skill pull <name> [--out=<dir>] | rmb skill pull --all [--out=<base>]")
-		return 2
-	}
-	name := pos[0]
-	dest := outBase
-	if strings.TrimSpace(parseFlagValue(args, "--out")) == "" {
-		var err error
-		dest, err = skillDir(name)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "skill pull: %v\n", err)
-			return 1
-		}
-	} else {
-		dest = filepath.Join(outBase, name)
-	}
-	if err := materializeSkill(cl, name, dest); err != nil {
-		fmt.Fprintf(os.Stderr, "skill pull: %v\n", err)
-		return 1
-	}
 	return 0
 }
 

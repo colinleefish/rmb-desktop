@@ -22,7 +22,7 @@ func newTestService(t *testing.T) *Service {
 }
 
 // TestAgentServedFromBundle verifies rmb://agent is served directly from the
-// embedded bundle, with no memories row involved (cat/meta/tree all bypass the
+// embedded bundle, with no memories row involved (cat/meta/ls all bypass the
 // memories table for the agent scope).
 func TestAgentServedFromBundle(t *testing.T) {
 	s := newTestService(t)
@@ -49,12 +49,12 @@ func TestAgentServedFromBundle(t *testing.T) {
 		}
 	}
 
-	// tree always lists the agent URI (it is bundled, so always "present").
+	// ls always lists the agent URI (it is bundled, so always "present").
 	buf.Reset()
-	if err := s.Tree(ctx, "rmb://agent", &buf); err != nil {
-		t.Fatalf("Tree: %v", err)
+	if err := s.Ls(ctx, "rmb://agent", &buf); err != nil {
+		t.Fatalf("Ls: %v", err)
 	}
 	if got := strings.TrimSpace(buf.String()); got != "rmb://agent" {
-		t.Fatalf("tree agent = %q, want rmb://agent", got)
+		t.Fatalf("ls agent = %q, want rmb://agent", got)
 	}
 }

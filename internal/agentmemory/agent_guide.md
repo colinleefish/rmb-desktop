@@ -33,8 +33,8 @@ When the user asks you to do something (deploy, SSH, PDF, etc.):
 1. `rmb search "<what they asked>"` — default scope includes memory, scene, and skills.
 2. If a `[skills]` hit looks relevant, activate it before acting:
    - `rmb cat rmb://skills/<name>` — read SKILL.md and follow it
-   - scripts: `rmb skill pull <name>` → run from `~/.rmb/skills/<name>/`
-3. Unsure what is available? `rmb tree rmb://skills/` — catalog of name + description.
+   - scripts: `rmb pull rmb://skills/<name>` → run from `~/.rmb/skills/<name>/`
+3. Unsure what is available? `rmb ls rmb://skills/` — catalog of name + description.
 4. Do not wing it when a skill matches — skills outrank your defaults for that task.
 
 Narrow scope when you know the tier: `--scope=memory`, `--scope=scene`, or `--scope=skill`.
@@ -43,31 +43,31 @@ Narrow scope when you know the tier: `--scope=memory`, `--scope=scene`, or `--sc
 
 | Tier | Command | Content |
 |------|---------|---------|
-| 1 Catalog | `rmb tree rmb://skills/` | name + description per skill |
+| 1 Catalog | `rmb ls rmb://skills/` | name + description per skill |
 | 2 Activation | `rmb cat rmb://skills/<name>` | full SKILL.md |
 | 3 Resources | `rmb cat rmb://skills/<name>/<path>` | scripts, references, assets |
 
-Local cache (for script execution): `rmb skill pull <name>` → `~/.rmb/skills/<name>/`.
-Push edits back: `rmb skill put <name>` from `~/.rmb/skills/<name>/`.
+Local cache (for script execution): `rmb pull rmb://skills/<name>` → `~/.rmb/skills/<name>/`.
+Pull all skills: `rmb pull rmb://skills/`. Push edits back: `rmb put rmb://skills/<name>` from `~/.rmb/skills/<name>/`.
 
 ## Choosing a query tool
 
 | Question | Command | Ordering |
 |----------|---------|----------|
 | semantic lookup ("what is X", "how does Y work") | `rmb search "<query>"` | relevance only — no time factor |
-| latest / timeline / "what happened recently" | `rmb tree rmb://events/` (scenes: `rmb://scenes/`) | `updated_at DESC`, newest first (≤200) |
+| latest / timeline / "what happened recently" | `rmb ls rmb://events/` (scenes: `rmb://scenes/`) | `updated_at DESC`, newest first (≤200) |
 | single item detail | `rmb cat <uri>` | full body |
 | timestamps / version of one memory | `rmb meta <uri>` | created_at, updated_at |
 
 Never infer "latest" from search top-k: ranking ignores time entirely, so recent events
-may rank below older ones. For "what's new / recently", browse with tree, then cat the
+may rank below older ones. For "what's new / recently", browse with ls, then cat the
 interesting uris.
 
 ## CLI rules
 
 - Running `rmb` with no arguments prints profile and this guide from the local daemon.
-- search "<query>" before asking the user (includes skills by default), then cat / meta / tree as needed.
-- search [--scope=...] — only search accepts --scope. cat/tree/meta take a single uri.
-- tree <uri-prefix> — browse rmb://entities/, rmb://skills/, rmb://profile (not rmb://memories/).
+- search "<query>" before asking the user (includes skills by default), then cat / meta / ls as needed.
+- search [--scope=...] — only search accepts --scope. cat/ls/meta take a single uri.
+- ls <uri-prefix> — list container contents: rmb://events/, rmb://scenes/, rmb://skills/, rmb://sessions/<id>/ (not rmb://memories/).
 - Never invent uris.
 - Recall is read-only. Workers distill new facts after conversations.

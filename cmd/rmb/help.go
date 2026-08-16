@@ -61,7 +61,7 @@ func printBootstrap() int {
 	}
 
 	if err := printSkillsCatalog(ctx, cl, out); err != nil {
-		printHelpSectionHeader(out, "skills", "Skills", uri.BuildSkill(""), "Curated playbooks. Read SKILL.md with rmb cat; run scripts via rmb skill pull.")
+		printHelpSectionHeader(out, "skills", "Skills", uri.BuildSkill(""), "Curated playbooks. Read SKILL.md with rmb cat; run scripts via rmb pull.")
 		fmt.Fprintf(out, "  (unavailable: %v)\n", err)
 	}
 
@@ -98,7 +98,7 @@ func printSkillsCatalog(ctx context.Context, cl *client.Client, out io.Writer) e
 	if err != nil {
 		return err
 	}
-	printHelpSectionHeader(out, "skills", "Skills", uri.BuildSkill(""), "Curated playbooks. Read SKILL.md with rmb cat; run scripts via rmb skill pull.")
+	printHelpSectionHeader(out, "skills", "Skills", uri.BuildSkill(""), "Curated playbooks. Read SKILL.md with rmb cat; run scripts via rmb pull.")
 	if len(items) == 0 {
 		fmt.Fprintln(out, "  (no skills)")
 		return nil
@@ -117,7 +117,7 @@ func printSkillsCatalog(ctx context.Context, cl *client.Client, out io.Writer) e
 		}
 	}
 	if len(items) > helpSkillCatalogLimit {
-		fmt.Fprintf(out, "\n  ... %d more — rmb tree rmb://skills/\n", len(items)-helpSkillCatalogLimit)
+		fmt.Fprintf(out, "\n  ... %d more — rmb ls rmb://skills/\n", len(items)-helpSkillCatalogLimit)
 	}
 	return nil
 }

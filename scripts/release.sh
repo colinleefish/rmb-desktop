@@ -98,6 +98,15 @@ if [[ ! -f "$MANIFEST" ]]; then
 fi
 
 echo "==> publish GitHub release v${VERSION}"
+# Any version with a "-" suffix is a prerelease: mark the GitHub release as
+# such so releases/latest (the prod feed) never points at it, matching the
+# updater's IsNewer policy (prereleases are never auto-installed).
+PRE_ARGS=()
+if [[ "$VERSION" == *-* ]]; then
+  PRE_ARGS=(--prerelease)
+  echo "  prerelease detected (version suffix '-')"
+fi
+PRE_ARGS_EXP=${PRE_ARGS[@]+"${PRE_ARGS[@]}"}
 if gh_cmd release view "v${VERSION}" --repo "$REPO" >/dev/null 2>&1; then
   gh_cmd release upload "v${VERSION}" "${ASSETS[@]}" --repo "$REPO" --clobber
   echo "  uploaded to existing release"
@@ -105,7 +114,8 @@ else
   gh_cmd release create "v${VERSION}" "${ASSETS[@]}" \
     --repo "$REPO" \
     --title "RMB Desktop ${VERSION}" \
-    --notes-file "$NOTES_FILE"
+    --notes-file "$NOTES_FILE" \
+    $PRE_ARGS_EXP
   echo "  created new release"
 fi
 

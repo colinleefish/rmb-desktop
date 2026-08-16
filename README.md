@@ -1,5 +1,7 @@
 # RMB Desktop
 
+> v0.2.7 is a release-pipeline smoke-test build (no functional changes).
+
 English / [简体中文](README_CN.md)
 
 **Give your AI coding agents a memory that lasts.**

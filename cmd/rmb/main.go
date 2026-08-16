@@ -42,7 +42,11 @@ func run() int {
 	case "setup":
 		return setupCmd(os.Args[2:])
 	case "version":
-		fmt.Println(version.Version)
+		if c := version.Commit; c != "" && c != "dev" {
+			fmt.Printf("%s (%s)\n", version.Version, c)
+		} else {
+			fmt.Println(version.Version)
+		}
 		return 0
 	case "help", "-h", "--help":
 		return printBootstrap()

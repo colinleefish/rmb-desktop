@@ -52,15 +52,18 @@ else
   CODESIGN_ID="-"
   TIMESTAMP=()  # secure timestamps need a real identity
 fi
+# ${ARR[@]+...} guards: bash 3.2 (stock macOS) treats empty-array expansion
+# under `set -u` as an unbound variable, which broke the ad-hoc path.
+TS_ARGS=${TIMESTAMP[@]+"${TIMESTAMP[@]}"}
 # Nested sidecars are separate Mach-O images: sign each one first (hardened
 # runtime + secure timestamp), then seal the bundle. Otherwise notary rejects
 # the DMG with "binary is not signed with a valid Developer ID certificate".
 for helper in rmb rmbd; do
   codesign --force --identifier "me.remember.rmb.$helper" --options runtime \
-    "${TIMESTAMP[@]}" --sign "$CODESIGN_ID" "$MACOS_DIR/$helper"
+    $TS_ARGS --sign "$CODESIGN_ID" "$MACOS_DIR/$helper"
 done
 codesign --force --identifier "me.remember.rmb" --options runtime \
-  "${TIMESTAMP[@]}" --sign "$CODESIGN_ID" "$APP_DIR"
+  $TS_ARGS --sign "$CODESIGN_ID" "$APP_DIR"
 codesign --verify --verbose=1 "$APP_DIR"
 
 echo "build-macos-app: $APP_DIR"

@@ -6,9 +6,12 @@ import (
 	"os/exec"
 	"os/signal"
 	"runtime"
+	"strings"
 	"syscall"
 
 	"fyne.io/systray"
+
+	"github.com/colinleefish/rmb-desktop/internal/platform"
 )
 
 //go:embed assets/tray-icon.png
@@ -23,15 +26,23 @@ func Run() {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
-		<-sig
+		s := <-sig
+		stderrPrintf("DEBUG: signal %v received, shutting down\n", s)
 		daemon.Shutdown()
 		systray.Quit()
 	}()
 
 	systray.Run(
-		func() { onTrayReady(daemon) },
-		func() { daemon.Shutdown() },
+		func() {
+			stderrPrintf("DEBUG: onReady\n")
+			onTrayReady(daemon)
+		},
+		func() {
+			stderrPrintf("DEBUG: onExit\n")
+			daemon.Shutdown()
+		},
 	)
+	stderrPrintf("DEBUG: systray.Run returned\n")
 }
 
 type trayUI struct {
@@ -40,6 +51,7 @@ type trayUI struct {
 	open   *systray.MenuItem
 	quit   *systray.MenuItem
 }
+
 func onTrayReady(daemon *DaemonManager) {
 	systray.SetTemplateIcon(trayIcon, trayIcon)
 	systray.SetTooltip("RMB Desktop")
@@ -64,14 +76,17 @@ func onTrayReady(daemon *DaemonManager) {
 // startup ports the Tauri setup callback: bootstrap, recycle daemon after
 // sidecar refresh, then hand over to the health poller.
 func (ui *trayUI) startup() {
+	stderrPrintf("DEBUG: startup begin\n")
 	if err := EnsureInstalled(); err != nil {
 		stderrPrintf("bootstrap: %v\n", err)
 	}
+	stderrPrintf("DEBUG: bootstrap done\n")
 	// Always recycle rmbd after (re)installing sidecars so an old process
 	// left behind by Quit / a previous version cannot stick.
 	if err := ui.daemon.RestartAfterUpdate(); err != nil {
 		stderrPrintf("start rmbd: %v\n", err)
 	}
+	stderrPrintf("DEBUG: restart done\n")
 	ui.refreshMenu()
 	ui.healthPoller()
 }
@@ -95,11 +110,17 @@ func (ui *trayUI) healthPoller() {
 
 func (ui *trayUI) refreshMenu() {
 	healthy := HealthOK(BaseURL())
+	lastErr := ui.daemon.LastError()
 	if healthy {
 		ui.status.SetTitle("🟢 RMB is running")
+	} else if lastErr != "" {
+		// Keep the title a fixed short phrase — the menu bar is always
+		// visible and a long error string would be unreadable noise.
+		ui.status.SetTitle("🔴 RMB failed to start")
 	} else {
 		ui.status.SetTitle("Starting…")
 	}
+	ui.status.SetTooltip(statusTooltip(healthy, lastErr))
 	if healthy {
 		ui.status.Enable()
 		ui.open.Enable()
@@ -107,6 +128,23 @@ func (ui *trayUI) refreshMenu() {
 		ui.status.Disable()
 		ui.open.Disable()
 	}
+}
+
+// statusTooltip carries the diagnostics the title deliberately omits:
+// the failure reason (hover to read it) and the daemon log path.
+func statusTooltip(healthy bool, lastErr string) string {
+	var parts []string
+	if healthy {
+		parts = append(parts, "RMB status: running")
+	} else if lastErr != "" {
+		parts = append(parts, "RMB status: "+truncate(lastErr, 200))
+	} else {
+		parts = append(parts, "RMB status: starting")
+	}
+	if path, err := platform.DaemonLogPath(); err == nil {
+		parts = append(parts, "daemon log: "+path)
+	}
+	return strings.Join(parts, "\n")
 }
 
 func (ui *trayUI) watchMenu() {

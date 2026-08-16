@@ -21,6 +21,89 @@ func TestNeedsRefreshMissingDest(t *testing.T) {
 	}
 }
 
+// Regression for the 2026-08-16 incident: rmbd-desktop was overwritten with
+// daemon log text carrying a *newer* mtime, so the mtime heuristic alone
+// never reinstalled it and the tray was stuck on "Starting…" forever.
+func TestNeedsRefreshClobberedDest(t *testing.T) {
+	dir := t.TempDir()
+	cliDst := filepath.Join(dir, "rmb")
+	daemonDst := filepath.Join(dir, "rmbd-desktop")
+	write(t, cliDst, machoFake)
+	write(t, daemonDst, "2026/08/15 23:27:49 goose: no migrations to run. current version: 9\n")
+
+	// Newer mtime must not protect a non-executable file.
+	future := time.Now().Add(time.Hour)
+	if err := os.Chtimes(daemonDst, future, future); err != nil {
+		t.Fatalf("chtimes: %v", err)
+	}
+
+	refresh, err := needsRefresh(cliDst, daemonDst)
+	if err != nil {
+		t.Fatalf("needsRefresh: %v", err)
+	}
+	if !refresh {
+		t.Error("destination without executable magic must trigger refresh even with a newer mtime")
+	}
+}
+
+func TestIsExecutableImage(t *testing.T) {
+	dir := t.TempDir()
+
+	macho := filepath.Join(dir, "macho")
+	write(t, macho, machoFake)
+	if !isExecutableImage(macho) {
+		t.Error("Mach-O 64 magic must be accepted")
+	}
+
+	text := filepath.Join(dir, "text")
+	write(t, text, "plain log line\n")
+	if isExecutableImage(text) {
+		t.Error("text file must be rejected")
+	}
+
+	elf := filepath.Join(dir, "elf")
+	write(t, elf, "\x7fELF\x02\x01\x01\x00")
+	if isExecutableImage(elf) {
+		t.Error("ELF must be rejected on darwin")
+	}
+
+	empty := filepath.Join(dir, "empty")
+	write(t, empty, "")
+	if isExecutableImage(empty) {
+		t.Error("empty file must be rejected")
+	}
+
+	if isExecutableImage(filepath.Join(dir, "missing")) {
+		t.Error("missing file must be rejected")
+	}
+}
+
+func TestHasExecutableMagic(t *testing.T) {
+	for _, m := range [][4]byte{
+		{0xcf, 0xfa, 0xed, 0xfe}, // MH_MAGIC_64 LE
+		{0xce, 0xfa, 0xed, 0xfe}, // MH_MAGIC LE
+		{0xca, 0xfe, 0xba, 0xbe}, // FAT_MAGIC
+		{0xca, 0xfe, 0xba, 0xbf}, // FAT_MAGIC_64
+	} {
+		if !hasExecutableMagic(m) {
+			t.Errorf("magic %x must be accepted on darwin", m)
+		}
+	}
+	for _, m := range [][4]byte{
+		{0x32, 0x30, 0x32, 0x36}, // "2026" — clobbered log text
+		{0x7f, 'E', 'L', 'F'},    // ELF
+		{'M', 'Z', 0x90, 0x00},   // PE
+		{'#', '!', '/', 'b'},     // script
+	} {
+		if hasExecutableMagic(m) {
+			t.Errorf("magic %x must be rejected on darwin", m)
+		}
+	}
+}
+
+// machoFake is a minimal MH_MAGIC_64 (little-endian) header prefix.
+const machoFake = "\xcf\xfa\xed\xfe\x00\x00\x00\x01fake-mach-o-payload"
+
 func TestIsNewer(t *testing.T) {
 	dir := t.TempDir()
 	src := filepath.Join(dir, "src")

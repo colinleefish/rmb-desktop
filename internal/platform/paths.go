@@ -56,6 +56,17 @@ func DBPath() (string, error) {
 	return filepath.Join(dir, "data", "rmb.db"), nil
 }
 
+// DaemonLogPath returns the rmbd log file path. The tray shell wires the
+// daemon child's stdout/stderr here so spawn failures and daemon errors are
+// diagnosable even when the app has no console.
+func DaemonLogPath() (string, error) {
+	dir, err := DataDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "logs", "rmbd.log"), nil
+}
+
 // OnboardingCompletePath returns the marker file written when first-run setup finishes.
 func OnboardingCompletePath() (string, error) {
 	dir, err := DataDir()

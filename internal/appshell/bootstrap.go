@@ -16,8 +16,9 @@ const (
 )
 
 // EnsureInstalled copies the bundled rmb/rmbd sidecars and the app itself
-// into ~/.rmb/bin, refreshing when the bundled sidecars are newer. Port of
-// bootstrap.rs ensure_installed.
+// into ~/.rmb/bin, refreshing when the bundled sidecars are newer or when an
+// installed copy is not a valid executable image (e.g. clobbered into a
+// text file by a redirected log). Port of bootstrap.rs ensure_installed.
 func EnsureInstalled() error {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -46,7 +47,7 @@ func EnsureInstalled() error {
 		if err := installCurrentExe(appDst); err != nil {
 			return err
 		}
-	} else if !isFile(appDst) {
+	} else if !isFile(appDst) || !isExecutableImage(appDst) {
 		if err := installCurrentExe(appDst); err != nil {
 			return err
 		}
@@ -65,9 +66,13 @@ func InstalledDaemonPath() string {
 }
 
 // needsRefresh ports needs_refresh/is_newer: refresh when either destination
-// is missing or its bundled source has a newer mtime.
+// is missing, is not a valid executable image, or its bundled source has a
+// newer mtime. The magic check self-heals a sidecar that was overwritten
+// with non-executable content carrying a fresh mtime — mtime alone would
+// treat it as up to date and never reinstall it.
 func needsRefresh(cliDst, daemonDst string) (bool, error) {
-	if !isFile(cliDst) || !isFile(daemonDst) {
+	if !isFile(cliDst) || !isFile(daemonDst) ||
+		!isExecutableImage(cliDst) || !isExecutableImage(daemonDst) {
 		return true, nil
 	}
 	bundledRmb, err := bundledSidecarPath("rmb")
@@ -204,4 +209,41 @@ func findPrefixedBinary(dir, baseName string) string {
 func isFile(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && !info.IsDir()
+}
+
+// isExecutableImage reports whether path starts with a plausible executable
+// header for this OS (Mach-O/fat on macOS, PE/MZ on Windows, ELF elsewhere).
+func isExecutableImage(path string) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+	var magic [4]byte
+	if _, err := io.ReadFull(f, magic[:]); err != nil {
+		return false
+	}
+	return hasExecutableMagic(magic)
+}
+
+// hasExecutableMagic matches the first four bytes against known executable
+// image headers for the current platform.
+func hasExecutableMagic(m [4]byte) bool {
+	switch runtime.GOOS {
+	case "darwin":
+		switch m {
+		case [4]byte{0xcf, 0xfa, 0xed, 0xfe}, // MH_MAGIC_64 (little-endian)
+			[4]byte{0xce, 0xfa, 0xed, 0xfe}, // MH_MAGIC (little-endian)
+			[4]byte{0xfe, 0xed, 0xfa, 0xcf}, // MH_MAGIC_64 (big-endian)
+			[4]byte{0xfe, 0xed, 0xfa, 0xce}, // MH_MAGIC (big-endian)
+			[4]byte{0xca, 0xfe, 0xba, 0xbe}, // FAT_MAGIC
+			[4]byte{0xca, 0xfe, 0xba, 0xbf}: // FAT_MAGIC_64
+			return true
+		}
+		return false
+	case "windows":
+		return m[0] == 'M' && m[1] == 'Z' // PE image (MZ header)
+	default:
+		return m[0] == 0x7f && m[1] == 'E' && m[2] == 'L' && m[3] == 'F'
+	}
 }

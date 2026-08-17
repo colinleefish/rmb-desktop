@@ -593,7 +593,7 @@ func skillListWhere(p ListParams) (string, []any) {
 	conds := []string{"superseded_at IS NULL"}
 	var args []any
 	if qWhere, qArgs := searchWhere(p.Query, []string{
-		"name", "description", "slug", "uri",
+		"name", "description", "slug", "substr(uri, 7)",
 	}); qWhere != "" {
 		conds = append(conds, strings.TrimPrefix(qWhere, " WHERE "))
 		args = append(args, qArgs...)
@@ -857,7 +857,7 @@ func memoryListWhere(p ListParams) (string, []any) {
 		args = append(args, cat)
 	}
 	if qWhere, qArgs := searchWhere(p.Query, []string{
-		"m.abstract", "m.body", "m.slug", "m.uri", "m.category",
+		"m.abstract", "m.body", "m.slug", "substr(m.uri, 7)", "m.category",
 	}); qWhere != "" {
 		conds = append(conds, strings.TrimPrefix(qWhere, " WHERE "))
 		args = append(args, qArgs...)
@@ -868,6 +868,13 @@ func memoryListWhere(p ListParams) (string, []any) {
 func searchWhere(query string, cols []string) (string, []any) {
 	query = strings.TrimSpace(query)
 	if query == "" || len(cols) == 0 {
+		return "", nil
+	}
+	// A pasted full URI ("rmb://entities/rmb") should match the path, not the
+	// scheme — searchable cols use substr(uri, 7), so strip the scheme here too.
+	// Without this, a bare "rmb" query would still match every row via scheme.
+	query = strings.TrimPrefix(strings.ToLower(query), "rmb://")
+	if query == "" {
 		return "", nil
 	}
 	like := "%" + strings.ToLower(query) + "%"

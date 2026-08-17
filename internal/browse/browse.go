@@ -877,7 +877,12 @@ func searchWhere(query string, cols []string) (string, []any) {
 		parts[i] = "lower(" + col + ") LIKE ?"
 		args[i] = like
 	}
-	return " WHERE " + strings.Join(parts, " OR "), args
+	// Parenthesize: callers AND this group with other conditions
+	// (superseded_at IS NULL, category, session_id). Without parens, SQL
+	// precedence (AND > OR) lets the OR branches bypass those filters —
+	// e.g. a query matching every "rmb://..." uri exposed superseded
+	// memory versions in the list.
+	return " WHERE (" + strings.Join(parts, " OR ") + ")", args
 }
 
 func sessionOrder(sort, order string) string {

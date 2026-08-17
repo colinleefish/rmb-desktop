@@ -2,7 +2,7 @@
 
 GO_TAGS := sqlite_fts5
 EMBED_INDEX := internal/http/static/web/index.html
-VERSION ?= 0.2.8-dev.3
+VERSION ?= 0.2.8-dev.4
 COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 GO_LDFLAGS := -X github.com/colinleefish/rmb-desktop/internal/version.Version=$(VERSION) -X github.com/colinleefish/rmb-desktop/internal/version.Commit=$(COMMIT)
 

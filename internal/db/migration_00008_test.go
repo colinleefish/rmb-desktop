@@ -87,6 +87,15 @@ func TestMigration00008_PurgesMultipleAgentMemoriesWithoutFTSCorrupt(t *testing.
 		t.Fatalf("undo 00011 schema: %v", err)
 	}
 
+	// Undo 00012 schema (consolidation gates: source_atom_hash column +
+	// atoms slug index) for the same reason.
+	if _, err := database.Exec(`
+		DROP INDEX IF EXISTS idx_atoms_category_slug;
+		ALTER TABLE memories DROP COLUMN source_atom_hash;
+	`); err != nil {
+		t.Fatalf("undo 00012 schema: %v", err)
+	}
+
 	// Re-run migrations. The old 00008 failed here with SQLITE_CORRUPT.
 	if err := migrate(database); err != nil {
 		t.Fatalf("re-migrate with two agent memories: %v (old 00008 hit SQLITE_CORRUPT here)", err)

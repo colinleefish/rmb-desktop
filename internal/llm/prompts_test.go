@@ -69,7 +69,7 @@ func TestBuildDistillMemoryPromptProfileFilterStillApplies(t *testing.T) {
 }
 
 func TestExtractPromptPairVersions(t *testing.T) {
-	sys2, _, err := ExtractPromptPair(2, "batch")
+	sys2, _, err := ExtractPromptPair(2, "batch", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func TestExtractPromptPairVersions(t *testing.T) {
 		t.Error("v2 extraction system prompt should carry the rationale/outcome guidance")
 	}
 
-	sys1, _, err := ExtractPromptPair(1, "batch")
+	sys1, _, err := ExtractPromptPair(1, "batch", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,19 +85,47 @@ func TestExtractPromptPairVersions(t *testing.T) {
 		t.Error("v1 extraction system prompt must stay pre-P2.2 for A/B replay")
 	}
 
-	if _, _, err := ExtractPromptPair(99, ""); err == nil {
+	if _, _, err := ExtractPromptPair(99, "", nil); err == nil {
 		t.Error("unknown version must error")
 	}
-	if _, _, err := ExtractPromptPair(0, ""); err != nil {
+	if _, _, err := ExtractPromptPair(0, "", nil); err != nil {
 		t.Errorf("version 0 must resolve to latest: %v", err)
 	}
 }
 
 func TestPromptVersionConstants(t *testing.T) {
-	if ExtractAtomsPromptLatest < 2 {
-		t.Error("extraction prompt should be at generation 2 after P2.2")
+	if ExtractAtomsPromptLatest < 3 {
+		t.Error("extraction prompt should be at generation 3 after P2.1")
 	}
 	if DistillMemoryPromptLatest < 2 {
 		t.Error("distill prompt should be at generation 2 after P2.2")
+	}
+}
+
+func TestExtractPromptV3CandidatesSection(t *testing.T) {
+	cands := []SlugCandidate{
+		{Category: "preferences", Slug: "docs-language"},
+		{Category: "preferences", Slug: "sql-format"},
+		{Category: "entities", Slug: "jenkins"},
+	}
+	_, user, err := ExtractPromptPair(3, "batch-jsonl", cands)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"docs-language", "sql-format", "entities: jenkins", "batch-jsonl"} {
+		if !strings.Contains(user, want) {
+			t.Errorf("v3 user prompt missing %q", want)
+		}
+	}
+	// Older generations must ignore candidates entirely (A/B parity).
+	_, userV2, err := ExtractPromptPair(2, "batch-jsonl", cands)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(userV2, "docs-language") {
+		t.Error("v2 user prompt must not render candidates")
+	}
+	if _, _, err := ExtractPromptPair(3, "batch-jsonl", nil); err != nil {
+		t.Errorf("v3 with no candidates must render '(none)': %v", err)
 	}
 }

@@ -90,7 +90,7 @@ func DryRunL3(
 		Buckets:     make([]L3DryRunBucket, 0, len(buckets)),
 	}
 
-	w := NewWorker(database, distiller, cfg, log, nil)
+	w := NewWorker(database, distiller, nil, cfg, log, nil)
 
 	for _, bucket := range buckets {
 		out := L3DryRunBucket{
@@ -130,9 +130,15 @@ func DryRunL3(
 				result.Buckets = append(result.Buckets, out)
 				continue
 			}
-			if out.ExistingBody != "" && existingAbstract != "" {
+			// Report the REAL rollup gate decision (P2.1 materiality: the
+			// active row's atom fingerprint), not just row existence.
+			unchanged, err := w.bucketUnchanged(ctx, bucket, nil, nil)
+			if err != nil {
+				out.Decision = "error"
+				out.Reason = err.Error()
+			} else if unchanged {
 				out.Decision = "unchanged"
-				out.Reason = "active memory exists; rollup would only rewrite on new source scenes/corrections"
+				out.Reason = "materiality gate: atom fingerprint unchanged since last distill"
 			} else {
 				out.Decision = "distilled"
 			}

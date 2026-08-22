@@ -98,8 +98,8 @@ func DebugRequestBudget(cfg config.LLMConfig, llmCalls int) time.Duration {
 	return perCall*time.Duration(llmCalls) + 15*time.Second
 }
 
-func (c *OpenAICompatibleClient) ExtractAtoms(ctx context.Context, messagesJSONL string) (string, error) {
-	system, user, err := ExtractPromptPair(c.extractVersion, messagesJSONL)
+func (c *OpenAICompatibleClient) ExtractAtoms(ctx context.Context, messagesJSONL string, candidates []SlugCandidate) (string, error) {
+	system, user, err := ExtractPromptPair(c.extractVersion, messagesJSONL, candidates)
 	if err != nil {
 		return "", fmt.Errorf("llm extract atoms: %w", err)
 	}
@@ -181,7 +181,7 @@ func (c *OpenAICompatibleClient) DistillMemory(
 // by this client (0 = latest). Older generations stay available for A/B
 // session replay (issue #28).
 func (c *OpenAICompatibleClient) SetExtractPromptVersion(version int) error {
-	if _, _, err := ExtractPromptPair(version, ""); err != nil {
+	if _, _, err := ExtractPromptPair(version, "", nil); err != nil {
 		return err
 	}
 	c.extractVersion = version

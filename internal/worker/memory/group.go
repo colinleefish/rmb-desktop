@@ -117,10 +117,34 @@ func serializeAtomsForLLM(atoms []model.Atom) (string, error) {
 	return string(raw), nil
 }
 
-func serializePartialsForLLM(partials []string) (string, error) {
-	raw, err := json.Marshal(map[string]any{"facts": partials})
+// reduceExcerptChars bounds each atom's content in the reduce input so the
+// final merge stays prompt-sized while still carrying atom-level evidence.
+const reduceExcerptChars = 480
+
+// serializeReduceForLLM builds the multi-chunk reduce payload: facts are the
+// bucket's atoms (content excerpted), partials are the per-chunk distilled
+// summaries kept as secondary context. The reduce LLM never sees only
+// distilled text (issue #27 task 5).
+func serializeReduceForLLM(atoms []model.Atom, partials []string) (string, error) {
+	type reduceFact struct {
+		URI      string `json:"uri"`
+		Priority int    `json:"priority"`
+		Content  string `json:"content"`
+	}
+	facts := make([]reduceFact, 0, len(atoms))
+	for _, a := range atoms {
+		content := a.Content
+		if r := []rune(content); len(r) > reduceExcerptChars {
+			content = string(r[:reduceExcerptChars])
+		}
+		facts = append(facts, reduceFact{URI: uri.BuildAtom(a.ID), Priority: a.Priority, Content: content})
+	}
+	raw, err := json.Marshal(map[string]any{
+		"facts":    facts,
+		"partials": partials,
+	})
 	if err != nil {
-		return "", fmt.Errorf("marshal partials for llm: %w", err)
+		return "", fmt.Errorf("marshal reduce input for llm: %w", err)
 	}
 	return string(raw), nil
 }

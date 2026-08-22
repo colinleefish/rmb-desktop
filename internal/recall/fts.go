@@ -107,6 +107,31 @@ func FTSEventLinks(ctx context.Context, db *sql.DB, query, excludeURI string, k 
 	return scanFTSMemoryMatches(rows, "events")
 }
 
+// FTSSlugCandidates retrieves active memory subjects matching ANY query
+// token (OR semantics, like FTSEventLinks), for the L1 extract prompt's
+// slug-canonicalization candidate list (P2.1 / issue #27). Returns
+// category+slug via the match URI.
+func FTSSlugCandidates(ctx context.Context, db *sql.DB, query string, k int) ([]Match, error) {
+	if k <= 0 {
+		k = 20
+	}
+	rows, err := db.QueryContext(ctx, `
+		SELECT m.uri,
+		       COALESCE(substr(COALESCE(NULLIF(TRIM(m.abstract), ''), m.body), 1, 160), '') AS snippet,
+		       m.version,
+		       m.source_scene_uris
+		FROM memories m
+		INNER JOIN memories_fts fts ON fts.rowid = m.rowid
+		WHERE memories_fts MATCH ? AND m.superseded_at IS NULL AND m.archived_at IS NULL
+		ORDER BY bm25(memories_fts)
+		LIMIT ?`, EscapeFTSQueryAny(query), k)
+	if err != nil {
+		return nil, fmt.Errorf("fts slug candidates: %w", err)
+	}
+	defer rows.Close()
+	return scanFTSMemoryMatches(rows, "memories")
+}
+
 func FTSSkills(ctx context.Context, db *sql.DB, query string, k int, tw TimeWindow) ([]Match, error) {
 	if k <= 0 {
 		k = 5

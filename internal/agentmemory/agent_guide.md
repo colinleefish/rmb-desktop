@@ -4,7 +4,7 @@ The rmb CLI lives at `~/.rmb/bin/rmb`. Use this full path whenever `rmb` is not 
 
 | Tier | URI | What |
 |------|-----|------|
-| sessions | rmb://sessions/<id> | conversation container |
+| sessions | rmb://sessions/<id> | conversation container (segment accepts the session_key or the session id) |
 | turns | rmb://turns/<uuid> | raw user+assistant exchange |
 | atoms | rmb://atoms/<uuid> | facts extracted from one session |
 | scenes | rmb://scenes/<uuid> | per-session summary (evidence for memories) |
@@ -93,7 +93,7 @@ How to read search output — each hit prints a fused score and version:
 - Running `rmb` with no arguments prints profile and this guide from the local daemon.
 - search "<query>" before asking the user (includes memory + skills by default), then cat / meta / ls as needed.
 - search [--scope=memory,scene,skill] [--k=n] [--since=<date|7d>] [--until=<date|7d>] — only search accepts --scope; --since/--until restrict results to a time window.
-- ls <uri-prefix> — list container contents: rmb://events/, rmb://scenes/, rmb://skills/, rmb://sessions/<id>/ (not rmb://memories/). The first segment is a prefix filter: `rmb ls rmb://events/2026-06` lists June events. Paginate with `--limit`/`--offset` (default 200 per page) and window with `--since`/`--until`/`--count`.
+- ls <uri-prefix> — list container contents: rmb://events/, rmb://scenes/, rmb://skills/, rmb://sessions/<id|key>/ (not rmb://memories/). `rmb ls rmb://sessions/<session_id>/` (or <session_key>/) lists that session's turns then atoms — this is the provenance ladder: a memory's scene meta exposes `session_id` and `session_key`, so you can jump to `ls rmb://sessions/<session_id>/` to walk back to source turns+atoms. The first segment of other scopes is a prefix filter: `rmb ls rmb://events/2026-06` lists June events. Paginate with `--limit`/`--offset` (default 200 per page) and window with `--since`/`--until`/`--count`.
 - Archival (cold memories): memories unused for 90 days are ARCHIVED (excluded from search) but are still cat-able by direct uri and restorable: `rmb doctor archive` (review list), `rmb doctor archive --apply` (archive), `rmb doctor archive --restore-all` (bring them back). Nothing is ever auto-deleted — evidence tiers (turns/atoms/scenes/skills) are never archived.
 - Never invent uris.
 - Recall is read-only. Workers distill new facts after conversations.

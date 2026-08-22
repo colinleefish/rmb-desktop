@@ -6,6 +6,8 @@ import (
 	"fmt"
 
 	sqlite_vec "github.com/asg017/sqlite-vec-go-bindings/cgo"
+
+	"github.com/colinleefish/rmb-desktop/internal/db"
 )
 
 func init() {
@@ -28,7 +30,9 @@ func VectorMemories(ctx context.Context, db *sql.DB, queryVec []float32, k int, 
 	rows, err := db.QueryContext(ctx, `
 		SELECT uri,
 		       COALESCE(substr(COALESCE(NULLIF(TRIM(abstract), ''), body), 1, 160), ''),
-		       vec_distance_cosine(embedding, ?) AS distance
+		       vec_distance_cosine(embedding, ?) AS distance,
+		       version,
+		       source_scene_uris
 		FROM memories
 		WHERE superseded_at IS NULL AND embedding IS NOT NULL`+windowClause+`
 		ORDER BY distance ASC
@@ -37,7 +41,29 @@ func VectorMemories(ctx context.Context, db *sql.DB, queryVec []float32, k int, 
 		return nil, fmt.Errorf("vector memories: %w", err)
 	}
 	defer rows.Close()
-	return scanVecMatches(rows, "memories")
+	return scanVecMemoryMatches(rows, "memories")
+}
+
+// scanVecMemoryMatches scans the memory-tier vector result (uri, snippet,
+// distance, version, source_scene_uris) and fills the extra Match fields.
+func scanVecMemoryMatches(rows *sql.Rows, tier string) ([]Match, error) {
+	var out []Match
+	for rows.Next() {
+		var uri, snippet, srcScenes string
+		var distance float64
+		var version int
+		if err := rows.Scan(&uri, &snippet, &distance, &version, &srcScenes); err != nil {
+			return nil, err
+		}
+		m := Match{
+			URI: uri, Tier: tier, Rank: 1 - distance, Snippet: snippet, Version: version,
+		}
+		if scenes, err := db.UnmarshalStringArray(srcScenes); err == nil {
+			m.SourceScenes = scenes
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
 }
 
 func VectorScenes(ctx context.Context, db *sql.DB, queryVec []float32, k int, tw TimeWindow) ([]Match, error) {

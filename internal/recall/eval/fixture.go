@@ -105,6 +105,13 @@ func (f *Fixture) BuildDB(path string) (*sql.DB, error) {
 			k.FTSText, embedBlob(k.Description, k.FTSText), k.CreatedAt, k.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("insert skill %s: %w", k.URI, err)
 		}
+		// skills has no FTS triggers (unlike scenes); seed manually so the
+		// FTS-only skill tier is exercised offline (plan P0.2 C4).
+		if _, err := database.Exec(`
+			INSERT INTO skills_fts (rowid, fts_text)
+			VALUES ((SELECT rowid FROM skills WHERE id = ?), ?)`, k.ID, k.FTSText); err != nil {
+			return nil, fmt.Errorf("insert skills_fts %s: %w", k.URI, err)
+		}
 	}
 	return database, nil
 }

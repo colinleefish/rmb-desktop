@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+
+	"github.com/colinleefish/rmb-desktop/internal/db"
 )
 
 // EscapeFTSQuery prepares a user query for FTS5 MATCH (phrase per token).
@@ -27,7 +29,9 @@ func FTSMemories(ctx context.Context, db *sql.DB, query string, k int, tw TimeWi
 	windowClause, windowArgs := tw.Clause("m.updated_at")
 	rows, err := db.QueryContext(ctx, `
 		SELECT m.uri,
-		       COALESCE(substr(COALESCE(NULLIF(TRIM(m.abstract), ''), m.body), 1, 160), '') AS snippet
+		       COALESCE(substr(COALESCE(NULLIF(TRIM(m.abstract), ''), m.body), 1, 160), '') AS snippet,
+		       m.version,
+		       m.source_scene_uris
 		FROM memories m
 		INNER JOIN memories_fts fts ON fts.rowid = m.rowid
 		WHERE memories_fts MATCH ? AND m.superseded_at IS NULL`+windowClause+`
@@ -37,7 +41,7 @@ func FTSMemories(ctx context.Context, db *sql.DB, query string, k int, tw TimeWi
 		return nil, fmt.Errorf("fts memories: %w", err)
 	}
 	defer rows.Close()
-	return scanFTSMatches(rows, "memories")
+	return scanFTSMemoryMatches(rows, "memories")
 }
 
 func FTSScenes(ctx context.Context, db *sql.DB, query string, k int, tw TimeWindow) ([]Match, error) {
@@ -78,6 +82,27 @@ func FTSSkills(ctx context.Context, db *sql.DB, query string, k int, tw TimeWind
 	}
 	defer rows.Close()
 	return scanFTSMatches(rows, "skills")
+}
+
+// scanFTSMemoryMatches scans the memory-tier FTS result (uri, snippet,
+// version, source_scene_uris) and fills the extra Match fields.
+func scanFTSMemoryMatches(rows *sql.Rows, tier string) ([]Match, error) {
+	var out []Match
+	rank := 1.0
+	for rows.Next() {
+		var uri, snippet, srcScenes string
+		var version int
+		if err := rows.Scan(&uri, &snippet, &version, &srcScenes); err != nil {
+			return nil, err
+		}
+		m := Match{URI: uri, Tier: tier, Rank: rank, Snippet: snippet, Version: version}
+		if scenes, err := db.UnmarshalStringArray(srcScenes); err == nil {
+			m.SourceScenes = scenes
+		}
+		out = append(out, m)
+		rank++
+	}
+	return out, rows.Err()
 }
 
 func scanFTSMatches(rows *sql.Rows, tier string) ([]Match, error) {

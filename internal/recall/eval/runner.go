@@ -20,7 +20,7 @@ func Run(ctx context.Context, database *sql.DB, golden *GoldenSet) (*Report, err
 
 	report := &Report{TotalQuestions: len(golden.Questions)}
 	for _, q := range golden.Questions {
-		matches, err := svc.Search(ctx, embed, q.Query, 5, nil)
+		matches, err := svc.Search(ctx, embed, q.Query, 5, nil, recall.TimeWindow{})
 		if err != nil {
 			return nil, fmt.Errorf("question %s: %w", q.ID, err)
 		}

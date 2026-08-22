@@ -101,7 +101,7 @@ func hookSubmit(args []string) int {
 func search(args []string) int {
 	query, rest := parseQueryAndFlags(args)
 	if query == "" {
-		fmt.Fprintf(os.Stderr, `usage: rmb search "<query>" [--scope=memory,scene,skill] [--k=n] [--since=<date|Nd>] [--until=<date|Nd>] [--since=<date|Nd>] [--until=<date|Nd>]`)
+		fmt.Fprintf(os.Stderr, `usage: rmb search "<query>" [--scope=memory,scene,skill] [--k=n] [--since=<date|Nd>] [--until=<date|Nd>]`)
 		return 2
 	}
 	k, err := parseK(rest)

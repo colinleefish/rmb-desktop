@@ -1,0 +1,139 @@
+# Golden retrieval set for the recall eval harness (issue #22).
+#
+# Provenance of questions:
+#   - audit-*, typo-*, xling-*: the 2026-08-22 retrieval audit's 8 golden
+#     questions plus its two adversarial probes
+#     (docs/audit/2026-08-22-memory-retrieval-audit/treasure-hunter-retrieval-stress-test.md).
+#   - live-*: written from raw session_turns sampled read-only across the
+#     ~20-day window (INCLUDING the backfill period, back to 2026-06-09),
+#     BEFORE inspecting which memories were distilled; expected URIs were
+#     then pinned by verifying each against the distilled store.
+#
+# Gates are the v1 baseline (recorded from a local full run). The eval fails
+# when aggregate metrics regress past these.
+gates:
+  # v1 baseline (deterministic hash-embedder, fixture subset): observed
+  # recall@5=0.545 dup-rate=0.000 recency-precision=1.000 on 22 questions.
+  # Gates are set at/below baseline so the eval fails only on real regressions
+  # from HEAD. The live production embedder scores higher; these numbers are
+  # a conservative lower bound (see package doc on the accuracy tradeoff).
+  min_recall_at_5: 0.50
+  max_dup_rate: 0.30
+  min_recency_precision: 0.50
+
+questions:
+  # ---- audit golden questions ----
+  - id: audit-1-cluster-admin-toolbox
+    query: "cluster-admin-toolbox rejected removed"
+    expected:
+      - rmb://events/2026-08-21-cluster-admin-toolbox-removal
+      - rmb://events/2026-08-21-reject-cluster-admin-toolbox
+  - id: audit-2-bbc-param-split
+    query: "bbc-deploy-k8s-param-split"
+    expected:
+      - rmb://events/2026-08-21-bbc-deploy-k8s-param-split
+      - rmb://entities/bbc-deploy-k8s
+  - id: audit-3-ashare-first-board
+    query: "A股 首板 入选条件 量价"
+    expected:
+      - rmb://preferences/stock-first-board-filter
+      - rmb://scenes/d0e388d6-9914-5a7b-ad37-fb20d56351cb
+  - id: audit-4-photo-workflow
+    query: "HEIC Nikon Z30 photo workflow"
+    expected:
+      - rmb://preferences/nikon-naming-rule
+      - rmb://scenes/8c533793-f31f-5023-abff-84748339a91b
+  - id: audit-5-why-sqlite
+    query: "why sqlite instead of postgres for rmb daemon"
+    expected:
+      - rmb://scenes/cdccc2a4-f2c5-5fa3-bd3e-a111ef85c229
+      - rmb://events/duckdb-to-postgres-pbp
+  - id: audit-6-bastion-ssh
+    query: "SSH bastion jump.hs99.vip ProxyJump"
+    expected:
+      - rmb://entities/jump-hs99-vip
+      - rmb://skills/jump-hs99-vip
+      - rmb://entities/jumpserver
+  - id: audit-7-tag-deletion-vague
+    query: "删除标签 标签问题 解决"
+    expected:
+      - rmb://events/2026-07-16-soft-delete-one-tag-solutions
+  - id: audit-8-openresty-dns
+    query: "starlink openresty dynamic dns"
+    expected:
+      - rmb://events/2026-08-21-starlink-openresty-dynamic-dns
+      - rmb://scenes/a391a8fa-a941-58e0-a097-9544eb7b38bc
+      - rmb://events/2026-07-28-openresty-dynamic-dns-investigation
+    tags: [recency]
+    latest: rmb://events/2026-08-21-starlink-openresty-dynamic-dns
+
+  # ---- audit adversarial probes ----
+  - id: typo-1-toolbox
+    query: "cluster-admin-toolboks removd"
+    expected:
+      - rmb://events/2026-08-21-cluster-admin-toolbox-removal
+    tags: [typo]
+  - id: xling-1-bastion-chinese
+    query: "堡垒机怎么连服务器 跳板机"
+    expected:
+      - rmb://entities/jumpserver
+      - rmb://skills/jump-hs99-vip
+    tags: [cross-lingual]
+
+  # ---- questions derived from raw session turns (pre-registered) ----
+  - id: live-1-starlink-open-gateway
+    query: "starlink open gateway X-Starlink-ApiKey"
+    expected:
+      - rmb://entities/starlink-open
+  - id: live-2-gateway-folder
+    query: "gateway folder namespace albconfig ingressclass"
+    expected:
+      - rmb://entities/gateway
+  - id: live-3-alb-rewrite
+    query: "ALB ingress rewrite path prefix strip"
+    expected:
+      - rmb://entities/alb-ingress-controller
+  - id: live-4-server-to-desktop-migration
+    query: "migrate memory server to desktop rmb"
+    expected:
+      - rmb://entities/backfill-from-remote
+  - id: live-5-kc-pattern-backtest
+    query: "科传 pattern backtest"
+    expected:
+      - rmb://events/2026-08-09-kc-pattern-backtest
+      - rmb://entities/backtest-kc-pattern
+  - id: live-6-commit-env-pm1
+    query: "env.pm1_dev committed starlink_pm"
+    expected:
+      - rmb://events/2026-08-06-commit-env-pm1-dev
+  - id: live-7-pyramid-logo
+    query: "pyramid logo favicon applied"
+    expected:
+      - rmb://events/2026-08-02-candidate-pyramid-logo-change
+      - rmb://entities/candidate-pyramid-svg
+  - id: live-8-gogoblast-bootstrap
+    query: "gogoblast vm bootstrap"
+    expected:
+      - rmb://events/2026-08-20-gogoblast-vm-bootstrap
+      - rmb://entities/gogoblast
+  - id: live-9-rmbd-port-fight
+    query: "rmbd port 19019 crash loop launchagent"
+    expected:
+      - rmb://entities/rmbd
+  - id: live-10-hfrog-presign
+    query: "hfrog presign pid s3Key"
+    expected:
+      - rmb://entities/hfrog
+      - rmb://events/2026-08-04-oss-switch-hfrog
+  - id: live-11-chenjing-svn
+    query: "chenjing svn user block_effect read only"
+    expected:
+      - rmb://events/2026-06-09-chenjing-svn-user
+      - rmb://entities/chenjing-001937
+    tags: [backfill]
+  - id: live-12-truncate-pm-script
+    query: "truncate_pm_workflow_runtime script"
+    expected:
+      - rmb://entities/truncate-pm-workflow-runtime
+      - rmb://events/2026-07-09-add-truncate-script
+    tags: [backfill]

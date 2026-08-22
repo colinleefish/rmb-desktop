@@ -101,7 +101,7 @@ func hookSubmit(args []string) int {
 func search(args []string) int {
 	query, rest := parseQueryAndFlags(args)
 	if query == "" {
-		fmt.Fprintf(os.Stderr, `usage: rmb search "<query>" [--scope=memory,scene,skill,atom] [--k=n] [--since=<date|Nd>] [--until=<date|Nd>]`)
+		fmt.Fprintf(os.Stderr, `usage: rmb search "<query>" [--scope=memory,scene,skill,atom] [--k=n] [--since=<date|Nd>] [--until=<date|Nd>] [--no-boost]`)
 		return 2
 	}
 	k, err := parseK(rest)
@@ -120,13 +120,14 @@ func search(args []string) int {
 		fmt.Fprintf(os.Stderr, "search: %v\n", err)
 		return 2
 	}
+	noBoost := hasFlag(rest, "--no-boost")
 
 	cl, err := apiClient()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "search: %v\n", err)
 		return 1
 	}
-	matches, err := cl.Search(context.Background(), query, k, scopes, since, until)
+	matches, err := cl.Search(context.Background(), query, k, scopes, since, until, noBoost)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "search: %v\n", err)
 		return 1
@@ -281,6 +282,16 @@ func parseK(args []string) (int, error) {
 	return 0, nil
 }
 
+// hasFlag reports whether the exact flag token is present in args.
+func hasFlag(args []string, flag string) bool {
+	for _, a := range args {
+		if a == flag {
+			return true
+		}
+	}
+	return false
+}
+
 func parseScopes(args []string) []string {
 	for _, a := range args {
 		if strings.HasPrefix(a, "--scope=") {
@@ -326,7 +337,7 @@ func printUsage() {
 func usageText() string {
 	return `Usage:
   rmb hook-submit --source=<cursor> [--url=http://127.0.0.1:19019]
-  rmb search "<query>" [--scope=memory,scene,skill,atom] [--k=n] [--since=<date|Nd>] [--until=<date|Nd>]
+  rmb search "<query>" [--scope=memory,scene,skill,atom] [--k=n] [--since=<date|Nd>] [--until=<date|Nd>] [--no-boost]
   rmb ls <uri-prefix>            # list container contents (e.g. rmb://events/)
   rmb ls <uri-prefix> [--limit=N] [--offset=N] [--since=<date|7d>] [--until=<date|7d>] [--count]
   rmb cat <uri>

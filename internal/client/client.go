@@ -42,7 +42,7 @@ type Match struct {
 	Version int     `json:"version,omitempty"`
 }
 
-func (c *Client) Search(ctx context.Context, query string, k int, scopes []string, since, until string) ([]Match, error) {
+func (c *Client) Search(ctx context.Context, query string, k int, scopes []string, since, until string, noBoost bool) ([]Match, error) {
 	q := url.Values{}
 	q.Set("q", query)
 	if k > 0 {
@@ -56,6 +56,9 @@ func (c *Client) Search(ctx context.Context, query string, k int, scopes []strin
 	}
 	if until != "" {
 		q.Set("until", until)
+	}
+	if noBoost {
+		q.Set("no_boost", "1")
 	}
 	endpoint := c.baseURL + "/api/v1/search?" + q.Encode()
 

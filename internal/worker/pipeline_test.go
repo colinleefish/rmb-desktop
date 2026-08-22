@@ -9,6 +9,7 @@ import (
 
 	"github.com/colinleefish/rmb-desktop/internal/config"
 	"github.com/colinleefish/rmb-desktop/internal/db"
+	"github.com/colinleefish/rmb-desktop/internal/llm"
 	"github.com/colinleefish/rmb-desktop/internal/model"
 	"github.com/colinleefish/rmb-desktop/internal/worker/extract"
 	"github.com/colinleefish/rmb-desktop/internal/workerlock"
@@ -29,7 +30,7 @@ func (m *mockLLM) SummarizeSessionAbstract(_ context.Context, _ string) (string,
 	return "Session about identity", nil
 }
 
-func (m *mockLLM) DistillMemory(_ context.Context, _, _, _ string, _ []string) (string, error) {
+func (m *mockLLM) DistillMemory(_ context.Context, _, _, _ string, _ []string, _ []llm.RelatedEvent) (string, error) {
 	return `{"abstract":"Profile","body":"Colin is the user."}`, nil
 }
 

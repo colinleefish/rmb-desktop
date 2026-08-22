@@ -36,6 +36,11 @@ type OpenAICompatibleClient struct {
 	maxRetries int
 	httpClient *http.Client
 	log        *slog.Logger
+	// Prompt template generations (0 = latest). Pinned versions let the
+	// debug dry-run endpoints A/B replay sessions distilled with older
+	// prompts (issue #28).
+	extractVersion int
+	distillVersion int
 }
 
 type chatCompletionRequest struct {
@@ -94,12 +99,16 @@ func DebugRequestBudget(cfg config.LLMConfig, llmCalls int) time.Duration {
 }
 
 func (c *OpenAICompatibleClient) ExtractAtoms(ctx context.Context, messagesJSONL string) (string, error) {
+	system, user, err := ExtractPromptPair(c.extractVersion, messagesJSONL)
+	if err != nil {
+		return "", fmt.Errorf("llm extract atoms: %w", err)
+	}
 	req := chatCompletionRequest{
 		Model:       c.model,
 		Temperature: 0.1,
 		Messages: []chatMessage{
-			{Role: "system", Content: extractAtomsSystemPrompt},
-			{Role: "user", Content: buildExtractAtomsPrompt(messagesJSONL)},
+			{Role: "system", Content: system},
+			{Role: "user", Content: user},
 		},
 	}
 	out, err := c.completeWithRetry(ctx, "extract_atoms", req)
@@ -147,13 +156,18 @@ func (c *OpenAICompatibleClient) DistillMemory(
 	slug string,
 	atomsJSON string,
 	corrections []string,
+	related []RelatedEvent,
 ) (string, error) {
+	version := c.distillVersion
+	if version == 0 {
+		version = DistillMemoryPromptLatest
+	}
 	req := chatCompletionRequest{
 		Model:       c.model,
 		Temperature: 0,
 		Messages: []chatMessage{
 			{Role: "system", Content: distillMemorySystemPrompt},
-			{Role: "user", Content: buildDistillMemoryPrompt(category, slug, atomsJSON, corrections)},
+			{Role: "user", Content: buildDistillMemoryPromptV(version, category, slug, atomsJSON, corrections, related)},
 		},
 	}
 	out, err := c.completeWithRetry(ctx, "distill_memory", req)
@@ -161,6 +175,41 @@ func (c *OpenAICompatibleClient) DistillMemory(
 		return "", fmt.Errorf("llm distill memory failed: %w", err)
 	}
 	return out, nil
+}
+
+// SetExtractPromptVersion pins the extraction prompt template generation used
+// by this client (0 = latest). Older generations stay available for A/B
+// session replay (issue #28).
+func (c *OpenAICompatibleClient) SetExtractPromptVersion(version int) error {
+	if _, _, err := ExtractPromptPair(version, ""); err != nil {
+		return err
+	}
+	c.extractVersion = version
+	return nil
+}
+
+// SetDistillPromptVersion pins the distillation prompt template generation
+// used by this client (0 = latest). Older generations stay available for A/B
+// session replay (issue #28).
+func (c *OpenAICompatibleClient) SetDistillPromptVersion(version int) error {
+	if version == 0 {
+		c.distillVersion = 0
+		return nil
+	}
+	if version < 1 || version > DistillMemoryPromptLatest {
+		return fmt.Errorf("unknown distill prompt version %d (latest %d)", version, DistillMemoryPromptLatest)
+	}
+	c.distillVersion = version
+	return nil
+}
+
+// DistillPromptVersion reports the effective distill prompt generation (0
+// means latest, resolved at call time).
+func (c *OpenAICompatibleClient) DistillPromptVersion() int {
+	if c.distillVersion == 0 {
+		return DistillMemoryPromptLatest
+	}
+	return c.distillVersion
 }
 
 func (c *OpenAICompatibleClient) completeWithRetry(ctx context.Context, operation string, req chatCompletionRequest) (string, error) {

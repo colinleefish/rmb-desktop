@@ -16,7 +16,7 @@ func init() {
 // vector. Distance is computed inside SQLite via sqlite-vec's
 // vec_distance_cosine, so vectors are no longer pulled into Go memory and
 // ranked by a hand-rolled linear scan.
-func VectorMemories(ctx context.Context, db *sql.DB, queryVec []float32, k int) ([]Match, error) {
+func VectorMemories(ctx context.Context, db *sql.DB, queryVec []float32, k int, tw TimeWindow) ([]Match, error) {
 	if k <= 0 {
 		k = 5
 	}
@@ -24,14 +24,15 @@ func VectorMemories(ctx context.Context, db *sql.DB, queryVec []float32, k int) 
 	if err != nil {
 		return nil, fmt.Errorf("serialize query vector: %w", err)
 	}
+	windowClause, windowArgs := tw.Clause("updated_at")
 	rows, err := db.QueryContext(ctx, `
 		SELECT uri,
 		       COALESCE(substr(COALESCE(NULLIF(TRIM(abstract), ''), body), 1, 160), ''),
 		       vec_distance_cosine(embedding, ?) AS distance
 		FROM memories
-		WHERE superseded_at IS NULL AND embedding IS NOT NULL
+		WHERE superseded_at IS NULL AND embedding IS NOT NULL`+windowClause+`
 		ORDER BY distance ASC
-		LIMIT ?`, blob, k)
+		LIMIT ?`, prependAny(blob, append(windowArgs, any(k))...)...)
 	if err != nil {
 		return nil, fmt.Errorf("vector memories: %w", err)
 	}
@@ -39,7 +40,7 @@ func VectorMemories(ctx context.Context, db *sql.DB, queryVec []float32, k int) 
 	return scanVecMatches(rows, "memories")
 }
 
-func VectorScenes(ctx context.Context, db *sql.DB, queryVec []float32, k int) ([]Match, error) {
+func VectorScenes(ctx context.Context, db *sql.DB, queryVec []float32, k int, tw TimeWindow) ([]Match, error) {
 	if k <= 0 {
 		k = 5
 	}
@@ -47,14 +48,15 @@ func VectorScenes(ctx context.Context, db *sql.DB, queryVec []float32, k int) ([
 	if err != nil {
 		return nil, fmt.Errorf("serialize query vector: %w", err)
 	}
+	windowClause, windowArgs := tw.Clause("updated_at")
 	rows, err := db.QueryContext(ctx, `
 		SELECT 'rmb://scenes/' || lower(id),
 		       COALESCE(substr(COALESCE(NULLIF(TRIM(abstract), ''), body), 1, 160), ''),
 		       vec_distance_cosine(embedding, ?) AS distance
 		FROM scenes
-		WHERE embedding IS NOT NULL
+		WHERE embedding IS NOT NULL`+windowClause+`
 		ORDER BY distance ASC
-		LIMIT ?`, blob, k)
+		LIMIT ?`, prependAny(blob, append(windowArgs, any(k))...)...)
 	if err != nil {
 		return nil, fmt.Errorf("vector scenes: %w", err)
 	}
@@ -62,7 +64,7 @@ func VectorScenes(ctx context.Context, db *sql.DB, queryVec []float32, k int) ([
 	return scanVecMatches(rows, "scenes")
 }
 
-func VectorSkills(ctx context.Context, db *sql.DB, queryVec []float32, k int) ([]Match, error) {
+func VectorSkills(ctx context.Context, db *sql.DB, queryVec []float32, k int, tw TimeWindow) ([]Match, error) {
 	if k <= 0 {
 		k = 5
 	}
@@ -70,14 +72,15 @@ func VectorSkills(ctx context.Context, db *sql.DB, queryVec []float32, k int) ([
 	if err != nil {
 		return nil, fmt.Errorf("serialize query vector: %w", err)
 	}
+	windowClause, windowArgs := tw.Clause("updated_at")
 	rows, err := db.QueryContext(ctx, `
 		SELECT uri,
 		       COALESCE(substr(description, 1, 160), ''),
 		       vec_distance_cosine(embedding, ?) AS distance
 		FROM skills
-		WHERE superseded_at IS NULL AND embedding IS NOT NULL
+		WHERE superseded_at IS NULL AND embedding IS NOT NULL`+windowClause+`
 		ORDER BY distance ASC
-		LIMIT ?`, blob, k)
+		LIMIT ?`, prependAny(blob, append(windowArgs, any(k))...)...)
 	if err != nil {
 		return nil, fmt.Errorf("vector skills: %w", err)
 	}

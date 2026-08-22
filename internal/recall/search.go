@@ -35,7 +35,7 @@ func (s *Service) Search(ctx context.Context, embed QueryEmbedder, query string,
 		scopes = DefaultScopes
 	}
 
-	wantMemory, wantScene, wantSkill := false, false, false
+	wantMemory, wantScene, wantSkill, wantAtom := false, false, false, false
 	for _, sc := range scopes {
 		switch sc {
 		case "memory":
@@ -44,11 +44,13 @@ func (s *Service) Search(ctx context.Context, embed QueryEmbedder, query string,
 			wantScene = true
 		case "skill":
 			wantSkill = true
+		case "atom":
+			wantAtom = true
 		default:
 			return nil, fmt.Errorf("invalid scope %q", sc)
 		}
 	}
-	if !wantMemory && !wantScene && !wantSkill {
+	if !wantMemory && !wantScene && !wantSkill && !wantAtom {
 		wantMemory, wantScene, wantSkill = true, true, true
 	}
 
@@ -131,6 +133,27 @@ func (s *Service) Search(ctx context.Context, embed QueryEmbedder, query string,
 		}
 	}
 
+	if wantAtom {
+		// Atoms are the raw per-fact evidence tier. They are an explicit
+		// --scope=atom tier (never default) so detail questions can reach the
+		// content that one-line memories only summarize (plan §5 P1.1, C6).
+		fts, err := FTSAtoms(ctx, s.DB, query, perList, tw)
+		if err != nil {
+			return nil, err
+		}
+		if hasVector {
+			vec, err := VectorAtoms(ctx, s.DB, queryVec, perList, tw)
+			if err != nil {
+				return nil, err
+			}
+			fuseTier(vec, fts)
+		} else {
+			for _, m := range fts {
+				merged = append(merged, tierHit{match: m, score: m.Rank})
+			}
+		}
+	}
+
 	if wantSkill {
 		// Skills are FTS-only: their descriptions are terse and domain-homogeneous,
 		// so the vector leg drifts toward generic ops language and lets an
@@ -197,7 +220,7 @@ func (s *Service) Search(ctx context.Context, embed QueryEmbedder, query string,
 
 	// Skill cap: outside an explicit skill-only scope, keep only the single
 	// highest-ranked skill so the generic-match skill cannot fill the list.
-	skillOnly := wantSkill && !wantMemory && !wantScene
+	skillOnly := wantSkill && !wantMemory && !wantScene && !wantAtom
 	skillSeen := 0
 	filtered := keep[:0]
 	for _, th := range keep {

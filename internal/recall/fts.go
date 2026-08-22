@@ -84,6 +84,51 @@ func FTSSkills(ctx context.Context, db *sql.DB, query string, k int, tw TimeWind
 	return scanFTSMatches(rows, "skills")
 }
 
+// FTSAtoms returns atom results (the raw per-fact evidence tier) ranked by
+// BM25. Atoms are an explicit --scope=atom tier (never default). Each hit is
+// annotated with its owning scene URI and session URI so agents can drill
+// down to the evidence without re-distillation (plan §5 P1.1, C6).
+func FTSAtoms(ctx context.Context, db *sql.DB, query string, k int, tw TimeWindow) ([]Match, error) {
+	if k <= 0 {
+		k = 5
+	}
+	windowClause, windowArgs := tw.Clause("a.updated_at")
+	rows, err := db.QueryContext(ctx, `
+		SELECT 'rmb://atoms/' || lower(a.id) AS uri,
+		       COALESCE(substr(a.content, 1, 160), '') AS snippet,
+		       COALESCE((SELECT 'rmb://scenes/' || lower(s.id)
+		                 FROM scenes s
+		                 WHERE s.source_atoms LIKE '%"' || a.id || '"%'
+		                 LIMIT 1), '') AS scene_uri,
+		       'rmb://sessions/' || lower(a.session_id) AS session_uri
+		FROM atoms a
+		INNER JOIN atoms_fts fts ON fts.rowid = a.rowid
+		WHERE atoms_fts MATCH ?`+windowClause+`
+		ORDER BY bm25(atoms_fts)
+		LIMIT ?`, prependArgs(EscapeFTSQuery(query), append(windowArgs, any(k))...)...)
+	if err != nil {
+		return nil, fmt.Errorf("fts atoms: %w", err)
+	}
+	defer rows.Close()
+	return scanAtomMatches(rows, "atoms")
+}
+
+// scanAtomMatches reads an atom-tier row (uri, snippet, scene_uri,
+// session_uri) and appends drill-down annotations to the snippet.
+func scanAtomMatches(rows *sql.Rows, tier string) ([]Match, error) {
+	var out []Match
+	rank := 1.0
+	for rows.Next() {
+		var uri, snippet, sceneURI, sessionURI string
+		if err := rows.Scan(&uri, &snippet, &sceneURI, &sessionURI); err != nil {
+			return nil, err
+		}
+		out = append(out, annotateAtom(Match{URI: uri, Tier: tier, Rank: rank, Snippet: snippet}, sceneURI, sessionURI))
+		rank++
+	}
+	return out, rows.Err()
+}
+
 // scanFTSMemoryMatches scans the memory-tier FTS result (uri, snippet,
 // version, source_scene_uris) and fills the extra Match fields.
 func scanFTSMemoryMatches(rows *sql.Rows, tier string) ([]Match, error) {

@@ -22,3 +22,17 @@ type Match struct {
 // --scope=scene (plan §9.2, D1). Keeping them out of the default keeps one
 // fact from flooding the result list across tiers.
 var DefaultScopes = []string{"memory", "skill"}
+
+// annotateAtom appends drill-down annotations (owning scene URI + session URI)
+// to an atom hit's snippet so agents can jump to the raw evidence. The
+// annotation is text-only so it never interacts with link-based scene
+// suppression. Atoms are an explicit --scope=atom tier only.
+func annotateAtom(m Match, sceneURI, sessionURI string) Match {
+	if sceneURI != "" {
+		m.Snippet += " (scene: " + sceneURI + ")"
+	}
+	if sessionURI != "" {
+		m.Snippet += " (session: " + sessionURI + ")"
+	}
+	return m
+}

@@ -218,6 +218,74 @@ func (s *Service) Search(ctx context.Context, embed QueryEmbedder, query string,
 		}
 	}
 
+	// Cosine cross-tier suppression (fallback, plan §5 P1.4): the link pass
+	// above only fires when the scene is listed in the owning memory's
+	// source_scene_uris. Rows without provenance (pre-provenance data, eval
+	// fixtures) can still co-rank a scene whose content is semantically
+	// identical to a memory. Compare the STORED embeddings of the memory and
+	// scene candidates already in the merged list (no extra queries beyond
+	// batch-fetching those embeddings) and drop the scene when cosine
+	// similarity exceeds crossTierDupThreshold — the memory is the index, the
+	// scene is evidence. Atoms and skills never participate.
+	var cosMemURIs, cosSceneURIs []string
+	for _, th := range keep {
+		switch th.match.Tier {
+		case "memories":
+			cosMemURIs = append(cosMemURIs, th.match.URI)
+		case "scenes":
+			cosSceneURIs = append(cosSceneURIs, th.match.URI)
+		}
+	}
+	if len(cosMemURIs) > 0 && len(cosSceneURIs) > 0 &&
+		len(cosMemURIs)*len(cosSceneURIs) <= maxCrossTierPairs {
+		embeds, err := fetchCrossTierEmbeddings(ctx, s.DB, cosMemURIs, cosSceneURIs)
+		if err != nil {
+			return nil, err
+		}
+		// scene uri -> highest-ranked near-duplicate memory (rank order = keep
+		// order; first match wins, mirroring the link pass's owner rule).
+		dupOwner := map[string]string{}
+		for i := range keep {
+			mv := embeds[keep[i].match.URI]
+			if keep[i].match.Tier != "memories" || len(mv) == 0 {
+				continue
+			}
+			for _, th := range keep {
+				if th.match.Tier != "scenes" {
+					continue
+				}
+				if _, done := dupOwner[th.match.URI]; done {
+					continue
+				}
+				if cosineSim(mv, embeds[th.match.URI]) > crossTierDupThreshold {
+					dupOwner[th.match.URI] = keep[i].match.URI
+				}
+			}
+		}
+		if len(dupOwner) > 0 {
+			filteredCos := keep[:0]
+			for _, th := range keep {
+				if _, dup := dupOwner[th.match.URI]; dup {
+					continue
+				}
+				filteredCos = append(filteredCos, th)
+			}
+			keep = filteredCos
+			// Annotate owners with the suppressed duplicates (once per owner,
+			// reusing the depth-annotation shape so agents can still drill down).
+			annotatedDup := map[string]bool{}
+			for scURI, ownerURI := range dupOwner {
+				for i := range keep {
+					if keep[i].match.URI == ownerURI && !annotatedDup[ownerURI] {
+						keep[i].match.Snippet += fmt.Sprintf(" (+scene dup: %s)", scURI)
+						annotatedDup[ownerURI] = true
+						break
+					}
+				}
+			}
+		}
+	}
+
 	// Skill cap: outside an explicit skill-only scope, keep only the single
 	// highest-ranked skill so the generic-match skill cannot fill the list.
 	skillOnly := wantSkill && !wantMemory && !wantScene && !wantAtom

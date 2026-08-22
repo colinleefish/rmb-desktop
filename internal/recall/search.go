@@ -132,20 +132,17 @@ func (s *Service) Search(ctx context.Context, embed QueryEmbedder, query string,
 	}
 
 	if wantSkill {
+		// Skills are FTS-only: their descriptions are terse and domain-homogeneous,
+		// so the vector leg drifts toward generic ops language and lets an
+		// irrelevant-but-generic skill (e.g. draft-aliyun-procurement-ticket)
+		// pollute every result list (plan §5 P0.2, C4). Lexical match on the
+		// distinctive name/description is the correct signal.
 		fts, err := FTSSkills(ctx, s.DB, query, perList, tw)
 		if err != nil {
 			return nil, err
 		}
-		if hasVector {
-			vec, err := VectorSkills(ctx, s.DB, queryVec, perList, tw)
-			if err != nil {
-				return nil, err
-			}
-			fuseTier(vec, fts)
-		} else {
-			for _, m := range fts {
-				merged = append(merged, tierHit{match: m, score: m.Rank})
-			}
+		for _, m := range fts {
+			merged = append(merged, tierHit{match: m, score: m.Rank})
 		}
 	}
 
@@ -156,9 +153,67 @@ func (s *Service) Search(ctx context.Context, embed QueryEmbedder, query string,
 		return merged[i].score > merged[j].score
 	})
 
+	// Link-based scene suppression: a scene that is the source_scene_uris of a
+	// higher-ranked memory is evidence, not a separate result. Drop it and
+	// annotate the owning memory so agents can drill down deterministically
+	// (plan §9.2: memories are the index, scenes are the evidence).
+	sceneOwner := map[string]int{} // scene uri -> merged index of owning memory
+	sceneIdx := map[string]int{}   // scene uri -> merged index of the scene hit itself
+	for i := range merged {
+		if merged[i].match.Tier == "scenes" {
+			sceneIdx[merged[i].match.URI] = i
+			continue
+		}
+		for _, sc := range merged[i].match.SourceScenes {
+			if _, ok := sceneOwner[sc]; !ok {
+				sceneOwner[sc] = i
+			}
+		}
+	}
+	keep := make([]tierHit, 0, len(merged))
+	suppressed := map[string]string{} // scene uri -> owner memory uri (annotation)
+	for i := range merged {
+		m := merged[i]
+		if m.match.Tier == "scenes" {
+			if owner, ok := sceneOwner[m.match.URI]; ok && owner != i {
+				suppressed[m.match.URI] = merged[owner].match.URI
+				continue
+			}
+		}
+		keep = append(keep, m)
+	}
+	// Annotate owners with suppressed evidence scenes (first one only, avoid
+	// clobbering).
+	annotated := map[string]bool{}
+	for sc, ownerURI := range suppressed {
+		for i := range keep {
+			if keep[i].match.URI == ownerURI && !annotated[ownerURI] {
+				keep[i].match.Snippet += fmt.Sprintf(" (+scene depth: %s)", sc)
+				annotated[ownerURI] = true
+				break
+			}
+		}
+	}
+
+	// Skill cap: outside an explicit skill-only scope, keep only the single
+	// highest-ranked skill so the generic-match skill cannot fill the list.
+	skillOnly := wantSkill && !wantMemory && !wantScene
+	skillSeen := 0
+	filtered := keep[:0]
+	for _, th := range keep {
+		if th.match.Tier == "skills" && !skillOnly {
+			if skillSeen >= 1 {
+				continue
+			}
+			skillSeen++
+		}
+		filtered = append(filtered, th)
+	}
+	keep = filtered
+
 	seen := make(map[string]struct{})
 	out := make([]Match, 0, k)
-	for _, h := range merged {
+	for _, h := range keep {
 		if _, dup := seen[h.match.URI]; dup {
 			continue
 		}

@@ -12,8 +12,12 @@
 # Gates are the v1 baseline (recorded from a local full run). The eval fails
 # when aggregate metrics regress past these.
 gates:
-  # v1 baseline (deterministic hash-embedder, fixture subset): observed
-  # recall@5=0.545 dup-rate=0.000 recency-precision=1.000 on 22 questions.
+  # Baseline history (deterministic hash-embedder, fixture subset, 22 q):
+  #   v1 (scenes in default scope): recall@5=0.545
+  #   after #19 scope redesign (scenes out of default; skills FTS-only):
+  #     recall@5=0.500. The -1 is audit-3 (A股 首板): it previously hit via a
+  #     scene; the correct memory (preferences/stock-first-board-filter) ranks
+  #     with the production embedder but not the conservative hash embedder.
   # Gates are set at/below baseline so the eval fails only on real regressions
   # from HEAD. The live production embedder scores higher; these numbers are
   # a conservative lower bound (see package doc on the accuracy tradeoff).
@@ -37,17 +41,15 @@ questions:
     query: "A股 首板 入选条件 量价"
     expected:
       - rmb://preferences/stock-first-board-filter
-      - rmb://scenes/d0e388d6-9914-5a7b-ad37-fb20d56351cb
   - id: audit-4-photo-workflow
     query: "HEIC Nikon Z30 photo workflow"
     expected:
       - rmb://preferences/nikon-naming-rule
-      - rmb://scenes/8c533793-f31f-5023-abff-84748339a91b
   - id: audit-5-why-sqlite
     query: "why sqlite instead of postgres for rmb daemon"
     expected:
-      - rmb://scenes/cdccc2a4-f2c5-5fa3-bd3e-a111ef85c229
       - rmb://events/duckdb-to-postgres-pbp
+      - rmb://events/rmbd-sqlite-architecture
   - id: audit-6-bastion-ssh
     query: "SSH bastion jump.hs99.vip ProxyJump"
     expected:
@@ -62,7 +64,6 @@ questions:
     query: "starlink openresty dynamic dns"
     expected:
       - rmb://events/2026-08-21-starlink-openresty-dynamic-dns
-      - rmb://scenes/a391a8fa-a941-58e0-a097-9544eb7b38bc
       - rmb://events/2026-07-28-openresty-dynamic-dns-investigation
     tags: [recency]
     latest: rmb://events/2026-08-21-starlink-openresty-dynamic-dns

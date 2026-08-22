@@ -248,7 +248,11 @@ func parseLsArgs(args []string) (string, url.Values, error) {
 
 func printMatches(matches []client.Match) {
 	for i, m := range matches {
-		fmt.Printf("%2d. [%s] %s\n", i+1, m.Tier, m.URI)
+		ver := ""
+		if m.Version > 0 {
+			ver = fmt.Sprintf(", v=%d", m.Version)
+		}
+		fmt.Printf("%2d. [%s] %s (%.4f%s)\n", i+1, m.Tier, m.URI, m.Rank, ver)
 		if m.Snippet != "" {
 			fmt.Printf("    %s\n", m.Snippet)
 		}

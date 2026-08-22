@@ -10,7 +10,7 @@ import (
 
 // Windows WaitForSingleObject event codes.
 const (
-	waitObject0 = 0 // WAIT_OBJECT_0
+	waitObject0 = 0   // WAIT_OBJECT_0
 	waitTimeout = 258 // WAIT_TIMEOUT
 )
 

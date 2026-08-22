@@ -67,7 +67,7 @@ type PipelineConfig struct {
 	L3PollInterval    time.Duration `yaml:"l3_poll_interval"`
 	EmbedPollInterval time.Duration `yaml:"embed_poll_interval"`
 	L1EveryN          int           `yaml:"l1_every_n"`
-	L1IdleSeconds     time.Duration `yaml:"l1_idle_seconds"`
+	L1Idle            time.Duration `yaml:"l1_idle_seconds"`
 	L1Warmup          bool          `yaml:"l1_warmup"`
 	L2DelayAfterL1    time.Duration `yaml:"l2_delay_after_l1"`
 	L1MaxTurns        int           `yaml:"l1_max_turns_per_batch"`
@@ -107,7 +107,7 @@ func Default() (Config, error) {
 			L3PollInterval:    5 * time.Minute,
 			EmbedPollInterval: 30 * time.Second,
 			L1EveryN:          8,
-			L1IdleSeconds:     10 * time.Minute,
+			L1Idle:            10 * time.Minute,
 			L1Warmup:          true,
 			L2DelayAfterL1:    90 * time.Second,
 			L1MaxTurns:        8,

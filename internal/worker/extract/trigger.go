@@ -14,7 +14,7 @@ func shouldRunL1(
 	warmupThreshold int,
 	everyN int,
 	warmupEnabled bool,
-	idleSeconds time.Duration,
+	idle time.Duration,
 	lastTurnAt time.Time,
 ) bool {
 	if unprocessedTurns <= 0 {
@@ -34,7 +34,7 @@ func shouldRunL1(
 	if turnsSinceAdvanced >= threshold {
 		return true
 	}
-	if idleSeconds > 0 && !lastTurnAt.IsZero() && now.Sub(lastTurnAt) >= idleSeconds {
+	if idle > 0 && !lastTurnAt.IsZero() && now.Sub(lastTurnAt) >= idle {
 		return true
 	}
 	return false

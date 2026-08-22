@@ -149,9 +149,10 @@ export function ConfigDiffReview({
   );
   const [copied, setCopied] = useState(false);
 
+  const { current, proposed } = artifact;
   const diffLines = useMemo(
-    () => computeDiff(artifact.current, artifact.proposed),
-    [artifact.current, artifact.proposed],
+    () => computeDiff(current, proposed),
+    [current, proposed],
   );
 
   const added = diffLines.filter((l) => l.kind === "add").length;

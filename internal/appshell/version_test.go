@@ -6,10 +6,10 @@ import "testing"
 // running_matches_expected.
 func TestVersionMatches(t *testing.T) {
 	cases := []struct {
-		name        string
-		expV, expC  string
-		remV, remC  string
-		want        bool
+		name       string
+		expV, expC string
+		remV, remC string
+		want       bool
 	}{
 		{"exact match", "0.1.21", "abc1234", "0.1.21", "abc1234", true},
 		{"version differs", "0.1.21", "abc1234", "0.1.20", "abc1234", false},

@@ -23,11 +23,11 @@ import (
 // Manifest v2. Served as R2 latest.json and as the manifest.json release
 // asset on GitHub; mirrors may host either name.
 type Manifest struct {
-	Product     string                            `json:"product"`
-	Version     string                            `json:"version"`
-	ReleasedAt  string                            `json:"released_at"`
-	Signature   string                            `json:"signature,omitempty"`
-	Platforms   map[string]map[string]PlatformArt `json:"platforms"`
+	Product    string                            `json:"product"`
+	Version    string                            `json:"version"`
+	ReleasedAt string                            `json:"released_at"`
+	Signature  string                            `json:"signature,omitempty"`
+	Platforms  map[string]map[string]PlatformArt `json:"platforms"`
 }
 
 // PlatformArt describes one platform/arch sidecar bundle.

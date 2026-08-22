@@ -14,7 +14,7 @@ func TestLooksLikeRmbd(t *testing.T) {
 		{"RMBD", true},
 		{"  rmbd  ", true},
 		{"Google Chrome Helper", false},
-		{"rmb", false},        // the CLI, not the daemon — must not match
+		{"rmb", false}, // the CLI, not the daemon — must not match
 		{"rmbd-something-else", false},
 		{"chrome", false},
 		{"", false},

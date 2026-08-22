@@ -159,9 +159,7 @@ func listModels(ctx context.Context, apiBase, apiKey string, timeout time.Durati
 
 		ids := make([]string, 0, len(parsed.Data))
 		for _, item := range parsed.Data {
-			for _, id := range modelListIDs(item) {
-				ids = append(ids, id)
-			}
+			ids = append(ids, modelListIDs(item)...)
 		}
 		return ids, nil
 	}

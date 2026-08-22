@@ -235,7 +235,7 @@ func (w *Worker) prepareBatch(ctx context.Context, sessionID string) (*extractBa
 	lastTurnAt := time.UnixMilli(turns[len(turns)-1].CreatedAt).UTC()
 	if !shouldRunL1(
 		w.now().UTC(), l1Status, len(turns), l1TurnsSinceAdvanced, warmupThreshold,
-		w.cfg.L1EveryN, w.cfg.L1Warmup, w.cfg.L1IdleSeconds, lastTurnAt,
+		w.cfg.L1EveryN, w.cfg.L1Warmup, w.cfg.L1Idle, lastTurnAt,
 	) {
 		return nil, nil
 	}

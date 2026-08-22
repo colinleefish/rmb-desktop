@@ -46,7 +46,7 @@ type PipelineView struct {
 	L3PollInterval    string `json:"l3_poll_interval"`
 	EmbedPollInterval string `json:"embed_poll_interval"`
 	L1EveryN          int    `json:"l1_every_n"`
-	L1IdleSeconds     string `json:"l1_idle_seconds"`
+	L1Idle            string `json:"l1_idle_seconds"`
 	L1Warmup          bool   `json:"l1_warmup"`
 	L2DelayAfterL1    string `json:"l2_delay_after_l1"`
 	L1MaxTurns        int    `json:"l1_max_turns_per_batch"`
@@ -90,7 +90,7 @@ type PipelineUpdate struct {
 	L3PollInterval    *string `json:"l3_poll_interval"`
 	EmbedPollInterval *string `json:"embed_poll_interval"`
 	L1EveryN          *int    `json:"l1_every_n"`
-	L1IdleSeconds     *string `json:"l1_idle_seconds"`
+	L1Idle            *string `json:"l1_idle_seconds"`
 	L1Warmup          *bool   `json:"l1_warmup"`
 	L2DelayAfterL1    *string `json:"l2_delay_after_l1"`
 	L1MaxTurns        *int    `json:"l1_max_turns_per_batch"`
@@ -138,7 +138,7 @@ func pipelineToView(p PipelineConfig) PipelineView {
 		L3PollInterval:    p.L3PollInterval.String(),
 		EmbedPollInterval: p.EmbedPollInterval.String(),
 		L1EveryN:          p.L1EveryN,
-		L1IdleSeconds:     p.L1IdleSeconds.String(),
+		L1Idle:            p.L1Idle.String(),
 		L1Warmup:          p.L1Warmup,
 		L2DelayAfterL1:    p.L2DelayAfterL1.String(),
 		L1MaxTurns:        p.L1MaxTurns,
@@ -238,8 +238,8 @@ func applyPipelineUpdate(p PipelineConfig, u PipelineUpdate) (PipelineConfig, er
 			return p, fmt.Errorf("embed_poll_interval: %w", err)
 		}
 	}
-	if u.L1IdleSeconds != nil {
-		p.L1IdleSeconds, err = time.ParseDuration(strings.TrimSpace(*u.L1IdleSeconds))
+	if u.L1Idle != nil {
+		p.L1Idle, err = time.ParseDuration(strings.TrimSpace(*u.L1Idle))
 		if err != nil {
 			return p, fmt.Errorf("l1_idle_seconds: %w", err)
 		}

@@ -30,14 +30,14 @@ Skills are curated playbooks at `rmb://skills/<name>` — check them before impr
 
 When the user asks you to do something (deploy, SSH, PDF, etc.):
 
-1. `rmb search "<what they asked>"` — default scope is memory + skills (scenes are NOT included).
+1. `rmb search "<what they asked>"` — default scope is memory + skills (scenes and atoms are evidence, NOT in the default — reach them via `--scope`).
 2. If a `[skills]` hit looks relevant, activate it before acting:
    - `rmb cat rmb://skills/<name>` — read SKILL.md and follow it
    - scripts: `rmb pull rmb://skills/<name>` → run from `~/.rmb/skills/<name>/`
 3. Unsure what is available? `rmb ls rmb://skills/` — catalog of name + description.
 4. Do not wing it when a skill matches — skills outrank your defaults for that task.
 
-Narrow scope when you know the tier: `--scope=memory`, `--scope=scene`, or `--scope=skill`.
+Narrow scope when you know the tier: `--scope=memory`, `--scope=scene`, `--scope=skill`, or `--scope=atom`. Use `--scope=atom` for raw per-fact detail (e.g. resolver IPs, config snippets) that one-line memories only summarize; atom hits carry `(scene: …)` / `(session: …)` drill-down annotations.
 
 ## Skills reference
 

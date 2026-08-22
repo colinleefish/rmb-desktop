@@ -101,7 +101,7 @@ func hookSubmit(args []string) int {
 func search(args []string) int {
 	query, rest := parseQueryAndFlags(args)
 	if query == "" {
-		fmt.Fprintf(os.Stderr, `usage: rmb search "<query>" [--scope=memory,scene,skill] [--k=n] [--since=<date|Nd>] [--until=<date|Nd>]`)
+		fmt.Fprintf(os.Stderr, `usage: rmb search "<query>" [--scope=memory,scene,skill,atom] [--k=n] [--since=<date|Nd>] [--until=<date|Nd>]`)
 		return 2
 	}
 	k, err := parseK(rest)
@@ -326,7 +326,7 @@ func printUsage() {
 func usageText() string {
 	return `Usage:
   rmb hook-submit --source=<cursor> [--url=http://127.0.0.1:19019]
-  rmb search "<query>" [--scope=memory,scene,skill] [--k=n] [--since=<date|Nd>] [--until=<date|Nd>]
+  rmb search "<query>" [--scope=memory,scene,skill,atom] [--k=n] [--since=<date|Nd>] [--until=<date|Nd>]
   rmb ls <uri-prefix>            # list container contents (e.g. rmb://events/)
   rmb ls <uri-prefix> [--limit=N] [--offset=N] [--since=<date|7d>] [--until=<date|7d>] [--count]
   rmb cat <uri>

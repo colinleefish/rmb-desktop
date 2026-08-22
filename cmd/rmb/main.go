@@ -46,6 +46,8 @@ func run() int {
 		return setupCmd(os.Args[2:])
 	case "doctor":
 		return doctorCmd(os.Args[2:])
+	case "backfill-provenance":
+		return backfillCmd(os.Args[2:])
 	case "version":
 		if c := version.Commit; c != "" && c != "dev" {
 			fmt.Printf("%s (%s)\n", version.Version, c)

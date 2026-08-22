@@ -91,6 +91,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/doctor/metrics", s.handleDoctorMetrics)
 	s.mux.HandleFunc("GET /api/v1/doctor/archive", s.handleDoctorArchiveCandidates)
 	s.mux.HandleFunc("POST /api/v1/doctor/archive", s.handleDoctorArchiveAction)
+	s.mux.HandleFunc("POST /api/v1/maintenance/backfill-provenance", s.handleBackfillProvenance)
 	s.mux.HandleFunc("GET /api/v1/inspect/cat", func(w http.ResponseWriter, r *http.Request) {
 		s.handleInspect(w, r, "cat")
 	})

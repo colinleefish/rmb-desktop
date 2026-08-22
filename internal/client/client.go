@@ -229,6 +229,26 @@ func (c *Client) InspectWith(ctx context.Context, kind, uri string, extra url.Va
 	return string(body), nil
 }
 
+// BackfillProvenance invokes the daemon's one-time provenance backfill
+// (issue #31). q holds optional threshold/max-scenes/dry-run/categories.
+func (c *Client) BackfillProvenance(ctx context.Context, q url.Values) (string, error) {
+	endpoint := c.baseURL + "/api/v1/maintenance/backfill-provenance?" + q.Encode()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("backfill provenance: %w", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode != http.StatusOK {
+		return "", apiError("backfill-provenance", resp.StatusCode, body)
+	}
+	return string(body), nil
+}
+
 // SkillFile is one file in a skill bundle upload.
 type SkillFile struct {
 	Path    string `json:"path"`

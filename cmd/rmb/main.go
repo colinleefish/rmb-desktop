@@ -44,6 +44,8 @@ func run() int {
 		return putCmd(os.Args[2:])
 	case "setup":
 		return setupCmd(os.Args[2:])
+	case "doctor":
+		return doctorCmd(os.Args[2:])
 	case "version":
 		if c := version.Commit; c != "" && c != "dev" {
 			fmt.Printf("%s (%s)\n", version.Version, c)
@@ -328,6 +330,165 @@ func parseTimeFlag(args []string, prefix string) (string, error) {
 		}
 	}
 	return "", nil
+}
+
+// doctorCmd implements `rmb doctor <subcommand>`.
+//
+//	rmb doctor archive                      # --dry-run: propose cold memories
+//	rmb doctor archive --dry-run [--days=N] # explicit review list
+//	rmb doctor archive --apply [--uri=U...] # archive approved list (all if no uri)
+//	rmb doctor archive --restore <uri>...    # un-archive specific memories
+//	rmb doctor archive --restore-all         # un-archive everything
+//	rmb doctor metrics                       # retrieval-health report (#24)
+func doctorCmd(args []string) int {
+	if len(args) == 0 {
+		fmt.Fprint(os.Stderr, doctorUsage())
+		return 2
+	}
+	switch args[0] {
+	case "archive":
+		return doctorArchive(args[1:])
+	case "metrics":
+		return doctorMetrics()
+	default:
+		fmt.Fprint(os.Stderr, doctorUsage())
+		return 2
+	}
+}
+
+func doctorUsage() string {
+	return `Usage:
+  rmb doctor archive                    # --dry-run: propose cold memories (issue #32)
+  rmb doctor archive --dry-run [--days=N]
+  rmb doctor archive --apply [--uri=rmb://... ...]  # archive approved list (bulk-all if no --uri)
+  rmb doctor archive --restore <uri>...              # restore specific uri(s)
+  rmb doctor archive --restore-all                  # restore everything
+  rmb doctor metrics                                # retrieval-health report (#24)
+`
+}
+
+func doctorArchive(args []string) int {
+	apply := false
+	restore := false
+	restoreAll := false
+	days := 0
+	var uris []string
+	for _, a := range args {
+		switch {
+		case a == "--dry-run":
+			// explicit no-op (default path is the review list)
+		case a == "--apply":
+			apply = true
+		case a == "--restore-all" || a == "--restore_all":
+			restoreAll = true
+		case strings.HasPrefix(a, "--days="):
+			n, err := strconv.Atoi(strings.TrimPrefix(a, "--days="))
+			if err != nil || n < 0 {
+				fmt.Fprintf(os.Stderr, "doctor archive: bad --days\n")
+				return 2
+			}
+			days = n
+		case strings.HasPrefix(a, "--uri="):
+			uris = append(uris, strings.TrimPrefix(a, "--uri="))
+		case strings.HasPrefix(a, "--restore="):
+			restore = true
+			if v := strings.TrimPrefix(a, "--restore="); v != "" {
+				uris = append(uris, v)
+			}
+		case a == "-h" || a == "--help":
+			fmt.Fprint(os.Stderr, doctorUsage())
+			return 2
+		case strings.HasPrefix(a, "-"):
+			fmt.Fprintf(os.Stderr, "doctor archive: unknown flag %q\n", a)
+			return 2
+		default:
+			// positional uri(s), valid for --restore
+			uris = append(uris, a)
+		}
+	}
+
+	cl, err := apiClient()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "doctor archive: %v\n", err)
+		return 1
+	}
+
+	if restoreAll {
+		return runArchiveAction(cl, "restore", nil, true)
+	}
+	if restore {
+		if len(uris) == 0 {
+			fmt.Fprint(os.Stderr, "doctor archive: --restore needs at least one uri\n")
+			return 2
+		}
+		return runArchiveAction(cl, "restore", uris, false)
+	}
+	if apply {
+		return runArchiveAction(cl, "archive", uris, false)
+	}
+	// dry-run (default): propose the reviewable list.
+	cands, err := cl.DoctorArchiveCandidates(context.Background(), days)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "doctor archive: %v\n", err)
+		return 1
+	}
+	if len(cands) == 0 {
+		fmt.Println("no cold memories proposed for archival (dry-run, 90-day window)")
+		return 0
+	}
+	fmt.Printf("%d memory(ies) proposed for archival (dry-run, %d-day window)\n\n", len(cands), max(days, 90))
+	for _, c := range cands {
+		fmt.Printf("  %s\n    category=%s version=%d heat=%.3f updated=%d\n", c.URI, c.Category, c.Version, c.Heat, c.UpdatedAt)
+		if c.Abstract != "" {
+			fmt.Printf("    %s\n", truncate(c.Abstract, 120))
+		}
+	}
+	fmt.Println("\nReview the list, then run:  rmb doctor archive --apply   (or --restore later)")
+	return 0
+}
+
+func runArchiveAction(cl *client.Client, action string, uris []string, all bool) int {
+	n, err := cl.DoctorArchiveAction(context.Background(), action, uris, all)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "doctor archive: %v\n", err)
+		return 1
+	}
+	verb := map[string]string{"archive": "archived", "restore": "restored"}[action]
+	switch {
+	case all:
+		fmt.Printf("%d memory(ies) %s\n", n, verb)
+	case len(uris) == 0:
+		fmt.Printf("%d cold memory(ies) %s (bulk apply of the proposed list; nothing deleted)\n", n, verb)
+	default:
+		for _, u := range uris {
+			fmt.Printf("  %s\n", u)
+		}
+		fmt.Printf("%d memory(ies) %s\n", n, verb)
+	}
+	return 0
+}
+
+func doctorMetrics() int {
+	cl, err := apiClient()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "doctor metrics: %v\n", err)
+		return 1
+	}
+	m, err := cl.DoctorMetrics(context.Background())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "doctor metrics: %v\n", err)
+		return 1
+	}
+	fmt.Printf("window_days=%d searches=%d zero_cat_rate=%.2f heat_concentration=%.2f alarm=%v\n",
+		m.WindowDays, m.Searches, m.ZeroCatRate, m.HeatConcentration, m.HeatAlarm)
+	return 0
+}
+
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "…"
 }
 
 func printUsage() {

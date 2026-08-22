@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -83,6 +84,116 @@ func (c *Client) Search(ctx context.Context, query string, k int, scopes []strin
 		return nil, fmt.Errorf("decode search response: %w", err)
 	}
 	return out.Items, nil
+}
+
+// ArchiveCandidate is one cold memory proposed for archival (issue #32).
+type ArchiveCandidate struct {
+	URI       string  `json:"uri"`
+	Category  string  `json:"category"`
+	Slug      string  `json:"slug,omitempty"`
+	Abstract  string  `json:"abstract,omitempty"`
+	Version   int     `json:"version"`
+	Heat      float64 `json:"heat"`
+	LastUseAt *int64  `json:"last_use_at,omitempty"`
+	UpdatedAt int64   `json:"updated_at"`
+}
+
+// DoctorArchiveCandidates fetches the doctor's proposed archive list
+// (read-only review / --dry-run). days <= 0 uses the 90-day default.
+func (c *Client) DoctorArchiveCandidates(ctx context.Context, days int) ([]ArchiveCandidate, error) {
+	endpoint := c.baseURL + "/api/v1/doctor/archive"
+	if days > 0 {
+		endpoint += "?days=" + strconv.Itoa(days)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("archive candidates request: %w", err)
+	}
+	defer resp.Body.Close()
+	// The proposal can be large (thousands of cold memories), so allow a
+	// generous read cap rather than the default 1 MiB used by other methods.
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 128<<20))
+	if resp.StatusCode != http.StatusOK {
+		return nil, apiError("doctor archive", resp.StatusCode, body)
+	}
+	var out struct {
+		Candidates []ArchiveCandidate `json:"candidates"`
+	}
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, fmt.Errorf("decode archive candidates: %w", err)
+	}
+	return out.Candidates, nil
+}
+
+// DoctorMetrics reports the retrieval-health signals behind the doctor
+// command (issue #24): zero-cat search rate and heat concentration.
+type DoctorMetrics struct {
+	WindowDays        int     `json:"window_days"`
+	Searches          int64   `json:"searches"`
+	ConvertedSearch   int64   `json:"converted_searches"`
+	ZeroCatRate       float64 `json:"zero_cat_search_rate"`
+	TotalCats         int64   `json:"total_cats"`
+	TopCats           int64   `json:"top_heats_cats"`
+	HeatConcentration float64 `json:"heat_concentration"`
+	HeatAlarm         bool    `json:"heat_concentration_alarm"`
+}
+
+// DoctorMetrics fetches the retrieval-health report from the local daemon.
+func (c *Client) DoctorMetrics(ctx context.Context) (DoctorMetrics, error) {
+	var m DoctorMetrics
+	endpoint := c.baseURL + "/api/v1/doctor/metrics"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return m, err
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return m, fmt.Errorf("doctor metrics request: %w", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode != http.StatusOK {
+		return m, apiError("doctor metrics", resp.StatusCode, body)
+	}
+	if err := json.Unmarshal(body, &m); err != nil {
+		return m, fmt.Errorf("decode doctor metrics: %w", err)
+	}
+	return m, nil
+}
+
+// DoctorArchiveAction performs the explicit, user-approved archive/restore
+// mutation. action is "archive" or "restore"; empty uris on archive means
+// bulk-archive the proposed set; all=true on restore un-archives everything.
+// Returns the number of rows affected.
+func (c *Client) DoctorArchiveAction(ctx context.Context, action string, uris []string, all bool) (int, error) {
+	payload, _ := json.Marshal(map[string]any{"action": action, "uris": uris, "all": all})
+	endpoint := c.baseURL + "/api/v1/doctor/archive"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return 0, fmt.Errorf("%s request: %w", action, err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode != http.StatusOK {
+		return 0, apiError("doctor archive", resp.StatusCode, body)
+	}
+	var out map[string]int
+	if err := json.Unmarshal(body, &out); err != nil {
+		return 0, fmt.Errorf("decode archive response: %w", err)
+	}
+	if action == "restore" {
+		return out["restored"], nil
+	}
+	return out["archived"], nil
 }
 
 func (c *Client) Inspect(ctx context.Context, kind, uri string) (string, error) {

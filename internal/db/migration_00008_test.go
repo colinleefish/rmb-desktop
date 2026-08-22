@@ -77,6 +77,16 @@ func TestMigration00008_PurgesMultipleAgentMemoriesWithoutFTSCorrupt(t *testing.
 		t.Fatalf("undo 00010 schema: %v", err)
 	}
 
+	// Undo 00011 schema (archived_at column + its partial index) too, so the
+	// re-run re-applies it exactly like 00010 above. Drop the index first:
+	// SQLite refuses to DROP a column that a partial index references.
+	if _, err := database.Exec(`
+		DROP INDEX IF EXISTS idx_memories_not_archived;
+		ALTER TABLE memories DROP COLUMN archived_at;
+	`); err != nil {
+		t.Fatalf("undo 00011 schema: %v", err)
+	}
+
 	// Re-run migrations. The old 00008 failed here with SQLITE_CORRUPT.
 	if err := migrate(database); err != nil {
 		t.Fatalf("re-migrate with two agent memories: %v (old 00008 hit SQLITE_CORRUPT here)", err)

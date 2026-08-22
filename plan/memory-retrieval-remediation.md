@@ -111,7 +111,7 @@ This version is the product of an adversarial self-review of v1: every claim re-
 
 **P2.3 One-time reconciliation (C8, C9).** Pre-backup (goose transactional + sqlite file copy).
 - Scripted: merge 4 duplicate clusters; re-slug 437 date-less events (date from body → prefix; unknowable → `undated-` prefix + doctor flag); resolve 29 cross-category slug collisions.
-- Human-in-loop: blockcrush/block-crush contradictions (DWB db name, gql tag) resolved by checking live infra, then recorded as **corrections** (not edits); doc-language 3-way split resolved by asking the user once.
+- Human-in-loop: blockcrush/block-crush contradictions (DWB db name, gql tag) resolved by checking live infra **via sub-agent + `jump-hs99-vip` skill, read-only** (D4), then recorded as **corrections** (not edits); doc-language 3-way split **resolved per D5**: canonical = `docs-language` (中文 technical + bilingual general), supersede `documentation-language` + `doc-language`, correction entry pinned.
 *Accept*: `rmb doctor --duplicates` reports 0 known clusters; corrections table carries the resolved contradictions with evidence refs.
 
 ### P3 — Truthfulness, forgetting, hygiene (weeks 4–6)
@@ -133,8 +133,8 @@ This version is the product of an adversarial self-review of v1: every claim re-
 | D1 | Default scope change (scenes out) | **RESOLVED 2026-08-22 — yes, reframed** (see §9.2): memory-primary default stands, not because scenes are redundant but because evidence must be *reachable by drill-down*, not sprayed into rankings. Safeguards added: version-as-trust-signal, `--scope=atom` for detail queries, evidence tiers exempt from archival. |
 | D2 | Archive threshold | **RESOLVED 2026-08-22 — 90 days** (one quarter). Archive candidacy = heat ≈ 0 AND no use in 90d; doctor-proposed, user-approved, reversible; evidence tiers exempt. |
 | D3 | Decay default | **RESOLVED 2026-08-22 — usage-heat ranking, ON (phased)**. User wants a time factor plus a popularity factor ("often searched = hot"). Design per §10: cat/meta-weighted exponentially-decayed heat counter (never raw search impressions — rich-get-richer trap), bounded additive bonus + 14d cold-start novelty, default-on after ~30d telemetry accumulation + eval gate, `--no-boost` escape hatch. |
-| D4 | Contradiction evidence gathering | Needs prod access (jump.hs99.vip / DBs) — user-run or sub-agent with the jump skill? |
-| D5 | doc-language resolution | Ask user: zh-only or bilingual? (one question, then corrections entry) |
+| D4 | Contradiction evidence gathering | **RESOLVED 2026-08-22 — default: sub-agent with the `jump-hs99-vip` skill** runs read-only evidence checks (DWB db name, gql prod tag) at P2.3 execution time; one approval per cluster before any merge. User can swap to self-run without changing the plan. |
+| D5 | doc-language resolution | **RESOLVED 2026-08-22 — bilingual**: technical documentation 中文; general documentation **中英双语 with technical detail** (user decision, matches `docs-language`'s content). Canonical = `docs-language`; supersede `documentation-language` + `doc-language`; correction entry pinned so L3 cannot re-split. |
 
 ## 7. Risks
 

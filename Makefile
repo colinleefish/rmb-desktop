@@ -1,4 +1,4 @@
-.PHONY: test build build-all run-rmbd run-hook tidy app-dev app-build app-build-windows app-install webui-dev webui-build webui-embed-check icons-sync build-windows-sidecars notarize release release-upload release-publish
+.PHONY: test eval build build-all run-rmbd run-hook tidy app-dev app-build app-build-windows app-install webui-dev webui-build webui-embed-check icons-sync build-windows-sidecars notarize release release-upload release-publish
 
 GO_TAGS := sqlite_fts5
 EMBED_INDEX := internal/http/static/web/index.html
@@ -11,6 +11,13 @@ TRAY_ICON_SRC := icons/pyramid-tray.svg
 
 test: webui-embed-check
 	CGO_ENABLED=1 go test -tags "$(GO_TAGS)" ./...
+
+# Offline recall regression gate (issue #22). Deterministic hash-embedder eval
+# over the committed golden fixture; fails the build if recall metrics regress.
+eval:
+	CGO_ENABLED=1 go run -tags "$(GO_TAGS)" ./cmd/rmb-eval run \
+		-fixture internal/recall/eval/testdata/golden_fixture.json \
+		-golden internal/recall/eval/golden.yaml
 
 build: webui-embed-check
 	CGO_ENABLED=1 go build -tags "$(GO_TAGS)" -ldflags "$(GO_LDFLAGS)" -o bin/rmbd ./cmd/rmbd

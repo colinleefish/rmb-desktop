@@ -1,0 +1,27 @@
+name: recall-eval
+
+on:
+  pull_request:
+    paths:
+      - 'internal/recall/**'
+      - 'internal/inspect/**'
+      - 'internal/agentmemory/**'
+      - 'cmd/rmb-eval/**'
+      - 'Makefile'
+      - '.github/workflows/eval.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      # cgo is required for the sqlite bindings (fts5 + sqlite-vec).
+      - name: Recall regression gate (offline, deterministic)
+        run: make eval

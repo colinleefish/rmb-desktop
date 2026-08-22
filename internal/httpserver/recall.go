@@ -117,7 +117,12 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	matches, err := s.recall.Search(r.Context(), embedder, query, k, scopes, tw)
+	var opts []recall.SearchOption
+	if nb := strings.TrimSpace(r.URL.Query().Get("no_boost")); nb != "" && nb != "0" && nb != "false" {
+		opts = append(opts, recall.WithNoBoost())
+	}
+
+	matches, err := s.recall.Search(r.Context(), embedder, query, k, scopes, tw, opts...)
 	if err != nil {
 		s.log.Error("search failed", "err", err)
 		writeError(w, http.StatusInternalServerError, err.Error())

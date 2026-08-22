@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"sort"
+	"time"
 )
 
 const (
@@ -26,8 +27,16 @@ func NewService(db *sql.DB) *Service {
 
 // Search runs hybrid recall (vector + FTS fused 70/30 per tier). Without an
 // embedder, falls back to FTS-only (D21). A non-zero tw filters every tier
-// by its updated_at column.
-func (s *Service) Search(ctx context.Context, embed QueryEmbedder, query string, k int, scopes []string, tw TimeWindow) ([]Match, error) {
+// by its updated_at column. opts tune the optional usage-heat boost (issue
+// #25): by default it follows the RMB_HEAT_RANKING rollout flag (off until
+// calibrated), can be forced on via WithHeatRanking, and turned off for a
+// single call via WithNoBoost.
+func (s *Service) Search(ctx context.Context, embed QueryEmbedder, query string, k int, scopes []string, tw TimeWindow, opts ...SearchOption) ([]Match, error) {
+	cfg := searchConfig{}
+	for _, o := range opts {
+		o(&cfg)
+	}
+
 	if k <= 0 {
 		k = 5
 	}
@@ -301,6 +310,44 @@ func (s *Service) Search(ctx context.Context, embed QueryEmbedder, query string,
 		filtered = append(filtered, th)
 	}
 	keep = filtered
+
+	// Usage-heat ranking (issue #25, plan §10): when the boost is active,
+	// re-rank the surviving memory candidates by rrf + α·log(1+heat) +
+	// β·e^(−age/14d) so genuinely-used / fresh memories break ties. Applied
+	// AFTER all suppression passes (so suppression ownership stays decided by
+	// relevance) and before the final top-k cut. When disabled (the default)
+	// this whole block is skipped and output is byte-identical to before.
+	if cfg.boosting() {
+		head := make(map[string]struct{})
+		var memURIs []string
+		for _, th := range keep {
+			if th.match.Tier == "memories" {
+				if _, dup := head[th.match.URI]; dup {
+					continue
+				}
+				head[th.match.URI] = struct{}{}
+				memURIs = append(memURIs, th.match.URI)
+			}
+		}
+		if len(memURIs) > 0 {
+			heats, err := fetchMemoryHeat(ctx, s.DB, memURIs)
+			if err != nil {
+				return nil, err
+			}
+			nowMS := time.Now().UTC().UnixMilli()
+			for i := range keep {
+				if h, ok := heats[keep[i].match.URI]; ok {
+					keep[i].score += heatRankBoost(h.heat, h.updatedAtMS, nowMS)
+				}
+			}
+			sort.SliceStable(keep, func(i, j int) bool {
+				if keep[i].score == keep[j].score {
+					return keep[i].match.URI < keep[j].match.URI
+				}
+				return keep[i].score > keep[j].score
+			})
+		}
+	}
 
 	seen := make(map[string]struct{})
 	out := make([]Match, 0, k)

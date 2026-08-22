@@ -34,7 +34,7 @@ func VectorMemories(ctx context.Context, db *sql.DB, queryVec []float32, k int, 
 		       version,
 		       source_scene_uris
 		FROM memories
-		WHERE superseded_at IS NULL AND embedding IS NOT NULL`+windowClause+`
+		WHERE superseded_at IS NULL AND embedding IS NOT NULL AND archived_at IS NULL`+windowClause+`
 		ORDER BY distance ASC
 		LIMIT ?`, prependAny(blob, append(windowArgs, any(k))...)...)
 	if err != nil {

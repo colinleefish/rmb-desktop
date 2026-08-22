@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/colinleefish/rmb-desktop/internal/archive"
 	"github.com/colinleefish/rmb-desktop/internal/browse"
 	"github.com/colinleefish/rmb-desktop/internal/config"
 	"github.com/colinleefish/rmb-desktop/internal/correction"
@@ -35,6 +36,7 @@ type Server struct {
 	inspect     *inspect.Service
 	browse      *browse.Service
 	corrections *correction.Service
+	archive     *archive.Service
 	embed       *llm.EmbeddingClient
 	configPath  string
 	mux         *http.ServeMux
@@ -62,6 +64,7 @@ func New(database *sql.DB, cfg config.Config, configPath string, log *slog.Logge
 		inspect:     inspect.NewService(database),
 		browse:      browse.NewService(database, recallStatsSvc),
 		corrections: correction.NewService(database),
+		archive:     archive.NewService(database),
 		configPath:  configPath,
 		mux:         http.NewServeMux(),
 	}
@@ -86,6 +89,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/sessions/{id}/upload", s.handleUpload)
 	s.mux.HandleFunc("GET /api/v1/search", s.handleSearch)
 	s.mux.HandleFunc("GET /api/v1/doctor/metrics", s.handleDoctorMetrics)
+	s.mux.HandleFunc("GET /api/v1/doctor/archive", s.handleDoctorArchiveCandidates)
+	s.mux.HandleFunc("POST /api/v1/doctor/archive", s.handleDoctorArchiveAction)
 	s.mux.HandleFunc("GET /api/v1/inspect/cat", func(w http.ResponseWriter, r *http.Request) {
 		s.handleInspect(w, r, "cat")
 	})

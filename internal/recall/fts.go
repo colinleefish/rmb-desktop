@@ -50,7 +50,7 @@ func FTSMemories(ctx context.Context, db *sql.DB, query string, k int, tw TimeWi
 		       m.source_scene_uris
 		FROM memories m
 		INNER JOIN memories_fts fts ON fts.rowid = m.rowid
-		WHERE memories_fts MATCH ? AND m.superseded_at IS NULL`+windowClause+`
+		WHERE memories_fts MATCH ? AND m.superseded_at IS NULL AND m.archived_at IS NULL`+windowClause+`
 		ORDER BY bm25(memories_fts)
 		LIMIT ?`, prependArgs(EscapeFTSQuery(query), append(windowArgs, any(k))...)...)
 	if err != nil {

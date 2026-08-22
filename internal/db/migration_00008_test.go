@@ -63,9 +63,18 @@ func TestMigration00008_PurgesMultipleAgentMemoriesWithoutFTSCorrupt(t *testing.
 		t.Fatalf("optimize memories_fts: %v", err)
 	}
 
-	// Roll goose back to v7 so the next migrate() re-applies 00008 (and 00009).
+	// Roll goose back to v7 so the next migrate() re-applies 00008+ (and 00009,
+	// 00010). Later migrations' schema effects must be undone too, since goose
+	// version rows are being faked away.
 	if _, err := database.Exec(`DELETE FROM goose_db_version WHERE version_id >= 8`); err != nil {
 		t.Fatalf("roll back goose version: %v", err)
+	}
+	if _, err := database.Exec(`
+		DROP TABLE IF EXISTS search_queries;
+		ALTER TABLE recall_stats DROP COLUMN last_use_at;
+		ALTER TABLE recall_stats DROP COLUMN heat;
+	`); err != nil {
+		t.Fatalf("undo 00010 schema: %v", err)
 	}
 
 	// Re-run migrations. The old 00008 failed here with SQLITE_CORRUPT.

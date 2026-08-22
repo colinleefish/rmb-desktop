@@ -128,7 +128,10 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		for i, m := range matches {
 			uris[i] = m.URI
 		}
+		// Per-URI exposure counter (raw signal; heat is NOT updated here).
 		s.recallStats.RecordSearchAsync(uris)
+		// Local-only query log for the search→cat join and doctor metrics.
+		s.recallStats.RecordQueryAsync(query, scopes, k, uris)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": matches})
 }

@@ -53,6 +53,14 @@ xattr -dr com.apple.quarantine "/Applications/RMB Desktop.app"
 - Runs entirely on your device — no cloud account required
 - Needs an LLM API key only for turning chats into memories
 - Optional multi-device sync may come later; v1 is single-device
+- **Local search telemetry (usage heat).** rmbd keeps a local-only log of every
+  search (query text, scope, k, the top-k result URIs, and whether one of those
+  URIs was `cat`-ed within 10 minutes) plus a per-URI usage-heat counter in its
+  SQLite database. This powers retrieval-health metrics ("did any search
+  actually answer the question?") and usage-based ranking calibration. It never
+  leaves your device: no upload, no export, no network calls, and it is deleted
+  together with the database if you uninstall. Bare search impressions never
+  count toward heat — only explicit reads (`cat`/`meta`) do.
 
 ## License
 

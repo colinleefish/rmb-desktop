@@ -129,7 +129,7 @@ This version is the product of an adversarial self-review of v1: every claim re-
 
 ## 6. Decision log (need user input)
 
-| D1 | Default scope change (scenes out) | Recommended: yes. Risk: agents that relied on scene hits — mitigated by guide v2 + deterministic drill-down annotation. |
+| D1 | Default scope change (scenes out) | **RESOLVED 2026-08-22 — yes, reframed** (see §9.2): memory-primary default stands, not because scenes are redundant but because evidence must be *reachable by drill-down*, not sprayed into rankings. Safeguards added: version-as-trust-signal, `--scope=atom` for detail queries, evidence tiers exempt from archival. |
 | D2 | Archive threshold | 120d zero-recall proposed; alternatives 60d/180d. |
 | D3 | Decay default | Off until P1.3 data; user preference? |
 | D4 | Contradiction evidence gathering | Needs prod access (jump.hs99.vip / DBs) — user-run or sub-agent with the jump skill? |
@@ -149,3 +149,47 @@ This version is the product of an adversarial self-review of v1: every claim re-
 - Auto-merging entity fragments (257 `starli*` shards) without per-cluster approval — doctor proposes, human disposes.
 - Full-text search over raw turns (5,841 transcripts; noisy + large; atoms cover distilled detail) — revisit if telemetry shows demand.
 - Semantic (vector) ranking for the skill tier (lexical only, per C4).
+
+---
+
+## 9. Amendment v2.1 — consolidation erosion (external evidence) & D1 resolution
+
+**Input**: Zhang et al., *"Useful Memories Become Faulty When Continuously Updated by LLMs"* (arXiv:2605.12978, May 2026) — provided by the user for D1. Verified against rmb's code (`internal/worker/memory/worker.go`) before adopting anything.
+
+### 9.1 What the paper establishes
+
+1. Continuously LLM-rewritten consolidated memory **erodes**: utility rises, then degrades below the no-memory baseline; in the cleanest case 100%-solved problems fall to 52.6% after 10 rounds of streaming consolidation, while one-shot (Static) consolidation of the same pool stays at ceiling.
+2. The failure is the **consolidation loop itself**: each rewrite compounds small abstraction errors; update-after-every-interaction designs are contradicted.
+3. **Episodic-only stores are competitive** with consolidated memory across benchmarks; raw episodes are the robust default; abstraction should be *selective, delayed, grounded in recoverable trajectories*.
+4. Three mechanisms: **misgrouping** before abstraction (forced early consolidation breaks segmentation that the model gets right given time); **interference** (overgeneralization strips applicability conditions; cumulative distillation accumulates overgeneralized entries at ~5× and garbage at ~20× the rate of per-task distillation); **overfit** to narrow/duplicate streams.
+5. Prescription: keep **episodic and schema-forming stores architecturally distinct**; gate consolidation rather than firing it every step.
+
+### 9.2 D1 resolution — memory-primary default stands, with the roles reframed
+
+The paper inverts v2's implicit assumption ("distilled memories are the good tier, scenes are redundant copies"). Scenes/atoms are not noise — they are the **evidence tier**, and the audit already caught the paper's predicted failures in production: rationale surviving only in a scene (sqlite decision), details lost at the memory tier (Q8), contradictions between coexisting memory versions (blockcrush), paraphrase-accretion inside a merged body (doc-language's 5 bullets).
+
+Decision: **yes to D1** — default scope = `memory` + `skill` (FTS, cap 1) — but the justification changes: memories are the *index*; evidence stays *reachable by deterministic drill-down* (`source_scene_uris`, `--scope=atom`). The paper's requirement is recoverable evidence, and rmb satisfies it architecturally — provided we make that an **invariant**: evidence tiers (turns/atoms/scenes) are never GC'd or archived (§9.3-e). Required safeguards shipped with P0.2/P0.4:
+- search output carries **version count as a trust signal** (high-churn = heavily rewritten = verify via linked scene);
+- guide v2 teaches tier routing: decisions/why → events (immutable) + linked scenes; details → `--scope=atom`; stable facts → entities/preferences.
+
+### 9.3 Code-grounded findings (rmb ↔ paper mapping)
+
+Verified in `worker.go` before amending:
+
+| Paper mechanism | rmb code reality | Fix |
+|---|---|---|
+| Update-after-every-interaction | `rollup` fires per session batch; only gate is `bucketUnchanged` = source-scene-set equality → profile re-distilled ~8×/day (166 versions) | **(a) Materiality gate**: require N new atoms or semantic delta, not just a new source scene |
+| Rewrite-of-rewrite compounding | multi-chunk path distills partials, then re-distills *the distilled partials* (`serializePartialsForLLM`) | **(b) Reduce pass must see atom-level evidence** (or atom excerpts alongside partials), never distilled-only input |
+| Near-duplicate stream overfit | L1 re-extracts paraphrased atoms per session; nothing dedupes atoms; merge keeps all variants (doc-language 5 bullets) | **(c) Atom-level near-dup suppression at L1/L2 ingest** (embedding sim vs same-slug neighborhood) |
+| Misgrouping / forced early abstraction | slugs are LLM-chosen at extract time; new subjects get rewritten-tier memories immediately (doc-language split; `call-user-daddy`) | **(d) Graduation threshold**: new subjects accrete as atoms/events (append-only, immutable) and graduate to entities/preferences only after K distinct sessions corroborate |
+| Stream ≪ Static schedules | L3 is per-subject Static-All over the full atom pool — already the paper's better regime, but erosion still accumulates via (a)–(c) | **(e) Re-consolidation from evidence as maintenance**: `rmb doctor --reconsolidate <uri>` re-distills full evidence in one static pass, replacing eroded chains; also **never delete/GC evidence tiers** (archival in P3.3 applies to the memories table only); doctor flags high-version memories (aliyun v131) for re-consolidation |
+
+### 9.4 Plan deltas
+
+- **P2.1 amended**: consolidation gate (9.3a) and atom dedup (9.3c) join slug canonicalization; body-diff gate generalizes from profile-only to all rewritten categories.
+- **P2.2 unchanged** (why/outcome/events) — the paper independently supports append-only event records as the safe tier.
+- **P2.3 amended**: prefer `--reconsolidate` (evidence-grounded static re-distillation) over hand-merged cluster bodies where evidence exists; corrections still override facts.
+- **P0.2 amended**: version count in search output (trust signal).
+- **P0.4 amended**: tier-routing guidance per §9.2.
+- **P3.3 amended**: archival scope explicitly excludes turns/atoms/scenes (invariant: evidence is never discarded).
+- **New acceptance test**: after gate (9.3a), profile version rate on unchanged-identity days = 0; after (9.3d), no new single-session preference promotions.

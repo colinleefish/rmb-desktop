@@ -209,7 +209,7 @@ func (s *Service) catSession(ctx context.Context, u uri.URI, w io.Writer) error 
 	}
 	sessionKey := strings.ToLower(u.Segments[0])
 	var abstract sql.NullString
-	err := s.db.QueryRowContext(ctx, `SELECT abstract FROM sessions WHERE session_key = ?`, sessionKey).Scan(&abstract)
+	err := s.db.QueryRowContext(ctx, `SELECT abstract FROM sessions WHERE session_key = ? OR id = ?`, sessionKey, sessionKey).Scan(&abstract)
 	if err != nil {
 		return fmt.Errorf("load session: %w", err)
 	}
@@ -235,7 +235,10 @@ func (s *Service) lsSession(ctx context.Context, u uri.URI, opts LsOptions, w io
 
 	sessionKey := strings.ToLower(u.Segments[0])
 	var sessionID string
-	err := s.db.QueryRowContext(ctx, `SELECT id FROM sessions WHERE session_key = ?`, sessionKey).Scan(&sessionID)
+	// The ladder (RC7): a session URI segment may be either the session_key
+	// or the session id — resolve both so `ls rmb://sessions/<scene's
+	// session_id>/` walks down from a scene's meta.
+	err := s.db.QueryRowContext(ctx, `SELECT id FROM sessions WHERE session_key = ? OR id = ?`, sessionKey, sessionKey).Scan(&sessionID)
 	if err == nil {
 
 		if len(u.Segments) == 1 && u.IsContainer() {
@@ -390,29 +393,33 @@ func (s *Service) metaScene(ctx context.Context, u uri.URI) (map[string]any, err
 	if len(u.Segments) != 1 {
 		return nil, fmt.Errorf("scene id required")
 	}
-	var id, sessionID string
+	var id, sessionID, sessionKey string
 	var displayName, abstract, body sql.NullString
 	var sourceAtoms string
 	var createdAt, updatedAt int64
 	err := s.db.QueryRowContext(ctx, `
-		SELECT id, session_id, display_name, abstract, body, source_atoms, created_at, updated_at
-		FROM scenes WHERE id = ?`, u.Segments[0],
-	).Scan(&id, &sessionID, &displayName, &abstract, &body, &sourceAtoms, &createdAt, &updatedAt)
+		SELECT sc.id, sc.session_id, COALESCE(se.session_key, ''), sc.display_name, sc.abstract, sc.body, sc.source_atoms, sc.created_at, sc.updated_at
+		FROM scenes sc
+		LEFT JOIN sessions se ON se.id = sc.session_id
+		WHERE sc.id = ?`, u.Segments[0],
+	).Scan(&id, &sessionID, &sessionKey, &displayName, &abstract, &body, &sourceAtoms, &createdAt, &updatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("load scene: %w", err)
 	}
 	atoms, _ := db.UnmarshalStringArray(sourceAtoms)
-	return map[string]any{
+	meta := map[string]any{
 		"uri":          uri.BuildScene(id),
 		"id":           id,
 		"session_id":   sessionID,
+		"session_key":  sessionKey,
 		"display_name": nullStr(displayName),
 		"abstract":     nullStr(abstract),
 		"body":         nullStr(body),
 		"source_atoms": atoms,
 		"created_at":   createdAt,
 		"updated_at":   updatedAt,
-	}, nil
+	}
+	return meta, nil
 }
 
 func (s *Service) metaTurn(ctx context.Context, u uri.URI) (map[string]any, error) {
@@ -475,17 +482,19 @@ func (s *Service) metaSession(ctx context.Context, u uri.URI) (map[string]any, e
 		return nil, errors.New("session key required")
 	}
 	sessionKey := strings.ToLower(u.Segments[0])
+	var id, storedKey string
 	var abstract sql.NullString
 	var createdAt, updatedAt int64
 	err := s.db.QueryRowContext(ctx, `
-		SELECT abstract, created_at, updated_at FROM sessions WHERE session_key = ?`, sessionKey,
-	).Scan(&abstract, &createdAt, &updatedAt)
+		SELECT id, session_key, abstract, created_at, updated_at FROM sessions WHERE session_key = ? OR id = ?`, sessionKey, sessionKey,
+	).Scan(&id, &storedKey, &abstract, &createdAt, &updatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("load session: %w", err)
 	}
 	return map[string]any{
 		"uri":         uri.BuildSession(sessionKey),
-		"session_key": sessionKey,
+		"session_key": storedKey,
+		"session_id":  id,
 		"abstract":    nullStr(abstract),
 		"created_at":  createdAt,
 		"updated_at":  updatedAt,

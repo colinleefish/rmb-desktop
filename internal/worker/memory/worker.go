@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -15,6 +16,8 @@ import (
 	"github.com/colinleefish/rmb-desktop/internal/debug"
 	"github.com/colinleefish/rmb-desktop/internal/llm"
 	"github.com/colinleefish/rmb-desktop/internal/model"
+	"github.com/colinleefish/rmb-desktop/internal/recall"
+	"github.com/colinleefish/rmb-desktop/internal/textsim"
 	"github.com/colinleefish/rmb-desktop/internal/worker/shared"
 	"github.com/colinleefish/rmb-desktop/internal/workerlock"
 	"github.com/google/uuid"
@@ -39,24 +42,56 @@ const relatedEventsTopK = 5
 // independent corroboration.
 const graduationMinSessions = 2
 
+// Embedder is the optional embedding dependency for the pre-insert
+// incumbent check (issue #27 task 3): it is satisfied by the embed worker's
+// client. When nil, incumbent detection falls back to deterministic
+// slug-normalization only (the cos path is skipped).
+type Embedder interface {
+	Embed(ctx context.Context, inputs []string) ([][]float32, error)
+}
+
+// bodyUnchangedJaccard is the token-Jaccard bar at which a freshly distilled
+// body counts as a paraphrase of the active body and does NOT bump the
+// version (provenance columns are still refreshed). Second line of defense
+// behind the materiality gate: reworded-but-same-information bodies (swap a
+// couple of tokens in a >=12-token body => ~0.82) stay above it, while a
+// genuine update (one new 5-token bullet on a 20-token body => ~0.7) falls
+// below. Calibration fixtures live in consolidation_test.go.
+const bodyUnchangedJaccard = 0.80
+
+// bodyMinTokens guards the semantic body gate: token-set similarity is too
+// twitchy on short bodies, so bodies with fewer distinct tokens only skip on
+// exact equality.
+const bodyMinTokens = 12
+
+// incumbentCosThreshold is the embedding-cosine bar for merging a NEW
+// subject into an existing same-category incumbent at persist time (issue
+// #27 task 3). Set just under the near-identical band used by cross-tier
+// suppression (#26: same-store random negatives max out ~0.95): same-subject
+// paraphrase bodies measure above it, distinct subjects below.
+const incumbentCosThreshold = 0.96
+
 type MemoryDistiller interface {
 	DistillMemory(ctx context.Context, category, slug, atomsJSON string, corrections []string, related []llm.RelatedEvent) (string, error)
 }
 
 type Worker struct {
-	db  *sql.DB
-	llm MemoryDistiller
-	cfg config.PipelineConfig
-	log *slog.Logger
-	now func() time.Time
-	reg *debug.Registry
+	db    *sql.DB
+	llm   MemoryDistiller
+	embed Embedder
+	cfg   config.PipelineConfig
+	log   *slog.Logger
+	now   func() time.Time
+	reg   *debug.Registry
 }
 
-func NewWorker(database *sql.DB, llm MemoryDistiller, cfg config.PipelineConfig, log *slog.Logger, reg *debug.Registry) *Worker {
+// NewWorker constructs the L3 memory worker. embed is optional (nil disables
+// the cosine incumbent check; slug canonicalization still applies).
+func NewWorker(database *sql.DB, llm MemoryDistiller, embed Embedder, cfg config.PipelineConfig, log *slog.Logger, reg *debug.Registry) *Worker {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Worker{db: database, llm: llm, cfg: cfg, log: log, now: time.Now, reg: reg}
+	return &Worker{db: database, llm: llm, embed: embed, cfg: cfg, log: log, now: time.Now, reg: reg}
 }
 
 func (w *Worker) Run(ctx context.Context) error {
@@ -299,11 +334,17 @@ func (w *Worker) distillBucket(ctx context.Context, bucket Bucket, corrections [
 		time.Sleep(distillDelay)
 	}
 
-	mergedJSON, err := serializePartialsForLLM(partials)
+	// Reduce-path fix (issue #27 task 5, plan §9.3c): the final merge call
+	// must see atom-level evidence, never distilled-only input — feeding
+	// partials alone re-distills distilled text (rewrite-of-rewrite, the
+	// erosion mechanism from arXiv:2605.12978). Partials ride along as
+	// context; the facts are the atoms themselves (excerpted per atom to
+	// bound the reduce prompt).
+	reduceJSON, err := serializeReduceForLLM(bucket.Atoms, partials)
 	if err != nil {
 		return ParsedMemory{}, err
 	}
-	raw, err := w.llm.DistillMemory(ctx, bucket.Category, bucket.Slug, mergedJSON, corrections, related)
+	raw, err := w.llm.DistillMemory(ctx, bucket.Category, bucket.Slug, reduceJSON, corrections, related)
 	if err != nil {
 		return ParsedMemory{}, err
 	}
@@ -343,13 +384,21 @@ func distinctSessionCount(atoms []model.Atom) int {
 	return len(seen)
 }
 
+// bucketUnchanged implements the materiality gate (issue #27 task 1/6,
+// plan §9.3a): a rewritten-category bucket is only re-distilled when its
+// evidence actually changed. The primary signal is the atom-ID fingerprint
+// stored on the active row (atoms are append-only, so an equal hash means
+// zero new evidence — replacing the old source-scene gate that re-distilled
+// the profile ~8x/day because every new session contributed a paraphrase
+// atom). Rows written before migration 00012 carry no hash and fall back to
+// scene-set equality.
 func (w *Worker) bucketUnchanged(ctx context.Context, bucket Bucket, srcScenes, corrURIs []string) (bool, error) {
-	var sourceScenesJSON, sourceCorrJSON string
+	var sourceScenesJSON, sourceCorrJSON, storedHash string
 	var category string
 	err := w.db.QueryRowContext(ctx, `
-		SELECT source_scene_uris, source_correction_uris, category FROM memories
-		WHERE uri = ? AND superseded_at IS NULL`, bucket.URI,
-	).Scan(&sourceScenesJSON, &sourceCorrJSON, &category)
+		SELECT source_scene_uris, source_correction_uris, category, COALESCE(source_atom_hash, '')
+		FROM memories WHERE uri = ? AND superseded_at IS NULL`, bucket.URI,
+	).Scan(&sourceScenesJSON, &sourceCorrJSON, &category, &storedHash)
 	if err == sql.ErrNoRows {
 		return false, nil
 	}
@@ -359,15 +408,44 @@ func (w *Worker) bucketUnchanged(ctx context.Context, bucket Bucket, srcScenes, 
 	if bucket.Category == model.AtomCategoryEvents {
 		return true, nil
 	}
-	existing, err := db.UnmarshalStringArray(sourceScenesJSON)
-	if err != nil {
-		return false, err
-	}
 	existingCorr, err := db.UnmarshalStringArray(sourceCorrJSON)
 	if err != nil {
 		return false, err
 	}
-	return equalStringSets(existing, srcScenes) && equalStringSets(existingCorr, corrURIs), nil
+	corrUnchanged := equalStringSets(existingCorr, corrURIs)
+	if storedHash != "" {
+		// Materiality (P2.1): identical evidence fingerprint => skip unless
+		// corrections changed. Any new atom => re-distill (N=1 with the L1
+		// paraphrase suppression upstream, so only genuinely new facts fire).
+		return textsim.HashIDs(atomIDs(bucket.Atoms)) == storedHash && corrUnchanged, nil
+	}
+	existing, err := db.UnmarshalStringArray(sourceScenesJSON)
+	if err != nil {
+		return false, err
+	}
+	return equalStringSets(existing, srcScenes) && corrUnchanged, nil
+}
+
+// bodyUnchanged reports whether a freshly distilled body carries no material
+// delta over the active body: exact equality, or token-set Jaccard at/above
+// bodyUnchangedJaccard on a body long enough for the signal to be reliable.
+func bodyUnchanged(activeBody, newBody string) bool {
+	if activeBody == newBody {
+		return true
+	}
+	ta, tb := textsim.Tokens(activeBody), textsim.Tokens(newBody)
+	if len(ta) < bodyMinTokens || len(tb) < bodyMinTokens {
+		return false
+	}
+	return textsim.Jaccard(activeBody, newBody) >= bodyUnchangedJaccard
+}
+
+func atomIDs(atoms []model.Atom) []string {
+	out := make([]string, 0, len(atoms))
+	for _, a := range atoms {
+		out = append(out, a.ID)
+	}
+	return out
 }
 
 func (w *Worker) persistMemory(ctx context.Context, bucket Bucket, pm ParsedMemory, sourceSceneURIs, sourceCorrectionURIs []string) error {
@@ -386,6 +464,7 @@ func (w *Worker) persistMemory(ctx context.Context, bucket Bucket, pm ParsedMemo
 	if err != nil {
 		return err
 	}
+	atomHash := textsim.HashIDs(atomIDs(bucket.Atoms))
 
 	if bucket.Category == model.AtomCategoryEvents {
 		var count int
@@ -398,7 +477,7 @@ func (w *Worker) persistMemory(ctx context.Context, bucket Bucket, pm ParsedMemo
 		if count > 0 {
 			return tx.Commit()
 		}
-		if err := insertMemory(ctx, tx, bucket, pm, sceneJSON, corrJSON, 1, nowMS); err != nil {
+		if err := insertMemory(ctx, tx, bucket, pm, sceneJSON, corrJSON, atomHash, 1, nowMS); err != nil {
 			return err
 		}
 		return tx.Commit()
@@ -411,7 +490,23 @@ func (w *Worker) persistMemory(ctx context.Context, bucket Bucket, pm ParsedMemo
 		WHERE uri = ? AND superseded_at IS NULL`, bucket.URI,
 	).Scan(&activeID, &activeBody, &version)
 	if err == sql.ErrNoRows {
-		if err := insertMemory(ctx, tx, bucket, pm, sceneJSON, corrJSON, 1, nowMS); err != nil {
+		// Pre-insert incumbent check (issue #27 task 3): before minting a new
+		// subject slug, look for an existing same-category active that IS the
+		// same subject (deterministic slug normalization, optionally backed
+		// by embedding cosine). Merge into the incumbent instead — the
+		// redis-per-env replay must bump the incumbent's version, not create
+		// a second slug. Hysteresis: the incumbent wins.
+		inc, err := w.findIncumbent(ctx, bucket, pm)
+		if err != nil {
+			w.log.Warn("l3 incumbent lookup failed; inserting as new subject", "uri", bucket.URI, "err", err)
+		} else if inc.uri != "" {
+			if err := w.mergeIntoIncumbent(ctx, tx, bucket, pm, inc, sceneJSON, corrJSON, atomHash, nowMS); err != nil {
+				return err
+			}
+			w.log.Info("l3 merged new subject into incumbent", "uri", bucket.URI, "incumbent", inc.uri)
+			return tx.Commit()
+		}
+		if err := insertMemory(ctx, tx, bucket, pm, sceneJSON, corrJSON, atomHash, 1, nowMS); err != nil {
 			return err
 		}
 		return tx.Commit()
@@ -420,6 +515,20 @@ func (w *Worker) persistMemory(ctx context.Context, bucket Bucket, pm ParsedMemo
 		return fmt.Errorf("load active memory: %w", err)
 	}
 	if activeBody == pm.Body {
+		// Exact repeat: refresh provenance fingerprint only (the materiality
+		// gate normally skips this distill; corrections can still land here).
+		if err := refreshProvenance(ctx, tx, activeID, sceneJSON, corrJSON, atomHash, nowMS); err != nil {
+			return err
+		}
+		return tx.Commit()
+	}
+	// Body-diff gate, generalized from exact-match to semantic (issue #27
+	// task 6): a paraphrased body with no material delta does not bump the
+	// version (profile rewritten ~8x/day on unchanged identity before).
+	if bodyUnchanged(activeBody, pm.Body) {
+		if err := refreshProvenance(ctx, tx, activeID, sceneJSON, corrJSON, atomHash, nowMS); err != nil {
+			return err
+		}
 		return tx.Commit()
 	}
 
@@ -427,13 +536,123 @@ func (w *Worker) persistMemory(ctx context.Context, bucket Bucket, pm ParsedMemo
 	if err != nil {
 		return fmt.Errorf("supersede memory: %w", err)
 	}
-	if err := insertMemory(ctx, tx, bucket, pm, sceneJSON, corrJSON, version+1, nowMS); err != nil {
+	if err := insertMemory(ctx, tx, bucket, pm, sceneJSON, corrJSON, atomHash, version+1, nowMS); err != nil {
 		return err
 	}
 	return tx.Commit()
 }
 
-func insertMemory(ctx context.Context, tx *sql.Tx, bucket Bucket, pm ParsedMemory, sceneJSON, corrJSON string, version int, nowMS int64) error {
+type incumbent struct {
+	uri     string
+	id      string
+	version int
+}
+
+// findIncumbent locates an existing same-category active memory that denotes
+// the same subject as a NEW bucket (no active row under bucket.URI):
+//   - slug path (deterministic, always on): a slug that normalizes equal to
+//     the bucket slug ("doc-language" vs "docs-language");
+//   - cos path (optional, embedder wired): active whose embedding is near
+//     the candidate body's (cos >= incumbentCosThreshold).
+//
+// It never matches the bucket's own URI.
+func (w *Worker) findIncumbent(ctx context.Context, bucket Bucket, pm ParsedMemory) (incumbent, error) {
+	rows, err := w.db.QueryContext(ctx, `
+		SELECT id, uri, COALESCE(slug, ''), version FROM memories
+		WHERE category = ? AND superseded_at IS NULL AND archived_at IS NULL AND uri <> ?`,
+		bucket.Category, bucket.URI)
+	if err != nil {
+		return incumbent{}, err
+	}
+	defer rows.Close()
+	var (
+		bySlug  []incumbent
+		anyList []incumbent
+	)
+	for rows.Next() {
+		var inc incumbent
+		var slug string
+		if err := rows.Scan(&inc.id, &inc.uri, &slug, &inc.version); err != nil {
+			return incumbent{}, err
+		}
+		if slug != "" && textsim.SlugEqual(slug, bucket.Slug) {
+			bySlug = append(bySlug, inc)
+		}
+		anyList = append(anyList, inc)
+	}
+	if err := rows.Err(); err != nil {
+		return incumbent{}, err
+	}
+	if len(bySlug) > 0 {
+		// Deterministic: lowest URI wins ties.
+		sort.Slice(bySlug, func(i, j int) bool { return bySlug[i].uri < bySlug[j].uri })
+		return bySlug[0], nil
+	}
+
+	if w.embed == nil || len(anyList) == 0 {
+		return incumbent{}, nil
+	}
+	vecs, err := w.embed.Embed(ctx, []string{pm.Abstract})
+	if err != nil || len(vecs) != 1 || len(vecs[0]) == 0 {
+		return incumbent{}, err
+	}
+	queryVec := vecs[0]
+	best := incumbent{}
+	bestCos := 0.0
+	for _, inc := range anyList {
+		blob, dim, err := storedEmbedding(ctx, w.db, inc.id)
+		if err != nil || blob == nil || dim != len(queryVec) {
+			continue
+		}
+		if cos := recall.CosineSim(queryVec, blob); cos > bestCos {
+			bestCos, best = cos, inc
+		}
+	}
+	if bestCos >= incumbentCosThreshold {
+		return best, nil
+	}
+	return incumbent{}, nil
+}
+
+// mergeIntoIncumbent rewrites the incumbent under ITS OWN uri with the new
+// evidence: supersede the incumbent's active row, insert version+1 under the
+// incumbent uri. The variant bucket slug never mints a new memory uri.
+func (w *Worker) mergeIntoIncumbent(ctx context.Context, tx *sql.Tx, bucket Bucket, pm ParsedMemory, inc incumbent, sceneJSON, corrJSON, atomHash string, nowMS int64) error {
+	_, err := tx.ExecContext(ctx, `UPDATE memories SET superseded_at = ? WHERE id = ?`, nowMS, inc.id)
+	if err != nil {
+		return fmt.Errorf("supersede incumbent: %w", err)
+	}
+	incBucket := Bucket{Category: bucket.Category, Slug: inc.uri, URI: inc.uri}
+	if slug, ok := strings.CutPrefix(inc.uri, "rmb://"+bucket.Category+"/"); ok {
+		incBucket.Slug = slug
+	}
+	return insertMemory(ctx, tx, incBucket, pm, sceneJSON, corrJSON, atomHash, inc.version+1, nowMS)
+}
+
+func storedEmbedding(ctx context.Context, database *sql.DB, id string) ([]float32, int, error) {
+	var blob []byte
+	err := database.QueryRowContext(ctx, `SELECT embedding FROM memories WHERE id = ?`, id).Scan(&blob)
+	if err == sql.ErrNoRows || err != nil {
+		return nil, 0, err
+	}
+	if len(blob) == 0 {
+		return nil, 0, nil
+	}
+	vec := recall.DecodeVecFloat32(blob)
+	if len(vec) == 0 {
+		return nil, 0, nil
+	}
+	return vec, len(vec), nil
+}
+
+func refreshProvenance(ctx context.Context, tx *sql.Tx, id, sceneJSON, corrJSON, atomHash string, nowMS int64) error {
+	_, err := tx.ExecContext(ctx, `
+		UPDATE memories SET source_scene_uris = ?, source_correction_uris = ?, source_atom_hash = ?, updated_at = ?
+		WHERE id = ?`, sceneJSON, corrJSON, atomHash, nowMS, id)
+	return err
+}
+
+func insertMemory(ctx context.Context, tx *sql.Tx, bucket Bucket, pm ParsedMemory, sceneJSON, corrJSON, atomHash string, version int, nowMS int64) error {
 	id, err := uuid.NewV7()
 	if err != nil {
 		return err
@@ -443,9 +662,9 @@ func insertMemory(ctx context.Context, tx *sql.Tx, bucket Bucket, pm ParsedMemor
 		slugPtr = &bucket.Slug
 	}
 	_, err = tx.ExecContext(ctx, `
-		INSERT INTO memories (id, uri, category, slug, version, abstract, body, source_scene_uris, source_correction_uris, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		id.String(), bucket.URI, bucket.Category, slugPtr, version, pm.Abstract, pm.Body, sceneJSON, corrJSON, nowMS, nowMS,
+		INSERT INTO memories (id, uri, category, slug, version, abstract, body, source_scene_uris, source_correction_uris, source_atom_hash, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		id.String(), bucket.URI, bucket.Category, slugPtr, version, pm.Abstract, pm.Body, sceneJSON, corrJSON, atomHash, nowMS, nowMS,
 	)
 	if err != nil {
 		return fmt.Errorf("insert memory: %w", err)

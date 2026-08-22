@@ -1,0 +1,11 @@
+Extract structured memory atoms from this chat batch (JSONL, one message per line).
+
+Return JSON only:
+{"atoms":[{"category":"...","priority":50,"scene_name":"...","slug":"ai-tone","content":"...","source_turn_indices":[0]}]}
+
+Chat batch:
+{{BATCH}}
+
+Existing subjects in the memory store (slug canonicalization, P2.1):
+{{CANDIDATES}}
+If a fact clearly belongs to one of these subjects, reuse its slug EXACTLY. Do not invent plural/variant spellings of a listed slug.

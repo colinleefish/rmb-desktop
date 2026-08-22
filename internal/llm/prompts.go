@@ -3,6 +3,7 @@ package llm
 import (
 	_ "embed"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -13,7 +14,10 @@ import (
 const (
 	// ExtractAtomsPromptLatest: v2 additionally extracts rationale,
 	// rejected-alternative, and verification/outcome atoms (P2.2).
-	ExtractAtomsPromptLatest = 2
+	// v3 adds retrieve-then-canonicalize: the user prompt carries existing
+	// subject slugs per category (FTS-retrieved) so the same subject reuses
+	// one slug, plus the YYYY-MM-DD- event slug date rule (P2.1 / #27).
+	ExtractAtomsPromptLatest = 3
 	// DistillMemoryPromptLatest: v2 gives event bodies a structured layout
 	// (Decision/Rationale/Outcome/Related/Refs) and injects related active
 	// events into the prompt for cross-session linking (P2.2).
@@ -25,6 +29,12 @@ var extractAtomsSystemPrompt string
 
 //go:embed prompts/extract_atoms.system.v1.txt
 var extractAtomsSystemPromptV1 string
+
+//go:embed prompts/extract_atoms.system.v2.txt
+var extractAtomsSystemPromptV2 string
+
+//go:embed prompts/extract_atoms.user.v3.txt
+var extractAtomsUserTmplV3 string
 
 //go:embed prompts/extract_atoms.user.txt
 var extractAtomsUserTmpl string
@@ -56,6 +66,15 @@ var distillMemoryProfileFilter string
 //go:embed prompts/distill_memory.event_format.txt
 var distillMemoryEventFormat string
 
+// SlugCandidate is an existing memory subject (per-category slug) injected
+// into the L1 extract prompt for slug canonicalization (P2.1 / issue #27):
+// the same real-world subject must reuse one slug across sessions so L3
+// buckets consolidate ("doc-language" / "docs-language" never split again).
+type SlugCandidate struct {
+	Category string `json:"category"`
+	Slug     string `json:"slug"`
+}
+
 // RelatedEvent is an active event memory injected into the L3 distill prompt
 // (retrieve-then-link, P2.2 / issue #28) so a resolution event can reference
 // the earlier problem event it resolves.
@@ -71,10 +90,42 @@ func orEmptyMarker(s string) string {
 	return "(empty)"
 }
 
+// FormatSlugCandidates renders the per-category existing-subject list for
+// the v3 extract user prompt. Empty input renders "(none)" so the template
+// stays valid for sessions with no matching subjects.
+func FormatSlugCandidates(candidates []SlugCandidate) string {
+	if len(candidates) == 0 {
+		return "(none)"
+	}
+	byCat := make(map[string][]string)
+	var cats []string
+	for _, c := range candidates {
+		if c.Category == "" || c.Slug == "" {
+			continue
+		}
+		if _, ok := byCat[c.Category]; !ok {
+			cats = append(cats, c.Category)
+		}
+		byCat[c.Category] = append(byCat[c.Category], c.Slug)
+	}
+	if len(cats) == 0 {
+		return "(none)"
+	}
+	sort.Strings(cats)
+	var out strings.Builder
+	for _, cat := range cats {
+		slugs := byCat[cat]
+		sort.Strings(slugs)
+		fmt.Fprintf(&out, "- %s: %s\n", cat, strings.Join(slugs, ", "))
+	}
+	return strings.TrimRight(out.String(), "\n")
+}
+
 // ExtractPromptPair returns the system+user prompt pair for an extraction
-// template generation. Version 1 is retained for A/B replay of sessions
-// extracted before P2.2.
-func ExtractPromptPair(version int, messagesJSONL string) (system, user string, err error) {
+// template generation. Version 1/2 are retained for A/B replay of sessions
+// extracted before P2.1. Version 3 additionally receives existing subject
+// slugs for canonicalization; older generations ignore them.
+func ExtractPromptPair(version int, messagesJSONL string, candidates []SlugCandidate) (system, user string, err error) {
 	if version == 0 {
 		version = ExtractAtomsPromptLatest
 	}
@@ -82,11 +133,18 @@ func ExtractPromptPair(version int, messagesJSONL string) (system, user string, 
 	case 1:
 		system = extractAtomsSystemPromptV1
 	case 2:
+		system = extractAtomsSystemPromptV2
+	case 3:
 		system = extractAtomsSystemPrompt
 	default:
 		return "", "", fmt.Errorf("unknown extract prompt version %d (latest %d)", version, ExtractAtomsPromptLatest)
 	}
-	user = strings.ReplaceAll(extractAtomsUserTmpl, "{{BATCH}}", orEmptyMarker(messagesJSONL))
+	if version >= 3 {
+		user = strings.ReplaceAll(extractAtomsUserTmplV3, "{{BATCH}}", orEmptyMarker(messagesJSONL))
+		user = strings.ReplaceAll(user, "{{CANDIDATES}}", FormatSlugCandidates(candidates))
+	} else {
+		user = strings.ReplaceAll(extractAtomsUserTmpl, "{{BATCH}}", orEmptyMarker(messagesJSONL))
+	}
 	return system, strings.TrimSpace(user), nil
 }
 

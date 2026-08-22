@@ -104,7 +104,7 @@ func testWorker(database *sql.DB, distiller MemoryDistiller) *Worker {
 	if err != nil {
 		panic(err)
 	}
-	return NewWorker(database, distiller, cfg.Pipeline, nil, nil)
+	return NewWorker(database, distiller, nil, cfg.Pipeline, nil, nil)
 }
 
 func TestDistillBucketSingleAtomEventGoesThroughLLMWithRelated(t *testing.T) {

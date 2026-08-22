@@ -66,21 +66,29 @@ func (r *Runner) Start(ctx context.Context) {
 	r.startWorker(ctx, "l2", func(ctx context.Context) error {
 		return scene.NewWorker(r.db, chat, r.cfg.Pipeline, r.locks, r.log, r.reg).Run(ctx)
 	})
-	r.startWorker(ctx, "l3", func(ctx context.Context) error {
-		return memory.NewWorker(r.db, chat, r.cfg.Pipeline, r.log, r.reg).Run(ctx)
-	})
-
+	// The embed client serves two roles when configured: the embed worker
+	// and the L3 incumbent-check dependency (P2.1 / issue #27). Without an
+	// embed key the L3 worker still runs — incumbent detection falls back to
+	// deterministic slug normalization.
+	var embedClient *llm.EmbeddingClient
 	if r.cfg.Embed.HasKey() {
-		embedClient, err := llm.NewEmbeddingClient(r.cfg.Embed)
+		embedClient, err = llm.NewEmbeddingClient(r.cfg.Embed)
 		if err != nil {
 			r.log.Error("failed to create embed client", "err", err)
-		} else {
-			r.startWorker(ctx, "embed", func(ctx context.Context) error {
-				return embed.NewWorker(r.db, embedClient, r.cfg.Pipeline, r.cfg.Embed.Dimensions, r.log, r.reg).Run(ctx)
-			})
+			embedClient = nil
 		}
 	} else {
 		r.log.Info("embed worker disabled (no embed api key)")
+	}
+
+	r.startWorker(ctx, "l3", func(ctx context.Context) error {
+		return memory.NewWorker(r.db, chat, embedClient, r.cfg.Pipeline, r.log, r.reg).Run(ctx)
+	})
+
+	if embedClient != nil {
+		r.startWorker(ctx, "embed", func(ctx context.Context) error {
+			return embed.NewWorker(r.db, embedClient, r.cfg.Pipeline, r.cfg.Embed.Dimensions, r.log, r.reg).Run(ctx)
+		})
 	}
 }
 

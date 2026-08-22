@@ -266,7 +266,7 @@ func (s *Service) Search(ctx context.Context, embed QueryEmbedder, query string,
 				if _, done := dupOwner[th.match.URI]; done {
 					continue
 				}
-				if cosineSim(mv, embeds[th.match.URI]) > crossTierDupThreshold {
+				if CosineSim(mv, embeds[th.match.URI]) > crossTierDupThreshold {
 					dupOwner[th.match.URI] = keep[i].match.URI
 				}
 			}

@@ -18,7 +18,7 @@ import (
 
 type mockLLM struct{}
 
-func (m *mockLLM) ExtractAtoms(_ context.Context, _ string) (string, error) {
+func (m *mockLLM) ExtractAtoms(_ context.Context, _ string, _ []llm.SlugCandidate) (string, error) {
 	return `{"atoms":[{"category":"profile","priority":80,"scene_name":"Identity","content":"User name is Colin","source_turn_indices":[0]}]}`, nil
 }
 

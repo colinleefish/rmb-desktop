@@ -5,14 +5,19 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"regexp"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/colinleefish/rmb-desktop/internal/config"
 	"github.com/colinleefish/rmb-desktop/internal/db"
 	"github.com/colinleefish/rmb-desktop/internal/debug"
+	"github.com/colinleefish/rmb-desktop/internal/llm"
 	"github.com/colinleefish/rmb-desktop/internal/model"
 	"github.com/colinleefish/rmb-desktop/internal/pipeline"
+	"github.com/colinleefish/rmb-desktop/internal/recall"
+	"github.com/colinleefish/rmb-desktop/internal/textsim"
 	"github.com/colinleefish/rmb-desktop/internal/uri"
 	"github.com/colinleefish/rmb-desktop/internal/worker/backpressure"
 	"github.com/colinleefish/rmb-desktop/internal/worker/shared"
@@ -21,8 +26,26 @@ import (
 )
 
 type AtomExtractor interface {
-	ExtractAtoms(ctx context.Context, messagesJSONL string) (string, error)
+	ExtractAtoms(ctx context.Context, messagesJSONL string, candidates []llm.SlugCandidate) (string, error)
 }
+
+// atomDedupJaccard is the token-Jaccard bar at which a freshly extracted
+// atom is treated as a near-verbatim restatement of an existing atom with the
+// SAME (category, slug) — or another profile atom — and skipped at ingest
+// (issue #27 task 4). Token-set similarity catches restatements, not free
+// paraphrases (a reworded sentence drops to ~0.4). Measured on the live
+// store (read-only, 2026-08-23): same-subject atom pairs n=1120 — median
+// 0.15, p90 0.36, only 1% >= 0.72 (the verbatim repeats that fed the
+// audit's redundant-bullet clusters); random same-category pairs n=1200 —
+// max 0.43, ZERO >= 0.72. The bar sits inside the empty band 0.43–0.72+,
+// so suppression drops only restatements, never new evidence. Fixtures in
+// consolidation_test.go.
+const atomDedupJaccard = 0.72
+
+// slugCandidatesPerCategory caps how many existing subject slugs per
+// category are injected into the extract prompt (P2.1 retrieve-then-
+// canonicalize).
+const slugCandidatesPerCategory = 6
 
 type Worker struct {
 	db    *sql.DB
@@ -127,6 +150,10 @@ type extractBatch struct {
 	Turns           []model.SessionTurn
 	MessagesJSONL   string
 	WarmupThreshold int
+	// Candidates carries existing subject slugs (per category) retrieved for
+	// this batch so the extract prompt can canonicalize slugs and persistBatch
+	// can deterministically remap variant spellings (P2.1 / issue #27).
+	Candidates []llm.SlugCandidate
 }
 
 func (w *Worker) processSession(ctx context.Context, sessionID string) error {
@@ -143,7 +170,12 @@ func (w *Worker) processSession(ctx context.Context, sessionID string) error {
 	w.reg.BeginSession(sessionID, batch.SessionKey, "l1", "llm.extract_atoms")
 	defer w.reg.EndSession(sessionID, "l1")
 
-	raw, err := w.llm.ExtractAtoms(ctx, batch.MessagesJSONL)
+	// Retrieve-then-canonicalize (P2.1): existing subject slugs for this
+	// batch, so the same subject reuses one slug across sessions. Retrieval
+	// failure is non-fatal — extract without candidates.
+	batch.Candidates = w.candidateSlugs(ctx, batch.MessagesJSONL)
+
+	raw, err := w.llm.ExtractAtoms(ctx, batch.MessagesJSONL, batch.Candidates)
 	if err != nil {
 		return w.handleProcessError(ctx, sessionID, fmt.Errorf("llm extract: %w", err))
 	}
@@ -274,6 +306,12 @@ func (w *Worker) persistBatch(ctx context.Context, sessionID string, batch *extr
 	nowMS := w.now().UTC().UnixMilli()
 	turnIndex := buildTurnIndex(batch.Turns)
 
+	// Canonicalize slugs + enforce the event date prefix (P2.1 / issue #27
+	// task 2), then drop paraphrase atoms against existing same-subject
+	// atoms and within the batch itself (task 4).
+	parsed = canonicalizeAtoms(parsed, batch.Candidates, batch.Turns)
+	parsed, deduped := w.dedupAtoms(ctx, parsed)
+
 	for _, a := range parsed {
 		atomID, err := uuid.NewV7()
 		if err != nil {
@@ -352,8 +390,217 @@ func (w *Worker) persistBatch(ctx context.Context, sessionID string, batch *extr
 	if err := tx.Commit(); err != nil {
 		return err
 	}
-	w.log.Info("l1 extracted", "session", batch.SessionKey, "turns", len(batch.Turns), "atoms", len(parsed))
+	w.log.Info("l1 extracted", "session", batch.SessionKey, "turns", len(batch.Turns),
+		"atoms", len(parsed), "deduped_paraphrases", deduped)
 	return nil
+}
+
+// canonicalizeAtoms applies two deterministic P2.1 normalizations the LLM may
+// miss: (a) event slugs without a YYYY-MM-DD- prefix get the session date
+// prepended; (b) a slug that normalizes equal to a retrieved candidate slug
+// of the same category is rewritten to the incumbent spelling, so variant
+// spellings ("doc-language" vs "docs-language") consolidate into one bucket.
+func canonicalizeAtoms(parsed []llmAtom, candidates []llm.SlugCandidate, turns []model.SessionTurn) []llmAtom {
+	if len(parsed) == 0 {
+		return parsed
+	}
+	sessionDate := ""
+	if len(turns) > 0 {
+		sessionDate = time.UnixMilli(turns[len(turns)-1].CreatedAt).Format("2006-01-02")
+	}
+	eventDatePrefix := regexp.MustCompile(`^\d{4}-\d{2}-\d{2}-`)
+	for i := range parsed {
+		if parsed[i].Slug == "" || parsed[i].Category == model.AtomCategoryProfile {
+			continue
+		}
+		if parsed[i].Category == model.AtomCategoryEvents && sessionDate != "" &&
+			!eventDatePrefix.MatchString(parsed[i].Slug) {
+			parsed[i].Slug = sessionDate + "-" + parsed[i].Slug
+		}
+		for _, c := range candidates {
+			if c.Category != parsed[i].Category || c.Slug == parsed[i].Slug {
+				continue
+			}
+			if textsim.SlugEqual(parsed[i].Slug, c.Slug) {
+				parsed[i].Slug = c.Slug
+				break
+			}
+		}
+	}
+	return parsed
+}
+
+// dedupAtoms suppresses paraphrase atoms (P2.1 task 4): a new atom whose
+// content is token-Jaccard-similar to an existing atom with the same
+// (category, slug) — or to another profile atom — is dropped at ingest, as
+// are duplicates within the batch itself. Suppression is conservative: only
+// same-subject (or profile) comparisons are made, so a similar sentence about
+// a different subject always survives.
+func (w *Worker) dedupAtoms(ctx context.Context, parsed []llmAtom) ([]llmAtom, int) {
+	if len(parsed) == 0 {
+		return parsed, 0
+	}
+	// existing content per compared key
+	type key struct{ category, slug string }
+	existing := make(map[key][]string)
+	need := make(map[key]struct{})
+	for _, a := range parsed {
+		if a.Category == model.AtomCategoryProfile {
+			need[key{model.AtomCategoryProfile, ""}] = struct{}{}
+			continue
+		}
+		if a.Slug == "" {
+			continue
+		}
+		need[key{a.Category, a.Slug}] = struct{}{}
+	}
+	for k := range need {
+		var (
+			rows *sql.Rows
+			err  error
+		)
+		if k.category == model.AtomCategoryProfile {
+			rows, err = w.db.QueryContext(ctx, `SELECT content FROM atoms WHERE category = 'profile'`)
+		} else {
+			rows, err = w.db.QueryContext(ctx, `SELECT content FROM atoms WHERE category = ? AND slug = ?`, k.category, k.slug)
+		}
+		if err != nil {
+			w.log.Warn("l1 dedup lookup failed; inserting without suppression", "err", err)
+			return parsed, 0
+		}
+		for rows.Next() {
+			var content string
+			if err := rows.Scan(&content); err != nil {
+				rows.Close()
+				return parsed, 0
+			}
+			existing[k] = append(existing[k], content)
+		}
+		rows.Close()
+	}
+
+	out := make([]llmAtom, 0, len(parsed))
+	suppressed := 0
+	for _, a := range parsed {
+		var k key
+		if a.Category == model.AtomCategoryProfile {
+			k = key{model.AtomCategoryProfile, ""}
+		} else {
+			if a.Slug == "" {
+				out = append(out, a)
+				continue
+			}
+			k = key{a.Category, a.Slug}
+		}
+		dup := false
+		for _, prev := range existing[k] {
+			if textsim.Jaccard(a.Content, prev) >= atomDedupJaccard {
+				dup = true
+				break
+			}
+		}
+		if dup {
+			suppressed++
+			continue
+		}
+		existing[k] = append(existing[k], a.Content) // in-batch dedup
+		out = append(out, a)
+	}
+	return out, suppressed
+}
+
+// candidateSlugs retrieves existing active memory subjects (per category)
+// relevant to this batch via FTS over memories (P2.1 retrieve-then-
+// canonicalize, issue #27 task 2). Failure returns nil: extraction proceeds
+// without candidates.
+func (w *Worker) candidateSlugs(ctx context.Context, messagesJSONL string) []llm.SlugCandidate {
+	query := candidateQuery(messagesJSONL)
+	if query == "" {
+		return nil
+	}
+	matches, err := recall.FTSSlugCandidates(ctx, w.db, query, 30)
+	if err != nil || len(matches) == 0 {
+		return nil
+	}
+	perCat := make(map[string][]string)
+	for _, m := range matches {
+		category, slug := memoryURISlug(m.URI)
+		if category == "" || slug == "" {
+			continue
+		}
+		slugs := perCat[category]
+		seen := false
+		for _, s := range slugs {
+			if s == slug {
+				seen = true
+				break
+			}
+		}
+		if !seen && len(slugs) < slugCandidatesPerCategory {
+			perCat[category] = append(slugs, slug)
+		}
+	}
+	var out []llm.SlugCandidate
+	for category, slugs := range perCat {
+		for _, slug := range slugs {
+			out = append(out, llm.SlugCandidate{Category: category, Slug: slug})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Category != out[j].Category {
+			return out[i].Category < out[j].Category
+		}
+		return out[i].Slug < out[j].Slug
+	})
+	return out
+}
+
+// memoryURISlug splits rmb://<category>/<slug> into its parts; empty strings
+// when the URI does not match the memory scheme.
+func memoryURISlug(memoryURI string) (category, slug string) {
+	rest := strings.TrimPrefix(memoryURI, "rmb://")
+	if rest == memoryURI {
+		return "", ""
+	}
+	parts := strings.SplitN(rest, "/", 2)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return "", ""
+	}
+	return parts[0], parts[1]
+}
+
+// candidateQuery builds an OR-token FTS query from the batch's distinctive
+// words (mirrors the L3 related-events query builder: drop stopwords, years,
+// and sub-3-letter fragments so subject tokens dominate).
+func candidateQuery(messagesJSONL string) string {
+	tokens := textsim.Tokens(messagesJSONL)
+	var words []string
+	for t := range tokens {
+		if len(t) < 3 || isYearToken(t) {
+			continue
+		}
+		words = append(words, t)
+	}
+	if len(words) == 0 {
+		return ""
+	}
+	sort.Strings(words)
+	if len(words) > 12 {
+		words = words[:12]
+	}
+	return strings.Join(words, " ")
+}
+
+func isYearToken(t string) bool {
+	if len(t) != 4 {
+		return false
+	}
+	for _, r := range t {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func (w *Worker) handleProcessError(ctx context.Context, sessionID string, cause error) error {

@@ -48,7 +48,7 @@ const embedFetchChunk = 400
 // sqlite-vec serializes float32 vectors as raw little-endian bytes
 // (see sqlite_vec.SerializeFloat32), so this is its exact inverse. A
 // malformed or empty blob yields nil.
-func decodeVecFloat32(b []byte) []float32 {
+func DecodeVecFloat32(b []byte) []float32 {
 	if len(b) == 0 || len(b)%4 != 0 {
 		return nil
 	}
@@ -62,7 +62,7 @@ func decodeVecFloat32(b []byte) []float32 {
 // cosineSim returns the cosine similarity of two vectors. Vectors of
 // mismatched length, zero vectors, or nil inputs return 0 (never a match),
 // which makes the suppression pass conservative on malformed rows.
-func cosineSim(a, b []float32) float64 {
+func CosineSim(a, b []float32) float64 {
 	if len(a) == 0 || len(a) != len(b) {
 		return 0
 	}
@@ -111,7 +111,7 @@ func fetchCrossTierEmbeddings(ctx context.Context, database *sql.DB, memURIs, sc
 					_ = rows.Close()
 					return err
 				}
-				if vec := decodeVecFloat32(blob); len(vec) > 0 {
+				if vec := DecodeVecFloat32(blob); len(vec) > 0 {
 					out[uri] = vec
 				}
 			}

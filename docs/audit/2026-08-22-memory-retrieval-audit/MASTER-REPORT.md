@@ -80,3 +80,16 @@
 ---
 
 *Audit artifacts: this file + 4 sub-reports in `/tmp/rmb-audit/`. Sub-agent panes left idle in the Herdr tab for inspection (cartographer wK:p2, treasure-hunter wK:p4, time-traveler wK:p3, fact-checker wK:p5) — close them when done reviewing.*
+
+---
+
+## Addendum (2026-08-22, post-review) — corrections & caveats
+
+A follow-up adversarial review (see `plan/memory-retrieval-remediation.md` v2 §1) corrected or caveated the following. The evidence sections above are unchanged; read them with these notes.
+
+1. **"~70% dark matter" is window-limited.** `recall_stats` instrumentation began ~2026-08-09 (goose migration 7), so "never recalled" means "not recalled in a ~13-day window", not ever. Directionally still meaningful for an actively used store, but the ratio is a lower bound on activity, not proof of dead weight.
+2. **The store is ~20 days old.** Every memory row was *written* 2026-08-02→08-22 (min `created_at` 1785658009757); "June/July" content is the backfill carrying old dates in slugs/prose only. "Harder and harder to retrieve" is therefore a **growth-rate** problem (≈50–100 events/day + a 2,238-event backfill), not legacy accumulation — which raises the priority of a forgetting/archival policy.
+3. **"≥85% of events unreachable" applies to `ls` browsing only.** Two semantic search queries already reached 1,327/3,382 (39%) of events. The precise claim: *enumeration and date-browsing* are capped at 200; keyword-guessing via search remains possible.
+4. **Golden-question success rates are inflated.** The 8 test questions were formulated after inspecting the store (selection bias) by testers who knew retrieval was being evaluated (expectation bias). Real-world success is likely lower; the eval harness must derive questions from raw session turns before looking at distilled memories.
+5. **Impact re-ranking.** Tier flooding + skill pollution degrade *every* query and should outrank the 200-cap and time-blindness (which hurt specific query classes). Reflected in plan v2's sequencing.
+6. **Sub-agent panes were closed and all reports committed to `docs/audit/2026-08-22-memory-retrieval-audit/` after this addendum.**

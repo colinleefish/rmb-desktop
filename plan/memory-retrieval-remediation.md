@@ -1,105 +1,151 @@
-# Memory Retrieval Remediation Plan
+# Memory Retrieval Remediation Plan — v2 (refined)
 
-**Date**: 2026-08-22
-**Problem statement**: `docs/audit/2026-08-22-memory-retrieval-audit/MASTER-REPORT.md` (4 sub-agent reports alongside)
+**Date**: 2026-08-22 · **Supersedes**: v1 (same day, prior commit — kept in git history)
+**Inputs**: `docs/audit/2026-08-22-memory-retrieval-audit/` + addendum; follow-up verification queries against the live db (read-only).
 **Status**: proposed
 
-Grounded in code as of `bce41e1` (0.2.8-dev.5). Every workstream names the files involved and an acceptance test.
+This version is the product of an adversarial self-review of v1: every claim re-checked against the database, every fix stress-tested for failure modes, impact re-ranked by query frequency rather than loudness.
 
 ---
 
-## Root causes found in code
+## 1. What the review corrected in v1
 
-| # | Symptom (audit ref) | Root cause in code |
+| # | v1 said | Review found | v2 change |
+|---|---|---|---|
+| C1 | P0 = 200-cap + time-blind search | Result **flooding** (tier duplication + skill pollution) degrades *every* query; the cap only hurts enumeration questions, time-blindness only recency questions. Impact was ranked by loudness, not frequency. | Re-ranked: precision fixes first (§4, P0). |
+| C2 | Recency boost: `score·(1/(1+age))^γ`, γ≈0.1–0.2 | **Mathematically unsound on RRF scores.** RRF scores compress into a narrow band (top ≈ 0.0164, rank-3 single-leg ≈ 0.0111 — a 1.5× gap spanning 2 ranks). γ=0.1 over 60 days multiplies by ~0.66 → flips 2-rank gaps, collapsing ranking into near-pure recency. Only γ≈0.01–0.03 is safe, and even then it only breaks near-ties. | Explicit `--since/--until` filters + agent-guide intent routing ("recent" → add `--since=7d`) becomes the primary fix — deterministic, testable, zero precision risk. Decay demoted to a behind-flag experiment, γ calibrated on eval data (§4 P1). |
+| C3 | Cross-tier dedup via cosine>0.98 in merge | Treating a symptom. Scenes duplicate memories **by design** — memories carry `source_scene_uris`. The cleaner fix: scenes shouldn't be primary search results at all; they're drill-down targets. The pyramid already defines this flow; the default scope violates it. | Default scope → `memory` + capped `skill`; scene hits suppressed when deterministically linked (`scene ∈ source_scene_uris` of a hit memory — no cosine guesswork); `--scope=scene` stays for explicit need. |
+| C4 | Cap skills at 1 slot | Symptom-level. Root cause: the skill tier competes on **vector** similarity, and generic ops-English skill descriptions ("Aliyun procurement for OA…") embed close to everything in a domain-concentrated corpus. Lexical match is the correct signal for skills (distinctive names). | Skill tier = FTS-only + cap 1 in default scope. |
+| C5 | (missing) | Q7's "怎么解决的" failure isn't just missing *outcome* fields — resolutions happen in **later sessions** than the problem, so per-session distillation can never link them. v1 had no linking mechanism. | **Event linking at distill time** (retrieve-then-link): related top-5 events injected into the L3 prompt; resolutions emit `Related:` refs. (§4 P2) |
+| C6 | (missing) | Atoms (14,717 rows, **all with embeddings + FTS index already built**) are not a searchable scope. They are the richest per-fact tier and would have answered Q8's "details" dead-end without any re-distillation. | Add `--scope=atom`. Cheap: infrastructure exists. |
+| C7 | "70%+ dark matter, never recalled" | `recall_stats` instrumentation began ~2026-08-09 (goose v7); the statement is really "not recalled in a 13-day window". Also: **every memory row was written in the last ~20 days** (backfill imported old dates in slugs/prose only). The complaint "harder and harder" is therefore a **growth-rate** problem (≈50–100 events/day steady-state + 2,238-event backfill), not legacy accumulation. | Archival/forgetting policy promoted from a doctor-report bullet to a designed subsystem (§4 P3); audit addendum corrects the stat. |
+| C8 | Fuzzy slug matching at bucketing | String-distance matching mis-merges (`bbc-build` vs `bbc-build-2`) and can't see semantics. Better: **retrieve-then-canonicalize** — at L2 extraction, embed the proposed slug/abstract, fetch top-K candidate existing slugs, show them to the extractor ("reuse slug if same subject"). Thresholds calibrated on the audit's labeled duplicate clusters + random negatives. Hysteresis: once merged, prefer the incumbent slug. | Replaces WS4 fuzzy matching. Also fixes **profile churn** (166 versions ≈ 8/day): extend the existing `bucketUnchanged` gate with a body-semantic diff (unchanged body → no new version). |
+| C9 | Contradictions: "resolve from infra" | Left the mechanism implicit. The system already has a **corrections** table (3 rows, underused) purpose-built for evidence-based fact overrides. | Contradiction resolution writes corrections; memories are never hand-edited. |
+| C10 | `ls` segment = exact-uri filter (fix crash) | Weak contract. Users and agents naturally type `ls rmb://events/2026-08-13-` expecting date browsing. | Segment = **slug/id prefix filter** (`LIKE 'seg%'`) + `--limit/--offset/--since/--until/--count` flags. Same effort, better contract. |
+| C11 | (missing) | No query-level telemetry: `recall_stats` knows per-URI hits but nothing about *queries that found nothing useful* (search→no-cat is a failure signal). Tuning C2/C4 without this data is guesswork. | Search query-log (local table): query, scope, top-k, which hits were catted within 10 min. Feeds eval + threshold calibration. |
+| C12 | Audit golden success rate 5/8 | Questions were formulated **after** inspecting the store (selection bias) and by testers who knew retrieval was being tested (expectation bias). Real-world success is likely lower. | WS8 golden set derives questions from raw session turns *before* looking at what was distilled; addendum notes the bias. |
+
+## 2. Re-scored problem model (by share of queries hurt)
+
+1. **Precision decay on every query** — tier flooding + skill pollution + duplicate memories competing for top-k. Gets worse as store grows. *(C1, C3, C4)*
+2. **Growth without forgetting** — 11.5k memories in 20 days, 90% untouched in-window; embeddings/FTS candidates grow, near-duplicate density rises, precision decays further. This is the engine of "harder and harder". *(C7)*
+3. **Enumeration blindness** — 200-cap, no pagination/prefix browsing. *(C10)*
+4. **Recency questions answered wrong** — no time filters. *(C2)*
+5. **Follow-up questions unanswerable** — no why/outcome, no cross-session resolution links, details live in unreachable tiers. *(C5, C6)*
+6. **Trust erosion** — live contradictions, undiscoverable dates, broken session ladder. *(C8, C9, C10)*
+
+## 3. Root causes (updated; file-level)
+
+| RC | Cause | Where |
 |---|---|---|
-| RC1 | `ls` capped at 200, date-suffix `ls` crashes (`no such column: uri`) | `internal/inspect/inspect.go` lsScope default branch: every container query is `... LIMIT 200` hardcoded; suffix path does `q += " AND uri = ?"` **after** `LIMIT 200` → broken SQL. No `--limit/--offset/--since` flags exist anywhere in `cmd/rmb`. (The webui's `internal/browse/browse.go` already paginates properly — the CLI just never got it.) |
-| RC2 | Search ignores time; "recent work" → 3-month-old #1 | `internal/recall/search.go`: RRF fusion of vector(0.7)+FTS(0.3) per tier, merged across tiers. No timestamp enters scoring; no `--since` filter; scores not printed. |
-| RC3 | Same fact floods results from 3 tiers | Final merge in `search.go` dedupes only by exact URI — scenes/events/preferences carrying identical text are distinct URIs, so all survive. |
-| RC4 | Duplicate memories never merge (`doc-language`×3, `redis-per-env`×2, `blockcrush`/`block-crush`) | `internal/worker/memory/worker.go`: L3 buckets atoms by `(category, slug)` and slugs are LLM-chosen at extract time. Divergent slug → parallel bucket → parallel version chain forever. No embedding-similarity check before `insertMemory`. |
-| RC5 | Backfill events carry write-time timestamps; ~14% slugs lack dates | `memories` has no `occurred_at`; events dated only by slug convention; `created_at` = write time. |
-| RC6 | `ls rmb://sessions/<id>/` fails even for today's session | `inspect.go` lsSession/catSession look up by `session_key`, but scene meta exposes `session_id` — the pyramid can't be walked. |
-| RC7 | Skills pollute results (`draft-aliyun-procurement-ticket` in ~40% of top-5s) | Skill tier fused with equal weight into the same merge; `recall_stats` (search_count vs activation) is collected but unused for ranking. |
-| RC8 | Events record what, never why/outcome | L2/L3 extraction prompts ask for actions/facts only; no rationale/outcome/refs fields in the distill template. |
+| RC1 | `LIMIT 200` hardcoded in all `lsScope` branches; segment path appends `AND uri=?` after LIMIT (broken SQL) | `internal/inspect/inspect.go` |
+| RC2 | RRF fusion (0.7/0.3) with no time signal, no filters; scores unprinted | `internal/recall/search.go` |
+| RC3 | Default scope includes scenes; final merge dedupes exact URIs only; tiers compete as equals | `internal/recall/search.go` |
+| RC4 | Skill tier fused on vector+FTS at equal weight | `internal/recall/search.go` |
+| RC5 | L3 buckets by LLM-chosen `(category, slug)`; no canonicalization against existing slugs; no pre-insert similarity check; `bucketUnchanged` gates on source-set only → profile churn | `internal/worker/memory/worker.go` |
+| RC6 | No `occurred_at`; event dates live only in slug convention/body prose | schema |
+| RC7 | `lsSession`/`catSession` resolve `session_key` while scenes expose `session_id` | `internal/inspect/inspect.go` |
+| RC8 | Extraction/distill prompts capture actions only; no rationale/outcome/related fields | L2/L3 prompts |
+| RC9 | Atoms not exposed as a search scope despite embeddings+FTS existing | `internal/recall/search.go` |
+| RC10 | No query telemetry (only per-URI `recall_stats`) | new |
+| RC11 | No archival/forgetting subsystem | new |
 
----
+## 4. Design principles
 
-## Workstreams
+1. **Search returns distilled truth; depth comes by drill-down.** Memories are primary results; scenes/atoms are reached via provenance links or explicit scopes — not sprayed into every result list.
+2. **Explicit time beats implicit decay.** Filters + guide-taught intent routing first; silent ranking changes only after eval data justifies them.
+3. **Link, don't guess.** Prefer deterministic relationships (`source_scene_uris`, incumbent slugs, exact evidence) over similarity heuristics; similarity only where no link exists, with calibrated thresholds.
+4. **Forgetting is a feature.** A memory system that only grows gets harder to retrieve from by construction. Archival must be reversible and evidence-gated.
+5. **The agent guide is the retrieval API.** Every behavior change ships with a guide update in the same release; agents re-read it every session.
+6. **Evidence over edit.** Contradictions resolve via the corrections mechanism against live infrastructure, never by hand-editing memories.
 
-### WS1 — CLI reachability (fixes RC1) · *Phase 1, ~2-3 days*
+## 5. Workstreams
 
-1. Fix the SQL construction bug in `lsScope` (build `WHERE ... AND uri = ?` before `ORDER/LIMIT`).
-2. Add flags to `cmd/rmb` `ls`: `--limit=N` (default 200), `--offset=N`, `--since=<date|Nd>` (server-side `WHERE updated_at >=`), `--count` (print total + window). Thread through `internal/httpserver` inspect route → `internal/inspect`.
-3. Apply the same to scenes/atoms/turns/sessions branches (they share the hardcoded 200).
-4. Update the embedded agent guide (`internal/agentmemory`) to document pagination + `--since`.
+### P0 — Precision & reachability (days 1–3)
 
-**Accept**: `rmb ls rmb://events/ --offset 200 --limit 100` returns 08-17-and-older events; `rmb ls rmb://events/ --since=7d` ≤ 7 days; `--count` reports 3382.
+**P0.1 Fix `ls` (RC1, C10).** Segment = slug/id prefix (`LIKE 'seg%'`, prefix-anchored, index-friendly); add `--limit` (default 200) / `--offset` / `--since` / `--until` / `--count` (total + window). Thread CLI → httpserver inspect route → inspect service. Apply to all containers.
+*Accept*: `rmb ls rmb://events/2026-06` lists June events (currently: SQL error); `--offset 200` returns pre-08-18 rows; `--count` reports 3,382.
 
-### WS2 — Time-aware search (fixes RC2, RC7) · *Phase 1, ~3-4 days*
+**P0.2 Search scope & tier redesign (RC3, RC4, C1, C3, C4).**
+- Default scope: `memory` + `skill` (FTS-only, capped at 1 slot). Scenes leave the default.
+- Link-based suppression: if an explicit multi-scope search returns a scene that ∈ `source_scene_uris` of another hit, suppress it and annotate the memory `(+scene depth: rmb://scenes/…)` — drills down deterministically.
+- `--scope=scene` unchanged for explicit use; `--scope=memory,scene,...` still composable.
+- Print fused score per result (confidence signal; agents currently guess).
+*Accept*: "openresty dynamic dns" default search: 0 suppressed-duplicate scenes in top-5, ≥4 distinct facts; the aliyun skill appears in ≤1 of 10 unrelated golden queries' top-5 (was ~6/14).
 
-1. `--since` filter on `search` (same predicate as WS1).
-2. Recency boost in `recall.Service.Search`: after fusion, multiply score by `1/(1+age_days)^γ` (γ≈0.1–0.2, tunable; suppressible via `--no-recency`). Rationale-preserving: pure-semantic behavior stays available.
-3. Print fused score per result (sub-agents asked for confidence signal).
-4. Skill-tier damping in default scope: cap skills at 1 slot unless `--scope=skill`; long-term, demote skills whose `recall_stats` shows high search-impressions but zero activations.
-5. Small popularity prior from `recall_stats.search_count` (log-scaled) — feedback loop the schema already supports.
+**P0.3 Time filters (RC2, C2).** `--since/--until` on search (v1 semantics: filters on `updated_at`; documented caveat: for immutable events this is write-time until P3.1 lands). No decay in this phase.
+*Accept*: `search "work" --since=7d` returns only last-7-day items; golden recency questions answered via guide-taught `--since` workflow.
 
-**Accept**: `search "recent work"` top-10 ≥ 8 items from last 7 days; eval harness (WS8) shows no recall@5 regression on the audit's 8 questions.
+**P0.4 Agent guide v2 (principle 5).** Teach: recency intent → `--since`; depth → cat `source_scene_uris`; details → `--scope=atom` (P1.1); enumeration → prefix `ls` + pagination; skills outrank defaults. Guide diff reviewed like code.
+*Accept*: fresh sub-agent replay of the audit's 8 questions + 2 probes using only the guide ≥ v1 results with fewer cats.
 
-### WS3 — Cross-tier result dedup (fixes RC3) · *Phase 1, ~2 days*
+**P0.5 Eval scaffold (C12).** Golden set built from **session turns sampled across the 20-day window, questions written before inspecting distilled memories**; expected answers pinned from turns. Metrics: recall@5, dup-rate in top-5, recency-precision, cats-per-answer. Runs on every PR touching recall/inspect.
+*Accept*: harness green on HEAD, CI-wired, v1-baseline numbers recorded.
 
-In the final merge step of `search.go`: fetch embeddings for candidate hits (already stored), collapse hits whose cosine > 0.98 (v1: exact-normalized-abstract hash match), keep highest-ranked, annotate `(dup of rmb://scenes/… ×2)`.
+### P1 — Depth & data (week 1–2)
 
-**Accept**: "openresty dynamic dns" returns the 5 distinct facts once each instead of 5/6 slots being the same fact.
+**P1.1 `--scope=atom` (RC9, C6).** Vector+FTS over atoms (embeddings exist for 14,717/14,717; `atoms_fts` built). Answer-attribution: results annotated with parent scene/session for drill-down.
+*Accept*: golden Q8 ("openresty resolver IPs") answered from an atom hit without re-distillation.
 
-### WS4 — Ingest dedup & one-time reconciliation (fixes RC4) · *Phase 2, ~1-2 weeks*
+**P1.2 Query telemetry (RC10, C11).** Local table: query, scope, k, top-k uris, ts; join with cat-events within 10 min (recall_stats already logs cats). Dashboard query: zero-cat search rate, empty-result rate, per-query cats.
+*Accept*: two weeks of data collected; zero-cat rate baseline published; used to calibrate P1.3.
 
-1. **Slug canonicalization at bucketing**: before creating a bucket, fuzzy-match the proposed slug against active slugs in the category (normalized edit distance + embedding of slug+abstract; threshold tuned on the known clusters). Reuse the existing slug → existing version chain finally absorbs the fact.
-2. **Pre-insert similarity check**: in/around `persistMemory`, cosine the distilled body embedding vs active memories in category; > 0.95 → supersede-and-merge instead of parallel insert.
-3. **One-time reconciliation (goose migration + LLM-assisted, backup first)**:
-   - Merge the 4 confirmed clusters: `redis-per-env`≡`dedicated-redis-per-env`; `release-auto-upload`≡`release-authorization`; `documentation-language`/`doc-language`/`docs-language` (resolve the zh-only vs bilingual contradiction — ask the user once); `blockcrush`/`block-crush` (resolve DWB db name + gql tag contradictions from current infra, not memory).
-   - Resolve 29 cross-category slug collisions.
-   - Re-slug 437 date-less events (extract date from body → `YYYY-MM-DD-` prefix; see WS6).
-4. **Entity fragmentation** (257 `starli*` etc.): do NOT auto-merge infra entities. Build a review flow (webui page or `rmb doctor --merge-suggestions`) listing cosine>0.9 clusters; user approves; merges via the existing supersede machinery.
+**P1.3 Recency-decay experiment (C2).** Behind `--boost=recency` flag (default off): additive log-age bonus ε·(1−min(age/90d,1)) with ε ≤ 10% of median top-1 RRF score (NOT multiplicative — see C2 math). Enable default only if eval shows recency-precision gains with zero recall@5 regression.
 
-**Accept**: re-ingesting a session containing the redis fact bumps the existing `redis-per-env` version, not a new slug; cluster count report from `rmb doctor` trends to 0.
+**P1.4 Cosine cross-tier suppression (fallback).** Only for unlinked near-dups (scene ∉ source_scene_uris but cos>0.98): suppress lower tier. Thresholds calibrated on labeled clusters.
 
-### WS5 — Distill *why* and *outcome* (fixes RC8) · *Phase 2, ~1 week, prompt+schema work*
+### P2 — Stop the rot at ingest (weeks 2–4)
 
-1. L2 extraction prompt: emit atoms for decision rationale, rejected alternatives, verification/outcome — not just actions.
-2. L3 event template: `## Event` with Date / Decision / **Rationale** / **Outcome** / **Refs** (resolver IPs, config keys, Jenkins job names, task-folder paths + 1-line summary of folder contents).
-3. Update `internal/agentmemory` guide so recallers know events can answer "why/怎么解决".
-4. Promotion bar: single-utterance quirks (cf. `call-user-daddy`) need corroboration before becoming preferences.
+**P2.1 Retrieve-then-canonicalize (RC5, C8).**
+- L2 extract prompt receives top-K (≤20) candidate existing slugs per category (embedding retrieval on slug+abstract) with instruction: same subject → reuse slug; genuinely new → propose slug with enforced `YYYY-MM-DD-` prefix for events.
+- L3 `persistMemory`: pre-insert similarity check vs same-category actives; cos>τ → merge into incumbent (new version), τ calibrated on the 4 audit clusters + random negatives; hysteresis: incumbent wins ties.
+- Profile churn: extend `bucketUnchanged` with body-comparison (exact-normalized v1; semantic v2) — 166 versions → converge.
+*Accept*: replay a session containing the redis-per-env fact → bumps existing memory's version, creates no new slug; profile version rate < 1/day on unchanged days.
 
-**Accept**: replaying the audit's Q1/Q5/Q7 (why rejected / why sqlite / 怎么解决的) against newly distilled equivalents answers rationale+outcome without user round-trip.
+**P2.2 Event linking + why/outcome (RC8, C5).**
+- L3 event prompt: inject top-5 related active events; extract Decision / **Rationale** / **Outcome** / **Related:** (uri refs, incl. "resolves rmb://events/…") / **Refs** (IPs, config keys, job names, task-folder + 1-line contents summary).
+- v1 stores links in body template (no migration); `related_uris` column only if query patterns demand it.
+- Promotion bar: single-utterance preferences (cf. `call-user-daddy`) require corroboration across sessions.
+*Accept*: replay audit Q1/Q5/Q7 → rationale + resolution retrievable without user round-trip; resolution event links its problem event.
 
-### WS6 — Timeline truthfulness (fixes RC5, RC6) · *Phase 3, ~1 week*
+**P2.3 One-time reconciliation (C8, C9).** Pre-backup (goose transactional + sqlite file copy).
+- Scripted: merge 4 duplicate clusters; re-slug 437 date-less events (date from body → prefix; unknowable → `undated-` prefix + doctor flag); resolve 29 cross-category slug collisions.
+- Human-in-loop: blockcrush/block-crush contradictions (DWB db name, gql tag) resolved by checking live infra, then recorded as **corrections** (not edits); doc-language 3-way split resolved by asking the user once.
+*Accept*: `rmb doctor --duplicates` reports 0 known clusters; corrections table carries the resolved contradictions with evidence refs.
 
-1. `occurred_at` column (goose): set from slug date, else LLM-extracted from body, else `created_at`. Backfill rows once.
-2. `ls rmb://events/` orders by `occurred_at DESC` by default (`--by=updated` to switch); other containers keep `updated_at`.
-3. Enforce `YYYY-MM-DD-` prefix in slug validation at extract time (hard requirement for events).
-4. Session ladder: `lsSession`/`catSession` accept both `session_key` and `id`; scene meta additionally exposes `session_key`.
-5. Backfill empty `source_scene_uris` (37.5% of visible events) where the linkage is recoverable from atoms.
+### P3 — Truthfulness, forgetting, hygiene (weeks 4–6)
 
-**Accept**: the 08-21 backfill batch sorts into June/July; `ls rmb://sessions/<scene's session_id>/` lists turns.
+**P3.1 `occurred_at` (RC6).** Column + backfill (slug date → body-extracted date → created_at fallback); events `ls`/`--since` switch to `occurred_at` (`--by=updated` opt-out); other containers keep `updated_at`.
+*Accept*: 08-21 backfill batch sorts into June/July; `--since` on events filters by when things happened.
 
-### WS7 — Store hygiene & security · *Phase 3, continuous*
+**P3.2 Session ladder (RC7).** `lsSession`/`catSession` accept `session_key` **and** `id`; scene meta exposes both. Backfill empty `source_scene_uris` where recoverable via atoms (37.5% of visible events).
 
-1. Superseded-row GC: keep last N versions (N=3?) per URI or age-out > 90 days; today 44% of rows / much of the 188 MB is dead weight.
-2. Body size cap at distill (e.g. 4k chars); runbook-grade content (cf. `entities/rmb` 12.3k chars) graduates into the skills system with the entity keeping a pointer.
-3. `rmb doctor`: never-recalled ratio (currently entities 75%, prefs 90%), duplicate clusters, date-less slugs, orphan scenes — monthly report.
-4. **Secrets**: move LLM/embed keys out of `config.yaml` plaintext (env var / macOS Keychain via the app); rotate the two keys that sat in the config during the audit.
+**P3.3 Archival / forgetting (RC11, C7).** New `archived_at` column. Policy (tunable): active memory, 0 recall_stats hits in 120 days, not profile/correction-linked, superseded-chain cold → **doctor proposes** archive; bulk-archive on approval; archived rows leave default search, remain `cat`-able and restorable. Never auto-delete.
+*Accept*: doctor's first run proposes a reviewable list; archive+restore round-trips; default-search candidate pool measurably shrinks.
 
-### WS8 — Regression eval harness · *start Phase 1, gates all ranking changes*
+**P3.4 Hygiene.** GC superseded versions (keep last 3 or 90 days — 44% of rows today); body cap at distill (4k chars) with runbook-grade content graduating to skills (entity keeps pointer); `rmb doctor`: duplicate scan (cos>0.9 pairs → LLM-diff → proposed corrections), contradiction scan, date-less slug count, orphan scenes, archive candidates, zero-cat queries.
 
-Encode the audit as replayable eval (golden file): the 8 realistic questions + typo/cross-lingual probes + "recent work" recency check; metrics: recall@5 of expected URIs, dup-rate in top-5, recency-precision. Every WS2/WS3/WS5 change must pass it; KPIs tracked over time (ever-recalled ratio, median cats per answer).
+**P3.5 Secrets.** Move LLM/embed keys out of `config.yaml` plaintext → env/Keychain via the desktop app; **rotate both live keys and any in `config.yaml.bak-stargate`**; scrub backups.
 
----
+## 6. Decision log (need user input)
 
-## Sequencing & risk
+| D1 | Default scope change (scenes out) | Recommended: yes. Risk: agents that relied on scene hits — mitigated by guide v2 + deterministic drill-down annotation. |
+| D2 | Archive threshold | 120d zero-recall proposed; alternatives 60d/180d. |
+| D3 | Decay default | Off until P1.3 data; user preference? |
+| D4 | Contradiction evidence gathering | Needs prod access (jump.hs99.vip / DBs) — user-run or sub-agent with the jump skill? |
+| D5 | doc-language resolution | Ask user: zh-only or bilingual? (one question, then corrections entry) |
 
-| Phase | Contents | Unlocks |
-|---|---|---|
-| 1 (week 1) | WS8 scaffold → WS1, WS2, WS3 | daily-pain P0s gone: full history reachable, recency works, results un-flooded |
-| 2 (weeks 2-3) | WS4 (canonicalization + reconciliation), WS5 | new memories stop rotting; why/outcome captured |
-| 3 (weeks 4-5) | WS6, WS7, entity merge review flow | timeline truthful, store shrinking instead of growing dark matter |
+## 7. Risks
 
-**Risks**: (a) ranking changes regress precision → gated by WS8, ship behind `--no-recency` escape hatch; (b) auto-merge fabricates "canonical" facts → cross-slug merges require human approval, only exact-cluster reconciliation is scripted; (c) migrations on the 188 MB live db → goose transactional + pre-migration backup (a backup dir already exists from 08-16); (d) prompt changes (WS5) shift atom formats → version the template, A/B on a session replay before rollout.
+- **Scope-change regression** → P0.4 guide ships atomically with P0.2; eval gates; `--scope=memory,scene` escape hatch preserves old behavior exactly.
+- **Canonicalizer mis-merges** → calibrated thresholds + hysteresis + doctor duplicate-scan as safety net; mis-merge recovery = supersede-chain rollback (machinery exists).
+- **Migrations on live 188 MB db** → goose transactional + file backup first (precedent: `backup-2026-08-16-removed-version/`).
+- **Prompt changes shift formats** → version templates; A/B on session replay before rollout.
+- **Telemetry privacy** → local-only table; never leaves the machine; documented.
+
+## 8. Explicitly not doing (now)
+
+- Auto-deleting memories (archive only, reversible).
+- Auto-merging entity fragments (257 `starli*` shards) without per-cluster approval — doctor proposes, human disposes.
+- Full-text search over raw turns (5,841 transcripts; noisy + large; atoms cover distilled detail) — revisit if telemetry shows demand.
+- Semantic (vector) ranking for the skill tier (lexical only, per C4).

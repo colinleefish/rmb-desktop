@@ -85,6 +85,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/version", s.handleVersion)
 	s.mux.HandleFunc("POST /api/v1/sessions/{id}/upload", s.handleUpload)
 	s.mux.HandleFunc("GET /api/v1/search", s.handleSearch)
+	s.mux.HandleFunc("GET /api/v1/doctor/metrics", s.handleDoctorMetrics)
 	s.mux.HandleFunc("GET /api/v1/inspect/cat", func(w http.ResponseWriter, r *http.Request) {
 		s.handleInspect(w, r, "cat")
 	})

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/colinleefish/rmb-desktop/internal/uri"
@@ -23,11 +24,16 @@ type Stats struct {
 }
 
 type Service struct {
-	db *sql.DB
+	db  *sql.DB
+	mu  sync.Mutex
+	now func() time.Time
 }
 
 func NewService(database *sql.DB) *Service {
-	return &Service{db: database}
+	return &Service{
+		db:  database,
+		now: func() time.Time { return time.Now().UTC() },
+	}
 }
 
 // NormalizeURI maps a recall URI to the stats key for memories, scenes, and skills.
@@ -97,30 +103,17 @@ func (s *Service) recordKind(ctx context.Context, raw, kind string) error {
 	if !ok {
 		return nil
 	}
-	nowMS := time.Now().UTC().UnixMilli()
-	var query string
-	switch kind {
-	case "cat":
-		query = `
-			INSERT INTO recall_stats (uri, search_count, cat_count, meta_count, last_cated_at, updated_at)
-			VALUES (?, 0, 1, 0, ?, ?)
-			ON CONFLICT(uri) DO UPDATE SET
-				cat_count = cat_count + 1,
-				last_cated_at = excluded.last_cated_at,
-				updated_at = excluded.updated_at`
-	case "meta":
-		query = `
-			INSERT INTO recall_stats (uri, search_count, cat_count, meta_count, last_metaed_at, updated_at)
-			VALUES (?, 0, 0, 1, ?, ?)
-			ON CONFLICT(uri) DO UPDATE SET
-				meta_count = meta_count + 1,
-				last_metaed_at = excluded.last_metaed_at,
-				updated_at = excluded.updated_at`
-	default:
-		return fmt.Errorf("unknown recall kind %q", kind)
+	w := WeightMeta
+	if kind == "cat" {
+		w = WeightCat
 	}
-	if _, err := s.db.ExecContext(ctx, query, target, nowMS, nowMS); err != nil {
-		return fmt.Errorf("record %s for %q: %w", kind, target, err)
+	if err := s.recordHeatAndCounters(ctx, target, kind, w); err != nil {
+		return err
+	}
+	if kind == "cat" {
+		// A cat of a uri that appeared in a recent search's top-k is the
+		// only event that makes that search count as usage (issue #24).
+		s.joinSearchToCat(ctx, target, s.clock().UnixMilli())
 	}
 	return nil
 }

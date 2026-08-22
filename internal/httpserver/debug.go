@@ -11,6 +11,7 @@ import (
 	"github.com/colinleefish/rmb-desktop/internal/config"
 	"github.com/colinleefish/rmb-desktop/internal/debug"
 	"github.com/colinleefish/rmb-desktop/internal/llm"
+	"github.com/colinleefish/rmb-desktop/internal/worker/memory"
 	"github.com/colinleefish/rmb-desktop/internal/worker/scene"
 )
 
@@ -114,8 +115,9 @@ func (s *Server) handleDebugPipelineRequeue(w http.ResponseWriter, r *http.Reque
 }
 
 type dryRunRequest struct {
-	SessionKey string `json:"session_key"`
-	Stage      string `json:"stage"`
+	SessionKey    string `json:"session_key"`
+	Stage         string `json:"stage"`
+	PromptVersion int    `json:"prompt_version"` // optional: pin a distill prompt generation (stage l3) for A/B replay
 }
 
 func (s *Server) handleDebugPipelineDryRun(w http.ResponseWriter, r *http.Request) {
@@ -128,8 +130,8 @@ func (s *Server) handleDebugPipelineDryRun(w http.ResponseWriter, r *http.Reques
 	if stage == "" {
 		stage = "t2"
 	}
-	if stage != "t2" {
-		writeError(w, http.StatusBadRequest, "only stage t2 is supported")
+	if stage != "t2" && stage != "l3" {
+		writeError(w, http.StatusBadRequest, "only stages t2 and l3 are supported")
 		return
 	}
 
@@ -154,9 +156,34 @@ func (s *Server) handleDebugPipelineDryRun(w http.ResponseWriter, r *http.Reques
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	if req.PromptVersion != 0 {
+		if stage != "l3" {
+			writeError(w, http.StatusBadRequest, "prompt_version only applies to stage l3")
+			return
+		}
+		if err := chat.SetDistillPromptVersion(req.PromptVersion); err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), llm.DebugRequestBudget(cfg.LLM, 4))
+	llmCalls := 4
+	if stage == "l3" {
+		llmCalls = 8
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), llm.DebugRequestBudget(cfg.LLM, llmCalls))
 	defer cancel()
+
+	if stage == "l3" {
+		result, err := memory.DryRunL3(ctx, s.db, chat, cfg.Pipeline, s.log, sessionID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		result.PromptVersion = chat.DistillPromptVersion()
+		writeJSON(w, http.StatusOK, result)
+		return
+	}
 
 	result, err := scene.DryRunT2(ctx, s.db, chat, cfg.Pipeline, sessionID)
 	if err != nil {

@@ -1,0 +1,11 @@
+EVENT FORMAT (category=events only) — body layout:
+<One-line dated summary: what happened, to what, when.>
+
+Then Markdown list items, one per section the supplied facts support (omit sections with no supporting fact — never invent):
+- **Decision:** the choice made (only if this event records a decision).
+- **Rationale:** WHY — motivations, constraints, and alternatives rejected with why they lost.
+- **Outcome:** verification and final state — how it was confirmed done/fixed (queries, tests, log evidence, numbers) and result dates.
+- **Related:** cross-session links, e.g. `resolves rmb://events/<slug>` when the facts show this event resolves that earlier problem event, or `related to rmb://events/<slug>` for context. Link ONLY events from the related-events list that the facts clearly connect to; prefer "resolves" when this event fixes an earlier problem.
+- **Refs:** concrete operational details worth keeping — resolver/IP addresses, config keys, job names, DB/table names, and dated task-folder paths each with a 1-line contents summary.
+
+The abstract stays one line. Ground every section in the supplied facts or the related-events list; if nothing explains the why, omit Rationale rather than guessing.

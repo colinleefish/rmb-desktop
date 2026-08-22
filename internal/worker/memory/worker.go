@@ -25,8 +25,22 @@ const distillDelay = 1 * time.Second
 // l3Concurrency bounds how many buckets distill in parallel during one rollup.
 const l3Concurrency = 8
 
+// relatedEventsTopK caps how many related active events are injected into the
+// L3 event distill prompt (retrieve-then-link, P2.2 / issue #28).
+const relatedEventsTopK = 5
+
+// graduationMinSessions is the distinct-session corroboration bar before a
+// NEW preferences/entities subject graduates from append-only atoms/events
+// into a rewritten memory (plan §5 P2.2, §9.3d). Below the bar the subject
+// keeps accreting as atoms (immutable, still searchable via --scope=atom);
+// this blocks single-utterance promotions like "call-user-daddy". Events are
+// exempt (immutable, append-only by design); profile is exempt (singleton
+// identity, correction-gated). K≈2–3 per plan; 2 keeps the bar at one
+// independent corroboration.
+const graduationMinSessions = 2
+
 type MemoryDistiller interface {
-	DistillMemory(ctx context.Context, category, slug, atomsJSON string, corrections []string) (string, error)
+	DistillMemory(ctx context.Context, category, slug, atomsJSON string, corrections []string, related []llm.RelatedEvent) (string, error)
 }
 
 type Worker struct {
@@ -115,6 +129,7 @@ func (w *Worker) rollup(ctx context.Context) error {
 	}
 
 	transientPending := false
+	deferredBuckets := 0
 	var (
 		mu  sync.Mutex
 		wg  sync.WaitGroup
@@ -133,6 +148,24 @@ func (w *Worker) rollup(ctx context.Context) error {
 
 			srcScenes := sourceSceneURIsFor(bucket, index)
 			corrStatements, corrURIs := correction.SplitSummaries(corrByTarget[bucket.URI])
+
+			// Graduation bar first (P2.2, §9.3d): a NEW preferences/entities
+			// subject below the distinct-session corroboration bar keeps
+			// accreting as atoms instead of being promoted to a memory.
+			deferred, err := w.graduationDeferred(ctx, bucket)
+			if err != nil {
+				w.log.Warn("l3 graduation check failed", "uri", bucket.URI, "err", err)
+				mu.Lock()
+				transientPending = true
+				mu.Unlock()
+				return
+			}
+			if deferred {
+				mu.Lock()
+				deferredBuckets++
+				mu.Unlock()
+				return
+			}
 
 			unchanged, err := w.bucketUnchanged(ctx, bucket, srcScenes, corrURIs)
 			if err != nil {
@@ -173,6 +206,11 @@ func (w *Worker) rollup(ctx context.Context) error {
 	}
 	wg.Wait()
 
+	if deferredBuckets > 0 {
+		w.log.Info("l3 graduation deferred (below corroboration bar; atoms kept)",
+			"buckets", deferredBuckets, "min_sessions", graduationMinSessions)
+	}
+
 	if transientPending {
 		w.log.Info("l3 rollup incomplete, leaving sessions pending", "count", len(pendingIDs))
 		return nil
@@ -200,8 +238,11 @@ func (w *Worker) pendingSessionIDs(ctx context.Context) ([]string, error) {
 func (w *Worker) distillBucket(ctx context.Context, bucket Bucket, corrections []string) (ParsedMemory, error) {
 	// Single-atom buckets don't need LLM distillation — there's nothing to
 	// merge. Emit the fact directly so LLM failures (empty/truncated
-	// responses) can't stall the whole rollup.
-	if len(bucket.Atoms) == 1 {
+	// responses) can't stall the whole rollup. Events are exempt: even a
+	// single-atom event goes through the LLM so the structured body
+	// (Decision/Rationale/Outcome/Related/Refs) and related-event linking
+	// apply (P2.2, issue #28).
+	if len(bucket.Atoms) == 1 && bucket.Category != model.AtomCategoryEvents {
 		content := strings.TrimSpace(bucket.Atoms[0].Content)
 		if content == "" {
 			return ParsedMemory{}, fmt.Errorf("single-atom bucket has empty content")
@@ -213,13 +254,27 @@ func (w *Worker) distillBucket(ctx context.Context, bucket Bucket, corrections [
 		return ParsedMemory{Abstract: abstract, Body: content}, nil
 	}
 
+	// Retrieve-then-link (P2.2, issue #28): for event buckets, fetch the top
+	// related active events and inject them into the prompt so a resolution
+	// can reference the earlier problem event. Failure is non-fatal — distill
+	// without links rather than stalling the rollup.
+	var related []llm.RelatedEvent
+	if bucket.Category == model.AtomCategoryEvents {
+		r, err := w.relatedEvents(ctx, bucket)
+		if err != nil {
+			w.log.Warn("l3 related-event retrieval failed; distilling without links", "uri", bucket.URI, "err", err)
+		} else {
+			related = r
+		}
+	}
+
 	chunks := chunkAtoms(bucket.Atoms, w.cfg.L3MaxAtoms)
 	if len(chunks) == 1 {
 		atomsJSON, err := serializeAtomsForLLM(chunks[0])
 		if err != nil {
 			return ParsedMemory{}, err
 		}
-		raw, err := w.llm.DistillMemory(ctx, bucket.Category, bucket.Slug, atomsJSON, corrections)
+		raw, err := w.llm.DistillMemory(ctx, bucket.Category, bucket.Slug, atomsJSON, corrections, related)
 		if err != nil {
 			return ParsedMemory{}, err
 		}
@@ -232,7 +287,7 @@ func (w *Worker) distillBucket(ctx context.Context, bucket Bucket, corrections [
 		if err != nil {
 			return ParsedMemory{}, err
 		}
-		raw, err := w.llm.DistillMemory(ctx, bucket.Category, bucket.Slug, atomsJSON, nil)
+		raw, err := w.llm.DistillMemory(ctx, bucket.Category, bucket.Slug, atomsJSON, nil, related)
 		if err != nil {
 			return ParsedMemory{}, err
 		}
@@ -248,11 +303,44 @@ func (w *Worker) distillBucket(ctx context.Context, bucket Bucket, corrections [
 	if err != nil {
 		return ParsedMemory{}, err
 	}
-	raw, err := w.llm.DistillMemory(ctx, bucket.Category, bucket.Slug, mergedJSON, corrections)
+	raw, err := w.llm.DistillMemory(ctx, bucket.Category, bucket.Slug, mergedJSON, corrections, related)
 	if err != nil {
 		return ParsedMemory{}, err
 	}
 	return parseDistillResponse(raw)
+}
+
+// graduationDeferred reports whether bucket is a NEW preferences/entities
+// subject whose atoms do not yet span graduationMinSessions distinct
+// sessions. Deferred subjects keep accreting as append-only atoms/events
+// instead of being promoted to a rewritten memory (issue #28, plan §9.3d).
+// Already-graduated subjects (an active memory exists) rewrite as before.
+func (w *Worker) graduationDeferred(ctx context.Context, bucket Bucket) (bool, error) {
+	if bucket.Category != model.AtomCategoryPreferences && bucket.Category != model.AtomCategoryEntities {
+		return false, nil
+	}
+	var active int
+	err := w.db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM memories WHERE uri = ? AND superseded_at IS NULL`, bucket.URI,
+	).Scan(&active)
+	if err != nil {
+		return false, err
+	}
+	if active > 0 {
+		return false, nil
+	}
+	return distinctSessionCount(bucket.Atoms) < graduationMinSessions, nil
+}
+
+// distinctSessionCount counts distinct source sessions across atoms.
+func distinctSessionCount(atoms []model.Atom) int {
+	seen := make(map[string]struct{}, len(atoms))
+	for _, a := range atoms {
+		if a.SessionID != "" {
+			seen[a.SessionID] = struct{}{}
+		}
+	}
+	return len(seen)
 }
 
 func (w *Worker) bucketUnchanged(ctx context.Context, bucket Bucket, srcScenes, corrURIs []string) (bool, error) {

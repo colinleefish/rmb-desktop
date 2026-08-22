@@ -22,6 +22,22 @@ func EscapeFTSQuery(query string) string {
 	return strings.Join(parts, " ")
 }
 
+// EscapeFTSQueryAny quotes each field of the query as a phrase and joins
+// them with OR — a recall-oriented variant of EscapeFTSQuery used where any
+// shared term makes a memory a candidate and bm25 ranking does the sorting
+// (L3 event linking, P2.2 / issue #28).
+func EscapeFTSQueryAny(query string) string {
+	parts := strings.Fields(strings.TrimSpace(query))
+	if len(parts) == 0 {
+		return `""`
+	}
+	for i, p := range parts {
+		p = strings.ReplaceAll(p, `"`, `""`)
+		parts[i] = `"` + p + `"`
+	}
+	return strings.Join(parts, " OR ")
+}
+
 func FTSMemories(ctx context.Context, db *sql.DB, query string, k int, tw TimeWindow) ([]Match, error) {
 	if k <= 0 {
 		k = 5
@@ -62,6 +78,33 @@ func FTSScenes(ctx context.Context, db *sql.DB, query string, k int, tw TimeWind
 	}
 	defer rows.Close()
 	return scanFTSMatches(rows, "scenes")
+}
+
+// FTSEventLinks returns the top-k active EVENT memories matching query by
+// BM25, excluding excludeURI (the event being distilled). It backs L3
+// retrieve-then-link (P2.2, issue #28): the distill prompt injects these so a
+// resolution event can link the earlier problem event it resolves. The query
+// is OR-joined per token (EscapeFTSQueryAny); bm25 sorts the candidates.
+func FTSEventLinks(ctx context.Context, db *sql.DB, query, excludeURI string, k int) ([]Match, error) {
+	if k <= 0 {
+		k = 5
+	}
+	rows, err := db.QueryContext(ctx, `
+		SELECT m.uri,
+		       COALESCE(substr(COALESCE(NULLIF(TRIM(m.abstract), ''), m.body), 1, 160), '') AS snippet,
+		       m.version,
+		       m.source_scene_uris
+		FROM memories m
+		INNER JOIN memories_fts fts ON fts.rowid = m.rowid
+		WHERE memories_fts MATCH ? AND m.superseded_at IS NULL
+		  AND m.category = 'events' AND m.uri <> ?
+		ORDER BY bm25(memories_fts)
+		LIMIT ?`, EscapeFTSQueryAny(query), excludeURI, k)
+	if err != nil {
+		return nil, fmt.Errorf("fts event links: %w", err)
+	}
+	defer rows.Close()
+	return scanFTSMemoryMatches(rows, "events")
 }
 
 func FTSSkills(ctx context.Context, db *sql.DB, query string, k int, tw TimeWindow) ([]Match, error) {

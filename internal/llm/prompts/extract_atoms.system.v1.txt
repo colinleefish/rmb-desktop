@@ -15,13 +15,6 @@ Category routing (choose exactly one per fact):
 - entities: a NAMEABLE, PERSISTENT thing that is not the user — a specific person, team, company, named project/repo, host/server, tool, or service. NOT an activity, comparison, investigation, bug-fix, or one-off task. The slug is the thing's canonical name. If a fact is "what we did to X", the entity is X and the doing is an event — do not invent an entity for the action.
 - events: dated decisions, milestones, or actions taken. Immutable. Slug is date-prefixed when a date is known; each distinct event gets its own slug (events are NOT consolidated).
 
-WHY and OUTCOME matter as much as the action (P2.2):
-- For every DECISION, also emit atoms for its RATIONALE (why this choice; which constraints mattered) and for each REJECTED ALTERNATIVE (what was considered and why it lost). Use the SAME slug as the decision event so they consolidate into one event record.
-- For every PROBLEM/BUG/INCIDENT, emit an atom capturing symptom + affected system, with its own dated event slug; a later fix is a separate dated event.
-- For every FIX/COMPLETION/RESOLUTION, emit an atom for the VERIFICATION/OUTCOME: what was done, how it was confirmed (query results, tests, log evidence, numbers) and the final state. If it resolves an earlier problem, say which problem in the content.
-- Keep concrete operational details (resolver/IP addresses, config keys, job names, DB/table names, dated task-folder paths) INSIDE the content of the matching event/entity atoms; do not drop them.
-- Rationale/outcome atoms are still ONE factual sentence each, like every atom.
-
 Do NOT extract (skip entirely):
 - Transient session state or the AI's current mode (e.g. "AI is in Ask mode", "switched to Agent mode").
 - The user's momentary emotional reactions (e.g. "user was surprised/alarmed").
@@ -52,7 +45,5 @@ Examples:
 - "We compared web service options today" -> (NOT an entity; it is an activity. If a decision was reached, emit an event; otherwise skip. WRONG: {"category":"entities","slug":"web-service-comparison",...})
 - "Fixed the T2 stall bug" -> {"category":"events","slug":"2026-06-07-fix-t2-stall","content":"On 2026-06-07 the T2 scene-worker stall was fixed.","scene_name":"decisions","source_turn_indices":[0]} (WRONG: an "entities" atom slugged "fix-t2-stall" — a bug-fix is an event, not an entity.)
 - "The starlink RDS is at 10.9.114.160" -> {"category":"entities","slug":"starlink","content":"The starlink RDS instance is reachable at 10.9.114.160.","scene_name":"infra","source_turn_indices":[0]} (WRONG: slug "10-9-114-160" or "starlink-rds" — never slug an IP, and fold the backing store into the system's canonical slug.)
-- Decision with rationale — "we'll use sqlite for rmbd: no RDS, no docker, single binary" -> TWO atoms sharing one slug: {"category":"events","slug":"2026-05-30-rmbd-sqlite","content":"On 2026-05-30 rmbd chose SQLite as its storage engine.","scene_name":"decisions","source_turn_indices":[0]} and {"category":"events","slug":"2026-05-30-rmbd-sqlite","content":"SQLite was chosen so installation needs no RDS, Docker, or exposed port.","scene_name":"decisions","source_turn_indices":[0]}.
-- Resolution with verification — "soft-deleted the bad rows, only 67 left now" -> {"category":"events","slug":"2026-07-16-soft-delete-one-tag-solutions","content":"On 2026-07-16 29,800 of 29,867 one-tag-diff solutions were soft-deleted in lhh_blockblast_client.","scene_name":"data-fixes","source_turn_indices":[0]} and {"category":"events","slug":"2026-07-16-soft-delete-one-tag-solutions","content":"Verification after the soft delete confirmed 67 one-tag-diff solutions remain.","scene_name":"data-fixes","source_turn_indices":[0]}.
 - "Let's build the T2 scenes worker next" / "follow the roadmap: eval, then embed, then search" -> (skip, or an event if a firm dated decision; NOT a preference. WRONG: {"category":"preferences","slug":"next-steps",...} or {"slug":"roadmap",...} — project plans are not standing dispositions.)
 - "The AI is currently in Ask mode" -> (skip: transient session state)

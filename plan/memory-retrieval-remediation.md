@@ -87,10 +87,11 @@ This version is the product of an adversarial self-review of v1: every claim re-
 **P1.1 `--scope=atom` (RC9, C6).** Vector+FTS over atoms (embeddings exist for 14,717/14,717; `atoms_fts` built). Answer-attribution: results annotated with parent scene/session for drill-down.
 *Accept*: golden Q8 ("openresty resolver IPs") answered from an atom hit without re-distillation.
 
-**P1.2 Query telemetry (RC10, C11).** Local table: query, scope, k, top-k uris, ts; join with cat-events within 10 min (recall_stats already logs cats). Dashboard query: zero-cat search rate, empty-result rate, per-query cats.
-*Accept*: two weeks of data collected; zero-cat rate baseline published; used to calibrate P1.3.
+**P1.2 Query telemetry & heat counter (RC10, C11, §10).** Local tables: (a) query log — query, scope, k, top-k uris, ts; (b) join search→cat within 10 min (successful retrieval). Add `heat` + `last_use_at` to recall_stats: `heat = heat·e^(−Δt/τ) + w` on qualifying use (τ≈30d; w=1 cat, 0.3 meta, search only if cat follows ≤10min; never bare impressions). Applies to memories and skills. Dashboard: zero-cat search rate, heat concentration (feedback-loop alarm).
+*Accept*: heat column live on all recall events; two weeks of data collected; aliyun skill heat ≈ 0 while jump-hs99-vip heat is high.
 
-**P1.3 Recency-decay experiment (C2).** Behind `--boost=recency` flag (default off): additive log-age bonus ε·(1−min(age/90d,1)) with ε ≤ 10% of median top-1 RRF score (NOT multiplicative — see C2 math). Enable default only if eval shows recency-precision gains with zero recall@5 regression.
+**P1.3 Usage-heat ranking (D3, §10).** Replaces the v2 recency-decay experiment: `final = rrf + α·log(1+heat) + β·e^(−age/14d)`, α/β bounded to ≤~10% each of median top-1 RRF score, `--no-boost` escape hatch, config-tunable. Rollout: counter ships in P1.2 → accumulate ≥30d → enable behind flag → default-on only after eval shows zero recall@5 regression on golden set. Cold-start novelty term ensures new memories surface before heat accrues.
+*Accept*: golden recency questions pass without `--since`; recall@5 on golden set unchanged; heat concentration stable in doctor.
 
 **P1.4 Cosine cross-tier suppression (fallback).** Only for unlinked near-dups (scene ∉ source_scene_uris but cos>0.98): suppress lower tier. Thresholds calibrated on labeled clusters.
 
@@ -120,8 +121,8 @@ This version is the product of an adversarial self-review of v1: every claim re-
 
 **P3.2 Session ladder (RC7).** `lsSession`/`catSession` accept `session_key` **and** `id`; scene meta exposes both. Backfill empty `source_scene_uris` where recoverable via atoms (37.5% of visible events).
 
-**P3.3 Archival / forgetting (RC11, C7).** New `archived_at` column. Policy (tunable): active memory, 0 recall_stats hits in 120 days, not profile/correction-linked, superseded-chain cold → **doctor proposes** archive; bulk-archive on approval; archived rows leave default search, remain `cat`-able and restorable. Never auto-delete.
-*Accept*: doctor's first run proposes a reviewable list; archive+restore round-trips; default-search candidate pool measurably shrinks.
+**P3.3 Archival / forgetting (RC11, C7, D2=90d).** New `archived_at` column. Policy (tunable): heat ≈ 0 AND no qualifying use in **90 days**, not profile/correction-linked, superseded-chain cold → **doctor proposes** archive; bulk-archive on approval; archived rows leave default search, remain `cat`-able and restorable. Never auto-delete. Evidence tiers (turns/atoms/scenes) exempt forever (§9.2 invariant).
+*Accept*: doctor's first run proposes a reviewable list (expected small until telemetry matures); archive+restore round-trips; default-search candidate pool measurably shrinks.
 
 **P3.4 Hygiene.** GC superseded versions (keep last 3 or 90 days — 44% of rows today); body cap at distill (4k chars) with runbook-grade content graduating to skills (entity keeps pointer); `rmb doctor`: duplicate scan (cos>0.9 pairs → LLM-diff → proposed corrections), contradiction scan, date-less slug count, orphan scenes, archive candidates, zero-cat queries.
 
@@ -130,8 +131,8 @@ This version is the product of an adversarial self-review of v1: every claim re-
 ## 6. Decision log (need user input)
 
 | D1 | Default scope change (scenes out) | **RESOLVED 2026-08-22 — yes, reframed** (see §9.2): memory-primary default stands, not because scenes are redundant but because evidence must be *reachable by drill-down*, not sprayed into rankings. Safeguards added: version-as-trust-signal, `--scope=atom` for detail queries, evidence tiers exempt from archival. |
-| D2 | Archive threshold | 120d zero-recall proposed; alternatives 60d/180d. |
-| D3 | Decay default | Off until P1.3 data; user preference? |
+| D2 | Archive threshold | **RESOLVED 2026-08-22 — 90 days** (one quarter). Archive candidacy = heat ≈ 0 AND no use in 90d; doctor-proposed, user-approved, reversible; evidence tiers exempt. |
+| D3 | Decay default | **RESOLVED 2026-08-22 — usage-heat ranking, ON (phased)**. User wants a time factor plus a popularity factor ("often searched = hot"). Design per §10: cat/meta-weighted exponentially-decayed heat counter (never raw search impressions — rich-get-richer trap), bounded additive bonus + 14d cold-start novelty, default-on after ~30d telemetry accumulation + eval gate, `--no-boost` escape hatch. |
 | D4 | Contradiction evidence gathering | Needs prod access (jump.hs99.vip / DBs) — user-run or sub-agent with the jump skill? |
 | D5 | doc-language resolution | Ask user: zh-only or bilingual? (one question, then corrections entry) |
 
@@ -193,3 +194,21 @@ Verified in `worker.go` before amending:
 - **P0.4 amended**: tier-routing guidance per §9.2.
 - **P3.3 amended**: archival scope explicitly excludes turns/atoms/scenes (invariant: evidence is never discarded).
 - **New acceptance test**: after gate (9.3a), profile version rate on unchanged-identity days = 0; after (9.3d), no new single-session preference promotions.
+
+---
+
+## 10. Usage-heat ranking design (D3 resolution)
+
+User decision: ranking should carry a time factor **and** a popularity factor ("often-retrieved memories are hot").
+
+**Principle — usage beats exposure.** `search_count` is an impression, not a choice; boosting on it creates a rich-get-richer loop (the aliyun-skill pollution would become permanent). Only qualifying *use* generates heat: cat (w=1), meta (w=0.3), search→cat within 10 min (counts as cat). Bare search hits never count.
+
+**Heat counter**: `heat = heat·e^(−Δt/τ) + w`, τ≈30d, one column on `recall_stats` + `last_use_at`, O(1) updates. Encodes frequency and freshness-of-use in one number: old-but-used-yesterday memories stay hot; once-popular-but-unused memories cool exponentially.
+
+**Ranking**: `final = rrf + α·log(1+heat) + β·e^(−age/14d)` — both bonuses bounded additive (≤~10% each of median top-1 RRF) so they only break near-ties; relevance always dominates; hot-irrelevant can never outrank cold-relevant. The β term is cold-start insurance: new memories (heat=0) get a small decaying novelty boost for ~14d, then earn their keep.
+
+**Lifecycle coherence**: the same heat drives D2 archival (heat≈0 ∧ 90d unused → doctor proposes). One signal, two consumers: hot → ranks higher; cold → archive candidate.
+
+**Why this beats created_at decay (v2's C2 concern)**: use-based heat refreshes canonical-but-old memories automatically (usage re-heats them), which was the failure mode of pure recency decay.
+
+**Risks & mitigations**: residual feedback loop (agents cat what ranks high) → ≤10% cap + log scale + doctor monitors heat concentration (alarm if top-10 memories eat >50% of cats); thin telemetry (started 2026-08-09) → counter ships first, boost default-on only after ≥30d data + eval gate; skills participate (never-activated skill stays cold; 66-activation skill earns its slot).

@@ -32,7 +32,7 @@ func TestSearch_FTS_memories(t *testing.T) {
 	}
 
 	svc := recall.NewService(database)
-	matches, err := svc.Search(context.Background(), nil, "kubectl deployment", 5, []string{"memory"})
+	matches, err := svc.Search(context.Background(), nil, "kubectl deployment", 5, []string{"memory"}, recall.TimeWindow{})
 	if err != nil {
 		t.Fatal(err)
 	}

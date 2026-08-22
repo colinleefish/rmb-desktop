@@ -9,10 +9,12 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/colinleefish/rmb-desktop/internal/client"
 	"github.com/colinleefish/rmb-desktop/internal/config"
 	"github.com/colinleefish/rmb-desktop/internal/hook"
+	"github.com/colinleefish/rmb-desktop/internal/recall"
 	"github.com/colinleefish/rmb-desktop/internal/version"
 )
 
@@ -99,7 +101,7 @@ func hookSubmit(args []string) int {
 func search(args []string) int {
 	query, rest := parseQueryAndFlags(args)
 	if query == "" {
-		fmt.Fprintf(os.Stderr, `usage: rmb search "<query>" [--scope=memory,scene,skill] [--k=n]`)
+		fmt.Fprintf(os.Stderr, `usage: rmb search "<query>" [--scope=memory,scene,skill] [--k=n] [--since=<date|Nd>] [--until=<date|Nd>] [--since=<date|Nd>] [--until=<date|Nd>]`)
 		return 2
 	}
 	k, err := parseK(rest)
@@ -108,13 +110,23 @@ func search(args []string) int {
 		return 2
 	}
 	scopes := parseScopes(rest)
+	since, err := parseTimeFlag(rest, "--since=")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "search: %v\n", err)
+		return 2
+	}
+	until, err := parseTimeFlag(rest, "--until=")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "search: %v\n", err)
+		return 2
+	}
 
 	cl, err := apiClient()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "search: %v\n", err)
 		return 1
 	}
-	matches, err := cl.Search(context.Background(), query, k, scopes)
+	matches, err := cl.Search(context.Background(), query, k, scopes, since, until)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "search: %v\n", err)
 		return 1
@@ -284,6 +296,25 @@ func parseScopes(args []string) []string {
 	return nil
 }
 
+// parseTimeFlag extracts a --since=/--until= value and validates its shape
+// (absolute date or relative Nd/Nh/Nm) client-side so typos fail fast.
+// The daemon re-parses and is the authority.
+func parseTimeFlag(args []string, prefix string) (string, error) {
+	for _, a := range args {
+		if strings.HasPrefix(a, prefix) {
+			raw := strings.TrimSpace(strings.TrimPrefix(a, prefix))
+			if raw == "" {
+				return "", fmt.Errorf("%s needs a value (2026-08-01, 15:04, or 7d/12h/30m)", strings.TrimSuffix(prefix, "="))
+			}
+			if _, err := recall.ParseTimeValue(raw, time.Now()); err != nil {
+				return "", err
+			}
+			return raw, nil
+		}
+	}
+	return "", nil
+}
+
 func printUsage() {
 	fmt.Fprint(os.Stderr, usageText())
 }
@@ -291,7 +322,7 @@ func printUsage() {
 func usageText() string {
 	return `Usage:
   rmb hook-submit --source=<cursor> [--url=http://127.0.0.1:19019]
-  rmb search "<query>" [--scope=memory,scene,skill] [--k=n]
+  rmb search "<query>" [--scope=memory,scene,skill] [--k=n] [--since=<date|Nd>] [--until=<date|Nd>]
   rmb ls <uri-prefix>            # list container contents (e.g. rmb://events/)
   rmb ls <uri-prefix> [--limit=N] [--offset=N] [--since=<date|7d>] [--until=<date|7d>] [--count]
   rmb cat <uri>

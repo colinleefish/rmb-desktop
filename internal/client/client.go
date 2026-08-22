@@ -41,7 +41,7 @@ type Match struct {
 	Snippet string  `json:"snippet"`
 }
 
-func (c *Client) Search(ctx context.Context, query string, k int, scopes []string) ([]Match, error) {
+func (c *Client) Search(ctx context.Context, query string, k int, scopes []string, since, until string) ([]Match, error) {
 	q := url.Values{}
 	q.Set("q", query)
 	if k > 0 {
@@ -49,6 +49,12 @@ func (c *Client) Search(ctx context.Context, query string, k int, scopes []strin
 	}
 	if len(scopes) > 0 {
 		q.Set("scope", strings.Join(scopes, ","))
+	}
+	if since != "" {
+		q.Set("since", since)
+	}
+	if until != "" {
+		q.Set("until", until)
 	}
 	endpoint := c.baseURL + "/api/v1/search?" + q.Encode()
 

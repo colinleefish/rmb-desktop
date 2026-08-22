@@ -84,6 +84,25 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	var tw recall.TimeWindow
+	now := time.Now()
+	if raw := strings.TrimSpace(r.URL.Query().Get("since")); raw != "" {
+		ms, err := recall.ParseTimeValue(raw, now)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "since: "+err.Error())
+			return
+		}
+		tw.SinceMS = ms
+	}
+	if raw := strings.TrimSpace(r.URL.Query().Get("until")); raw != "" {
+		ms, err := recall.ParseTimeValue(raw, now)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "until: "+err.Error())
+			return
+		}
+		tw.UntilMS = ms
+	}
+
 	var embedder recall.QueryEmbedder
 	if s.embed != nil {
 		embedder = func(ctx context.Context, q string) ([]float32, error) {
@@ -98,7 +117,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	matches, err := s.recall.Search(r.Context(), embedder, query, k, scopes)
+	matches, err := s.recall.Search(r.Context(), embedder, query, k, scopes, tw)
 	if err != nil {
 		s.log.Error("search failed", "err", err)
 		writeError(w, http.StatusInternalServerError, err.Error())

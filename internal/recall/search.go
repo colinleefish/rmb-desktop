@@ -25,8 +25,9 @@ func NewService(db *sql.DB) *Service {
 }
 
 // Search runs hybrid recall (vector + FTS fused 70/30 per tier). Without an
-// embedder, falls back to FTS-only (D21).
-func (s *Service) Search(ctx context.Context, embed QueryEmbedder, query string, k int, scopes []string) ([]Match, error) {
+// embedder, falls back to FTS-only (D21). A non-zero tw filters every tier
+// by its updated_at column.
+func (s *Service) Search(ctx context.Context, embed QueryEmbedder, query string, k int, scopes []string, tw TimeWindow) ([]Match, error) {
 	if k <= 0 {
 		k = 5
 	}
@@ -95,12 +96,12 @@ func (s *Service) Search(ctx context.Context, embed QueryEmbedder, query string,
 	}
 
 	if wantMemory {
-		fts, err := FTSMemories(ctx, s.DB, query, perList)
+		fts, err := FTSMemories(ctx, s.DB, query, perList, tw)
 		if err != nil {
 			return nil, err
 		}
 		if hasVector {
-			vec, err := VectorMemories(ctx, s.DB, queryVec, perList)
+			vec, err := VectorMemories(ctx, s.DB, queryVec, perList, tw)
 			if err != nil {
 				return nil, err
 			}
@@ -113,12 +114,12 @@ func (s *Service) Search(ctx context.Context, embed QueryEmbedder, query string,
 	}
 
 	if wantScene {
-		fts, err := FTSScenes(ctx, s.DB, query, perList)
+		fts, err := FTSScenes(ctx, s.DB, query, perList, tw)
 		if err != nil {
 			return nil, err
 		}
 		if hasVector {
-			vec, err := VectorScenes(ctx, s.DB, queryVec, perList)
+			vec, err := VectorScenes(ctx, s.DB, queryVec, perList, tw)
 			if err != nil {
 				return nil, err
 			}
@@ -131,12 +132,12 @@ func (s *Service) Search(ctx context.Context, embed QueryEmbedder, query string,
 	}
 
 	if wantSkill {
-		fts, err := FTSSkills(ctx, s.DB, query, perList)
+		fts, err := FTSSkills(ctx, s.DB, query, perList, tw)
 		if err != nil {
 			return nil, err
 		}
 		if hasVector {
-			vec, err := VectorSkills(ctx, s.DB, queryVec, perList)
+			vec, err := VectorSkills(ctx, s.DB, queryVec, perList, tw)
 			if err != nil {
 				return nil, err
 			}

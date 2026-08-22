@@ -20,18 +20,19 @@ func EscapeFTSQuery(query string) string {
 	return strings.Join(parts, " ")
 }
 
-func FTSMemories(ctx context.Context, db *sql.DB, query string, k int) ([]Match, error) {
+func FTSMemories(ctx context.Context, db *sql.DB, query string, k int, tw TimeWindow) ([]Match, error) {
 	if k <= 0 {
 		k = 5
 	}
+	windowClause, windowArgs := tw.Clause("m.updated_at")
 	rows, err := db.QueryContext(ctx, `
 		SELECT m.uri,
 		       COALESCE(substr(COALESCE(NULLIF(TRIM(m.abstract), ''), m.body), 1, 160), '') AS snippet
 		FROM memories m
 		INNER JOIN memories_fts fts ON fts.rowid = m.rowid
-		WHERE memories_fts MATCH ? AND m.superseded_at IS NULL
+		WHERE memories_fts MATCH ? AND m.superseded_at IS NULL`+windowClause+`
 		ORDER BY bm25(memories_fts)
-		LIMIT ?`, EscapeFTSQuery(query), k)
+		LIMIT ?`, prependArgs(EscapeFTSQuery(query), append(windowArgs, any(k))...)...)
 	if err != nil {
 		return nil, fmt.Errorf("fts memories: %w", err)
 	}
@@ -39,18 +40,19 @@ func FTSMemories(ctx context.Context, db *sql.DB, query string, k int) ([]Match,
 	return scanFTSMatches(rows, "memories")
 }
 
-func FTSScenes(ctx context.Context, db *sql.DB, query string, k int) ([]Match, error) {
+func FTSScenes(ctx context.Context, db *sql.DB, query string, k int, tw TimeWindow) ([]Match, error) {
 	if k <= 0 {
 		k = 5
 	}
+	windowClause, windowArgs := tw.Clause("s.updated_at")
 	rows, err := db.QueryContext(ctx, `
 		SELECT 'rmb://scenes/' || lower(s.id) AS uri,
 		       COALESCE(substr(COALESCE(NULLIF(TRIM(s.abstract), ''), s.body), 1, 160), '') AS snippet
 		FROM scenes s
 		INNER JOIN scenes_fts fts ON fts.rowid = s.rowid
-		WHERE scenes_fts MATCH ?
+		WHERE scenes_fts MATCH ?`+windowClause+`
 		ORDER BY bm25(scenes_fts)
-		LIMIT ?`, EscapeFTSQuery(query), k)
+		LIMIT ?`, prependArgs(EscapeFTSQuery(query), append(windowArgs, any(k))...)...)
 	if err != nil {
 		return nil, fmt.Errorf("fts scenes: %w", err)
 	}
@@ -58,18 +60,19 @@ func FTSScenes(ctx context.Context, db *sql.DB, query string, k int) ([]Match, e
 	return scanFTSMatches(rows, "scenes")
 }
 
-func FTSSkills(ctx context.Context, db *sql.DB, query string, k int) ([]Match, error) {
+func FTSSkills(ctx context.Context, db *sql.DB, query string, k int, tw TimeWindow) ([]Match, error) {
 	if k <= 0 {
 		k = 5
 	}
+	windowClause, windowArgs := tw.Clause("s.updated_at")
 	rows, err := db.QueryContext(ctx, `
 		SELECT s.uri,
 		       COALESCE(substr(s.description, 1, 160), '') AS snippet
 		FROM skills s
 		INNER JOIN skills_fts fts ON fts.rowid = s.rowid
-		WHERE skills_fts MATCH ? AND s.superseded_at IS NULL
+		WHERE skills_fts MATCH ? AND s.superseded_at IS NULL`+windowClause+`
 		ORDER BY bm25(skills_fts)
-		LIMIT ?`, EscapeFTSQuery(query), k)
+		LIMIT ?`, prependArgs(EscapeFTSQuery(query), append(windowArgs, any(k))...)...)
 	if err != nil {
 		return nil, fmt.Errorf("fts skills: %w", err)
 	}

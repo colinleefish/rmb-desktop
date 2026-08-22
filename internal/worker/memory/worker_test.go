@@ -257,6 +257,57 @@ func TestRollupGraduationBar(t *testing.T) {
 	}
 }
 
+func TestPersistEventBodyRetainsResolvesLink(t *testing.T) {
+	// Cross-session linking (P2.2): when the model emits
+	// "resolves rmb://events/<problem>" in the body, the link must be stored
+	// verbatim in the body template (no schema column) so it is retrievable
+	// via rmb search over memories FTS.
+	database := openWorkerTestDB(t)
+	defer database.Close()
+
+	insertPendingSession(t, database, "s1")
+	w := testWorker(database, &recordingDistiller{})
+
+	problemURI := "rmb://events/2026-07-13-starlink-hs99-vip-500-bug"
+	insertMemoryRow(t, database, "p1", problemURI, "tag_base_editer dict-vs-list bug caused 500s")
+
+	bucket := Bucket{
+		Category: model.AtomCategoryEvents,
+		Slug:     "2026-07-16-soft-delete-one-tag-solutions",
+		URI:      "rmb://events/2026-07-16-soft-delete-one-tag-solutions",
+		Atoms: []model.Atom{{
+			ID: "a1", SessionID: "s1", Category: model.AtomCategoryEvents,
+			Content: "On 2026-07-16 the one-tag-diff solutions were cleaned up.",
+		}},
+	}
+	body := "On 2026-07-16 the one-tag-diff solutions were cleaned up.\n\n- **Decision:** Clean up bad one-tag-diff rows.\n- **Outcome:** Soft-deleted 29,800, 67 remain.\n- **Related:** resolves " + problemURI
+	pm := ParsedMemory{Abstract: "one-tag cleaned after tag bug", Body: body}
+
+	if err := w.persistMemory(context.Background(), bucket, pm, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	var stored string
+	if err := database.QueryRow(`SELECT body FROM memories WHERE uri = ? AND superseded_at IS NULL`, bucket.URI).Scan(&stored); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stored, "resolves rmb://events/2026-07-13-starlink-hs99-vip-500-bug") {
+		t.Fatalf("resolves link not retained in body: %q", stored)
+	}
+
+	// And it is verbatim searchable via the memories FTS index (the same index
+	// `rmb search` reads).
+	var n int
+	if err := database.QueryRow(`
+		SELECT COUNT(*) FROM memories m JOIN memories_fts fts ON fts.rowid = m.rowid
+		WHERE memories_fts MATCH 'resolves' AND m.uri = ?`, bucket.URI).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n == 0 {
+		t.Fatal("resolves link not searchable via memories FTS")
+	}
+}
+
 func TestGraduationDeferredExistingMemoryRewrites(t *testing.T) {
 	database := openWorkerTestDB(t)
 	defer database.Close()

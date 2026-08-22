@@ -21,6 +21,9 @@ type L3DryRunBucket struct {
 	AtomCount        int    `json:"atom_count"`
 	DistinctSessions int    `json:"distinct_sessions"`
 	RelatedCount     int    `json:"related_count"`
+	// RelatedURIs are the retrieve-then-link candidates injected for event
+	// buckets (P2.2 / issue #28).
+	RelatedURIs []string `json:"related_uris,omitempty"`
 	// Decision is one of: "distilled", "graduation-deferred", "unchanged".
 	Decision string `json:"decision"`
 	Reason   string `json:"reason,omitempty"`
@@ -146,6 +149,10 @@ func DryRunL3(
 		out.Abstract = pm.Abstract
 		out.Body = pm.Body
 		out.RelatedCount = len(related)
+		out.RelatedURIs = make([]string, 0, len(related))
+		for _, r := range related {
+			out.RelatedURIs = append(out.RelatedURIs, r.URI)
+		}
 		out.MS = time.Since(start).Milliseconds()
 		result.Buckets = append(result.Buckets, out)
 	}

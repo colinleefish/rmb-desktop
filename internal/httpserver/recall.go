@@ -2,12 +2,59 @@ package httpserver
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/colinleefish/rmb-desktop/internal/inspect"
 	"github.com/colinleefish/rmb-desktop/internal/recall"
 )
+
+// lsOptionsFromQuery maps the optional ls query parameters (limit, offset,
+// since, until, count) onto inspect.LsOptions. Unknown or malformed values
+// are rejected with a descriptive error.
+func lsOptionsFromQuery(r *http.Request) (inspect.LsOptions, error) {
+	opts := inspect.DefaultLsOptions()
+	q := r.URL.Query()
+	if v := strings.TrimSpace(q.Get("limit")); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 0 {
+			return opts, fmt.Errorf("limit must be a non-negative integer")
+		}
+		opts.Limit = n
+	}
+	if v := strings.TrimSpace(q.Get("offset")); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 0 {
+			return opts, fmt.Errorf("offset must be a non-negative integer")
+		}
+		opts.Offset = n
+	}
+	if v := strings.TrimSpace(q.Get("since")); v != "" {
+		ts, err := inspect.ParseTimeFilter(v, time.Now())
+		if err != nil {
+			return opts, err
+		}
+		opts.Since = ts
+	}
+	if v := strings.TrimSpace(q.Get("until")); v != "" {
+		ts, err := inspect.ParseTimeFilter(v, time.Now())
+		if err != nil {
+			return opts, err
+		}
+		opts.Until = ts
+	}
+	if v := strings.TrimSpace(q.Get("count")); v != "" {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			return opts, fmt.Errorf("count must be true or false")
+		}
+		opts.Count = b
+	}
+	return opts, nil
+}
 
 func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	query := strings.TrimSpace(r.URL.Query().Get("q"))
@@ -80,7 +127,12 @@ func (s *Server) handleInspect(w http.ResponseWriter, r *http.Request, kind stri
 	case "cat":
 		err = s.inspect.Cat(r.Context(), rawURI, w)
 	case "ls":
-		err = s.inspect.Ls(r.Context(), rawURI, w)
+		opts, perr := lsOptionsFromQuery(r)
+		if perr != nil {
+			writeError(w, http.StatusBadRequest, perr.Error())
+			return
+		}
+		err = s.inspect.LsWith(r.Context(), rawURI, opts, w)
 	case "meta":
 		err = s.inspect.Meta(r.Context(), rawURI, w)
 	default:

@@ -76,8 +76,19 @@ func (c *Client) Search(ctx context.Context, query string, k int, scopes []strin
 }
 
 func (c *Client) Inspect(ctx context.Context, kind, uri string) (string, error) {
+	return c.InspectWith(ctx, kind, uri, nil)
+}
+
+// InspectWith is Inspect with extra query parameters (used by ls for
+// --limit/--offset/--since/--until/--count).
+func (c *Client) InspectWith(ctx context.Context, kind, uri string, extra url.Values) (string, error) {
 	q := url.Values{}
 	q.Set("uri", uri)
+	for k, vs := range extra {
+		for _, v := range vs {
+			q.Add(k, v)
+		}
+	}
 	endpoint := c.baseURL + "/api/v1/inspect/" + kind + "?" + q.Encode()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)

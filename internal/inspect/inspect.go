@@ -63,6 +63,12 @@ func (s *Service) Cat(ctx context.Context, raw string, w io.Writer) error {
 }
 
 func (s *Service) Ls(ctx context.Context, raw string, w io.Writer) error {
+	return s.LsWith(ctx, raw, DefaultLsOptions(), w)
+}
+
+// LsWith lists a container's contents with paging, prefix, and time filters
+// (see LsOptions). The historical Ls behavior is LsWith with defaults.
+func (s *Service) LsWith(ctx context.Context, raw string, opts LsOptions, w io.Writer) error {
 	u, err := uri.Parse(raw)
 	if err != nil {
 		return err
@@ -72,9 +78,9 @@ func (s *Service) Ls(ctx context.Context, raw string, w io.Writer) error {
 	}
 	switch u.Scope {
 	case uri.ScopeSessions:
-		return s.lsSession(ctx, u, w)
+		return s.lsSession(ctx, u, opts, w)
 	case uri.ScopeScenes, uri.ScopeAtoms, uri.ScopeTurns, uri.ScopePrefs, uri.ScopeEntities, uri.ScopeEvents, uri.ScopeProfile, uri.ScopeAgent:
-		return s.lsScope(ctx, u, w)
+		return s.lsScope(ctx, u, opts, w)
 	case uri.ScopeSkills:
 		return s.lsSkill(ctx, u, w)
 	default:
@@ -215,72 +221,76 @@ func (s *Service) catSession(ctx context.Context, u uri.URI, w io.Writer) error 
 	return err
 }
 
-func (s *Service) lsSession(ctx context.Context, u uri.URI, w io.Writer) error {
+func (s *Service) lsSession(ctx context.Context, u uri.URI, opts LsOptions, w io.Writer) error {
 	if len(u.Segments) == 0 {
-		rows, err := s.db.QueryContext(ctx, `SELECT session_key FROM sessions ORDER BY updated_at DESC LIMIT 200`)
+		items, total, err := s.queryList(ctx, "sessions", "session_key",
+			nil, nil, "updated_at DESC", "updated_at", opts)
 		if err != nil {
 			return err
 		}
-		defer rows.Close()
-		for rows.Next() {
-			var key string
-			if err := rows.Scan(&key); err != nil {
-				return err
-			}
-			if _, err := fmt.Fprintln(w, uri.BuildSession(key)+"/"); err != nil {
-				return err
-			}
-		}
-		return rows.Err()
+		return writeLsResult(w, items, total, opts, func(key string) string {
+			return uri.BuildSession(key) + "/"
+		})
 	}
 
 	sessionKey := strings.ToLower(u.Segments[0])
 	var sessionID string
-	if err := s.db.QueryRowContext(ctx, `SELECT id FROM sessions WHERE session_key = ?`, sessionKey).Scan(&sessionID); err != nil {
-		return fmt.Errorf("load session: %w", err)
-	}
+	err := s.db.QueryRowContext(ctx, `SELECT id FROM sessions WHERE session_key = ?`, sessionKey).Scan(&sessionID)
+	if err == nil {
 
-	if len(u.Segments) == 1 && u.IsContainer() {
-		turnRows, err := s.db.QueryContext(ctx, `
+		if len(u.Segments) == 1 && u.IsContainer() {
+			turnRows, err := s.db.QueryContext(ctx, `
 			SELECT id FROM session_turns WHERE session_id = ? ORDER BY created_at ASC`, sessionID)
-		if err != nil {
-			return err
-		}
-		for turnRows.Next() {
-			var id string
-			if err := turnRows.Scan(&id); err != nil {
-				turnRows.Close()
+			if err != nil {
 				return err
 			}
-			if _, err := fmt.Fprintln(w, uri.BuildTurn(id)); err != nil {
-				turnRows.Close()
-				return err
+			for turnRows.Next() {
+				var id string
+				if err := turnRows.Scan(&id); err != nil {
+					turnRows.Close()
+					return err
+				}
+				if _, err := fmt.Fprintln(w, uri.BuildTurn(id)); err != nil {
+					turnRows.Close()
+					return err
+				}
 			}
-		}
-		turnRows.Close()
+			turnRows.Close()
 
-		atomRows, err := s.db.QueryContext(ctx, `
+			atomRows, err := s.db.QueryContext(ctx, `
 			SELECT id FROM atoms WHERE session_id = ? ORDER BY created_at ASC`, sessionID)
-		if err != nil {
-			return err
-		}
-		for atomRows.Next() {
-			var id string
-			if err := atomRows.Scan(&id); err != nil {
-				atomRows.Close()
+			if err != nil {
 				return err
 			}
-			if _, err := fmt.Fprintln(w, uri.BuildAtom(id)); err != nil {
-				atomRows.Close()
-				return err
+			for atomRows.Next() {
+				var id string
+				if err := atomRows.Scan(&id); err != nil {
+					atomRows.Close()
+					return err
+				}
+				if _, err := fmt.Fprintln(w, uri.BuildAtom(id)); err != nil {
+					atomRows.Close()
+					return err
+				}
 			}
+			return atomRows.Close()
 		}
-		return atomRows.Close()
 	}
-	return fmt.Errorf("ls not supported for %q", u.String())
+
+	// Segment did not exactly match a session: treat it as a session_key
+	// prefix filter (e.g. rmb ls rmb://sessions/2026-06).
+	items, total, err := s.queryList(ctx, "sessions", "session_key",
+		[]string{"session_key LIKE ? ESCAPE '\\'"},
+		[]any{likePrefix(sessionKey)}, "updated_at DESC", "updated_at", opts)
+	if err != nil {
+		return err
+	}
+	return writeLsResult(w, items, total, opts, func(key string) string {
+		return uri.BuildSession(key) + "/"
+	})
 }
 
-func (s *Service) lsScope(ctx context.Context, u uri.URI, w io.Writer) error {
+func (s *Service) lsScope(ctx context.Context, u uri.URI, opts LsOptions, w io.Writer) error {
 	switch u.Scope {
 	case uri.ScopeProfile:
 		var count int
@@ -295,94 +305,42 @@ func (s *Service) lsScope(ctx context.Context, u uri.URI, w io.Writer) error {
 		_, err := fmt.Fprintln(w, uri.BuildAgent())
 		return err
 	case uri.ScopeScenes:
-		q := `SELECT id FROM scenes ORDER BY updated_at DESC LIMIT 200`
-		args := []any{}
-		if len(u.Segments) == 1 {
-			q = `SELECT id FROM scenes WHERE id = ?`
-			args = append(args, u.Segments[0])
-		}
-		rows, err := s.db.QueryContext(ctx, q, args...)
-		if err != nil {
-			return err
-		}
-		defer rows.Close()
-		for rows.Next() {
-			var id string
-			if err := rows.Scan(&id); err != nil {
-				return err
-			}
-			if _, err := fmt.Fprintln(w, uri.BuildScene(id)); err != nil {
-				return err
-			}
-		}
-		return rows.Err()
+		return s.lsTable(ctx, "scenes", u, "updated_at DESC", "updated_at", opts, uri.BuildScene, w)
 	case uri.ScopeAtoms:
-		q := `SELECT id FROM atoms ORDER BY created_at ASC LIMIT 200`
-		args := []any{}
-		if len(u.Segments) == 1 {
-			q = `SELECT id FROM atoms WHERE id = ?`
-			args = append(args, u.Segments[0])
-		}
-		rows, err := s.db.QueryContext(ctx, q, args...)
-		if err != nil {
-			return err
-		}
-		defer rows.Close()
-		for rows.Next() {
-			var id string
-			if err := rows.Scan(&id); err != nil {
-				return err
-			}
-			if _, err := fmt.Fprintln(w, uri.BuildAtom(id)); err != nil {
-				return err
-			}
-		}
-		return rows.Err()
+		return s.lsTable(ctx, "atoms", u, "created_at ASC", "updated_at", opts, uri.BuildAtom, w)
 	case uri.ScopeTurns:
-		q := `SELECT id FROM session_turns ORDER BY created_at ASC LIMIT 200`
-		args := []any{}
-		if len(u.Segments) == 1 {
-			q = `SELECT id FROM session_turns WHERE id = ?`
-			args = append(args, u.Segments[0])
-		}
-		rows, err := s.db.QueryContext(ctx, q, args...)
-		if err != nil {
-			return err
-		}
-		defer rows.Close()
-		for rows.Next() {
-			var id string
-			if err := rows.Scan(&id); err != nil {
-				return err
-			}
-			if _, err := fmt.Fprintln(w, uri.BuildTurn(id)); err != nil {
-				return err
-			}
-		}
-		return rows.Err()
+		return s.lsTable(ctx, "session_turns", u, "created_at ASC", "created_at", opts, uri.BuildTurn, w)
 	default:
-		q := `SELECT uri FROM memories WHERE category = ? AND superseded_at IS NULL ORDER BY updated_at DESC LIMIT 200`
+		// Memory categories (events/entities/preferences).
+		conds := []string{"category = ?", "superseded_at IS NULL"}
 		args := []any{u.Scope}
 		if len(u.Segments) == 1 {
-			q += ` AND uri = ?`
-			args = append(args, uri.BuildMemory(u.Scope, u.Segments[0]))
+			conds = append(conds, "uri LIKE ? ESCAPE '\\'")
+			args = append(args, likePrefix(uri.BuildMemory(u.Scope, u.Segments[0])))
 		}
-		rows, err := s.db.QueryContext(ctx, q, args...)
+		items, total, err := s.queryList(ctx, "memories", "uri", conds, args, "updated_at DESC", "updated_at", opts)
 		if err != nil {
 			return err
 		}
-		defer rows.Close()
-		for rows.Next() {
-			var memURI string
-			if err := rows.Scan(&memURI); err != nil {
-				return err
-			}
-			if _, err := fmt.Fprintln(w, memURI); err != nil {
-				return err
-			}
-		}
-		return rows.Err()
+		return writeLsResult(w, items, total, opts, func(s string) string { return s })
 	}
+}
+
+// lsTable lists an id-keyed table (scenes/atoms/turns). A single URI segment
+// acts as an id prefix filter; filters are composed into the WHERE clause
+// before ORDER BY / LIMIT.
+func (s *Service) lsTable(ctx context.Context, table string, u uri.URI, order, timeCol string, opts LsOptions, build func(string) string, w io.Writer) error {
+	var conds []string
+	var args []any
+	if len(u.Segments) >= 1 {
+		conds = append(conds, "id LIKE ? ESCAPE '\\'")
+		args = append(args, likePrefix(strings.ToLower(u.Segments[0])))
+	}
+	items, total, err := s.queryList(ctx, table, "id", conds, args, order, timeCol, opts)
+	if err != nil {
+		return err
+	}
+	return writeLsResult(w, items, total, opts, build)
 }
 
 func (s *Service) metaMemory(ctx context.Context, target string) (map[string]any, error) {

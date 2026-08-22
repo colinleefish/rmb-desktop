@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -123,9 +124,22 @@ func search(args []string) int {
 }
 
 func inspectCmd(kind string, args []string) int {
-	uri := strings.TrimSpace(strings.Join(args, " "))
+	var (
+		uri   string
+		extra url.Values
+		err   error
+	)
+	if kind == "ls" {
+		uri, extra, err = parseLsArgs(args)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "ls: %v\n", err)
+			return 2
+		}
+	} else {
+		uri = strings.TrimSpace(strings.Join(args, " "))
+	}
 	if uri == "" {
-		fmt.Fprintf(os.Stderr, "usage: rmb %s <uri>\n", kind)
+		fmt.Fprintf(os.Stderr, "usage: rmb %s <uri>%s\n", kind, lsUsageHint(kind))
 		return 2
 	}
 	cl, err := apiClient()
@@ -133,13 +147,91 @@ func inspectCmd(kind string, args []string) int {
 		fmt.Fprintf(os.Stderr, "%s: %v\n", kind, err)
 		return 1
 	}
-	out, err := cl.Inspect(context.Background(), kind, uri)
+	out, err := cl.InspectWith(context.Background(), kind, uri, extra)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s: %v\n", kind, err)
 		return 1
 	}
 	fmt.Print(out)
 	return 0
+}
+
+func lsUsageHint(kind string) string {
+	if kind != "ls" {
+		return ""
+	}
+	return " [--limit N] [--offset N] [--since <date|7d>] [--until <date|7d>] [--count]"
+}
+
+// parseLsArgs splits a uri from ls flags, accepting both --flag=value and
+// --flag value forms. Numeric flags are validated here; time filters are
+// passed through for the daemon to parse (inspect.ParseTimeFilter) so CLI
+// and API semantics stay in sync.
+func parseLsArgs(args []string) (string, url.Values, error) {
+	var positional []string
+	extra := url.Values{}
+	i := 0
+	for i < len(args) {
+		a := args[i]
+		if !strings.HasPrefix(a, "--") {
+			positional = append(positional, a)
+			i++
+			continue
+		}
+		name, val, hasVal := strings.Cut(a, "=")
+		consume := func() (string, error) {
+			if hasVal {
+				return val, nil
+			}
+			if i+1 < len(args) {
+				i++
+				return args[i], nil
+			}
+			return "", fmt.Errorf("missing value for %s", name)
+		}
+		switch name {
+		case "--count":
+			v := "true"
+			if hasVal {
+				v = val
+			}
+			extra.Set("count", v)
+		case "--limit":
+			v, err := consume()
+			if err != nil {
+				return "", nil, err
+			}
+			if _, err := strconv.Atoi(v); err != nil {
+				return "", nil, fmt.Errorf("bad --limit %q (want a non-negative integer)", v)
+			}
+			extra.Set("limit", v)
+		case "--offset":
+			v, err := consume()
+			if err != nil {
+				return "", nil, err
+			}
+			if _, err := strconv.Atoi(v); err != nil {
+				return "", nil, fmt.Errorf("bad --offset %q (want a non-negative integer)", v)
+			}
+			extra.Set("offset", v)
+		case "--since":
+			v, err := consume()
+			if err != nil {
+				return "", nil, err
+			}
+			extra.Set("since", v)
+		case "--until":
+			v, err := consume()
+			if err != nil {
+				return "", nil, err
+			}
+			extra.Set("until", v)
+		default:
+			return "", nil, fmt.Errorf("unknown ls flag %q", a)
+		}
+		i++
+	}
+	return strings.TrimSpace(strings.Join(positional, " ")), extra, nil
 }
 
 func printMatches(matches []client.Match) {
@@ -201,6 +293,7 @@ func usageText() string {
   rmb hook-submit --source=<cursor> [--url=http://127.0.0.1:19019]
   rmb search "<query>" [--scope=memory,scene,skill] [--k=n]
   rmb ls <uri-prefix>            # list container contents (e.g. rmb://events/)
+  rmb ls <uri-prefix> [--limit=N] [--offset=N] [--since=<date|7d>] [--until=<date|7d>] [--count]
   rmb cat <uri>
   rmb meta <uri>
   rmb pull <uri> [--out=<dir>]   # rmb://skills/<name> | rmb://skills/ (all)

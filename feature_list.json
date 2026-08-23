@@ -5,8 +5,8 @@
       "name": "harness-arch-rules",
       "behavior": "Architecture boundary rules (.harness/arch-rules.json) enforced by scripts/check-arch.sh, wired into make check; violations print WHAT/WHY/FIX",
       "verification": "make check-arch exits 0; make check (with check-arch wired) exits 0",
-      "state": "planned",
-      "evidence": "",
+      "state": "passing",
+      "evidence": "commit 9dcd1d9, verified 2026-08-23",
       "issue": 57,
       "layers": [
         {

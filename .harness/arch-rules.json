@@ -1,0 +1,49 @@
+{
+  "rules": [
+    {
+      "id": "R1-embed-flow",
+      "description": "Embedded webui files are build artifacts, never hand-edited source",
+      "check": "git ls-files internal/http/static/web | grep -vE '(\\.gitkeep|README\\.md)$' | wc -l",
+      "expect": "^0$",
+      "what": "Files besides .gitkeep/README.md tracked under internal/http/static/web/",
+      "why": "That directory is the go:embed target of webui/dist; hand-edits are silently overwritten by make webui-build and drift from webui/src (source: Makefile webui-embed-check, incident class: lost UI edits)",
+      "fix": "Remove the tracked files (git rm --cached), edit webui/src instead, regenerate with make webui-build"
+    },
+    {
+      "id": "R2-version-single-source",
+      "description": "VERSION is defined exactly once — Makefile VERSION ?= is the single source of truth",
+      "check": "git grep -En 'VERSION \\?=' -- 'Makefile' '**/Makefile' '*.mk' | wc -l",
+      "expect": "^1$",
+      "what": "More (or fewer) than one 'VERSION ?=' occurrence among tracked files",
+      "why": "Duplicate version definitions desync releases — the Makefile is the release pipeline's input (source: .cursor/rules/release.mdc, tauri-to-go Phase 4)",
+      "fix": "Keep only the root Makefile assignment; read VERSION from make/bake elsewhere or pass it explicitly"
+    },
+    {
+      "id": "R3-no-tauri",
+      "description": "Tauri-era shell files stay dead",
+      "check": "git ls-files | grep -cE '^app/'",
+      "expect": "^0$",
+      "what": "Tracked files under app/ (Tauri/Rust shell remnants)",
+      "why": "The shell was replaced by the pure-Go tray app in 0.2.0; resurrecting Tauri files reintroduces a deleted runtime and breaks the build graph (source: plan/done/tauri-to-go-shell.md)",
+      "fix": "Delete the files; the Go shell lives in cmd/rmb-app + internal/appshell"
+    },
+    {
+      "id": "R4-plan-lifecycle",
+      "description": "Completed plans live in plan/done/, active plans in plan/",
+      "check": "test -d plan/done && test -f plan/local-first-desktop.md && echo ok",
+      "expect": "^ok$",
+      "what": "plan/done/ or the active-plan set is missing/misplaced",
+      "why": "Plan lifecycle is the repo's decision history: active vs done must stay distinguishable for agents clocking in (source: repo convention 2026-08-24)",
+      "fix": "Move completed plans into plan/done/ in the same commit that completes them"
+    },
+    {
+      "id": "R5-no-debug-prints",
+      "description": "No stray debug prints in non-test Go code",
+      "check": "git grep -E 'fmt\\.Println|fmt\\.Printf' -- '*.go' ':!*_test.go' ':!cmd/' | wc -l",
+      "expect": "^0$",
+      "what": "fmt.Println/Printf outside cmd/ (CLI user-facing output) and tests",
+      "why": "CLI output is user-facing: stray prints corrupt piped output and logs (source: general code-review category)",
+      "fix": "Route through the structured logger or remove; use t.Log in tests"
+    }
+  ]
+}

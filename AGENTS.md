@@ -50,6 +50,12 @@ Write commit messages that explain **why**, not just what. Example: `docs(plan):
 
 If you are running low on context: **do not rush to finish**. Stop, update `PROGRESS.md` (next steps specific enough for a fresh session to resume), commit a clean checkpoint. An honest checkpoint beats a botched finish.
 
+## Architecture Boundaries (L09)
+
+Layer model: `cmd/` thin entrypoints (user-facing CLI output lives here) → `internal/<domain>` packages (structured logging only, no fmt prints) → `webui/` SPA (compiled to `internal/http/static/web` **only** via `make webui-build`). Boundary rules live in `.harness/arch-rules.json` and are enforced by `make check-arch` (part of `make check`); each rule prints WHAT/WHY/FIX on violation.
+
+**Promotion principle:** every new error category caught in code review becomes a rule in `.harness/arch-rules.json` — with its `source:` — in the same commit that surfaced it.
+
 ## Feature List Rules (L07/L10/L11)
 
 `feature_list.json` is the machine-readable feature tracker. State machine: `planned → active → passing` — **no skipping states, and NEVER set state to passing by hand**; only `make verify-feature F=<id>` may, by running the feature's layers.

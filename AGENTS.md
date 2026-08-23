@@ -6,16 +6,21 @@ This is **rmb-desktop**: a local-first memory product for AI coding agents. Go d
 
 ## Clock-in (before touching code)
 
-1. Read this file, then `PROGRESS.md` (current state + next steps).
-2. Run `make check` — confirm a green baseline before you start. If red, stop and report; do not build on red.
-3. Declare your branch + worktree per [`plan/parallel-work-and-versioning.md`](plan/parallel-work-and-versioning.md) §2 (one task = one branch = one worktree; never work on the main checkout).
+1. Run `make session-start` (appends the session trace event).
+2. Read this file, then `PROGRESS.md` (current state + next steps).
+3. Run `make check` — confirm a green baseline before you start. If red, stop and report; do not build on red.
+4. Declare your branch + worktree per [`plan/parallel-work-and-versioning.md`](plan/parallel-work-and-versioning.md) §2 (one task = one branch = one worktree; never work on the main checkout).
+5. Fill `templates/sprint-contract.md` for the feature (scope in/out, DoD, timebox) before implementing.
 
 ## Clock-out (before closing)
 
 1. Update `PROGRESS.md`: Current State (last commit + check status), Next Steps, Blockers.
-2. Run `make check`; if you touched docs/plans only, say so explicitly in the commit.
-3. Commit — the repo must be in a consistent state after every commit (one logical operation per commit, no partial work).
-4. Leave the worktree clean (commit or stash everything; no drifting artifacts).
+2. Update `docs/quality-document.md` grades for the module you touched.
+3. Run `make clean-check` (5 clean-state dimensions, idempotent) — all must pass.
+4. Run `make check`; if you touched docs/plans only, say so explicitly in the commit.
+5. `make session-end` (appends the session trace event).
+6. Commit — the repo must be in a consistent state after every commit (one logical operation per commit, no partial work).
+7. Leave the worktree clean (commit or stash everything; no drifting artifacts).
 
 ## Hard constraints
 
@@ -49,6 +54,14 @@ Write commit messages that explain **why**, not just what. Example: `docs(plan):
 ## Context anxiety
 
 If you are running low on context: **do not rush to finish**. Stop, update `PROGRESS.md` (next steps specific enough for a fresh session to resume), commit a clean checkpoint. An honest checkpoint beats a botched finish.
+
+## Observability (L12)
+
+- **Before each feature**: sprint contract (`templates/sprint-contract.md`) — scope/DoD/exclusions, filled at clock-in.
+- **During**: `make session-start` / `make session-end` append structured events to `.harness/traces/traces.jsonl` (gitignored runtime artifact).
+- **After completion**: score the sprint against `templates/evaluator-rubric.md` (correctness / arch compliance / test coverage / verification evidence; every dimension ≥ B) and update `docs/quality-document.md` for touched modules.
+
+**Dual-mode cleanup**: immediate cleanup at every session end (`make clean-check`) + a periodic (weekly-ish) full sweep for structural drift — re-run the harness audit (`temp/learn-harness-engineering/tools/audit-harness.sh .`), re-score the quality document, promote recurring review findings into `.harness/arch-rules.json`.
 
 ## Architecture Boundaries (L09)
 

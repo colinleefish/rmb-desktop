@@ -67,6 +67,16 @@ webui-dev:
 
 dev: webui-dev
 
+# ── Harness: session lifecycle + clean state (L12) ────────────────────────
+session-start:
+	bash scripts/session-trace.sh session-start
+
+session-end:
+	bash scripts/session-trace.sh session-end
+
+clean-check:
+	bash scripts/clean-state-check.sh .
+
 webui-build: icons-sync
 	cd webui && npm run build
 	rm -rf internal/http/static/web/assets internal/http/static/web/index.html internal/http/static/web/vite.svg

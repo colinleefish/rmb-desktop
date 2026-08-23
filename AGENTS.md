@@ -50,6 +50,15 @@ Write commit messages that explain **why**, not just what. Example: `docs(plan):
 
 If you are running low on context: **do not rush to finish**. Stop, update `PROGRESS.md` (next steps specific enough for a fresh session to resume), commit a clean checkpoint. An honest checkpoint beats a botched finish.
 
+## Feature List Rules (L07/L10/L11)
+
+`feature_list.json` is the machine-readable feature tracker. State machine: `planned → active → passing` — **no skipping states, and NEVER set state to passing by hand**; only `make verify-feature F=<id>` may, by running the feature's layers.
+
+- Activate: `make verify-feature F=<id> A=1` (enforces WIP=1 — refuses if another feature is active).
+- Each feature carries `layers`: L1 static/syntax → L2 runtime behavior → L3 system confirmation. Do not proceed to layer N+1 if layer N fails. **Definition of Done = runtime evidence passes, not "the code is written" or "the agent is confident".**
+- Granularity: each feature must be completable in one session. If it spans sessions, split it.
+- New features get an entry (with verification layers) *before* implementation starts.
+
 ## Tools
 
 - Build/test: `make` targets only (`check`, `test`, `eval`, `build`, `dev`, `setup`) — do not invoke raw go/npm commands that bypass the pipeline.

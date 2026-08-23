@@ -1,4 +1,4 @@
-.PHONY: setup check test eval e2e dev build build-all run-rmbd run-hook tidy app-dev app-build app-build-windows app-install webui-dev webui-build webui-embed-check icons-sync build-windows-sidecars notarize release release-upload release-publish
+.PHONY: setup check test eval e2e dev vcr verify-feature build build-all run-rmbd run-hook tidy app-dev app-build app-build-windows app-install webui-dev webui-build webui-embed-check icons-sync build-windows-sidecars notarize release release-upload release-publish
 
 GO_TAGS := sqlite_fts5
 EMBED_INDEX := internal/http/static/web/index.html
@@ -26,6 +26,20 @@ test: webui-embed-check
 
 # e2e = offline recall regression gate over the committed golden fixture.
 e2e: eval
+
+# ── Harness: feature gate (L07/L10) ──────────────────────────────────────
+# Verify an active feature; A=1 also activates it (enforces WIP=1).
+verify-feature:
+	@test -n "$(F)" || (echo "usage: make verify-feature F=<id> [A=1]  (no F to list)"; bash scripts/verify-feature.sh --list; exit 1)
+	bash scripts/verify-feature.sh "$(F)" $(if $(A),--activate)
+
+# VCR = verified-completion ratio: passing / ever-activated features.
+vcr:
+	@bash scripts/verify-feature.sh --list; \
+	active=$$(jq '[.features[] | select(.state=="active")] | length' feature_list.json); \
+	passing=$$(jq '[.features[] | select(.state=="passing")] | length' feature_list.json); \
+	if [ $$((active + passing)) -eq 0 ]; then echo "VCR: no features activated yet"; \
+	else echo "VCR: $$passing/$$((active+passing)) (passing/activated)"; fi
 # Offline recall regression gate (issue #22). Deterministic hash-embedder eval
 # over the committed golden fixture; fails the build if recall metrics regress.
 eval:

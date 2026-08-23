@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/colinleefish/rmb-desktop/internal/db"
+	"github.com/colinleefish/rmb-desktop/internal/model"
 )
 
 func openHygieneDB(t *testing.T) *sql.DB {
@@ -102,7 +103,7 @@ func TestReport_Scans(t *testing.T) {
 	mustExec(t, d, `INSERT INTO memories (id, uri, category, version, superseded_at, abstract, body, source_scene_uris, created_at, updated_at)
 		VALUES ('e1', 'rmb://events/some-undated-event', 'events', 1, NULL, 'a', 'b', '[]', ?, ?)`, now, now)
 	// Over-cap body + a v131 chain (the audit's erosion case).
-	long := strings.Repeat("x", MaxBodyChars+100)
+	long := strings.Repeat("x", model.MaxBodyChars+100)
 	mustExec(t, d, `INSERT INTO memories (id, uri, category, version, superseded_at, abstract, body, source_scene_uris, created_at, updated_at)
 		VALUES ('h1', 'rmb://entities/eroded', 'entities', 131, NULL, 'a', ?, '[]', ?, ?)`, long, now, now)
 	mustExec(t, d, `INSERT INTO memories (id, uri, category, version, superseded_at, abstract, body, source_scene_uris, created_at, updated_at)

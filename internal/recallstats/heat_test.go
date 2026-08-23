@@ -29,7 +29,6 @@ func fakeClock(start time.Time) (func() time.Time, func(time.Time)) {
 }
 
 func TestDecayHeat_math(t *testing.T) {
-	const day = 24 * time.Hour
 	// First use: no prior use, heat = w.
 	if got := DecayHeat(0, 0, 1_000_000, HeatTau, WeightCat); got != WeightCat {
 		t.Fatalf("first use: got %v want %v", got, WeightCat)

@@ -11,11 +11,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"regexp"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/colinleefish/rmb-desktop/internal/model"
 	"github.com/colinleefish/rmb-desktop/internal/recall"
 )
 
@@ -30,14 +30,6 @@ const (
 // audit found chains up to 131 versions — erosion candidates for
 // `doctor reconsolidate`).
 const HighVersionThreshold = 20
-
-// MaxBodyChars mirrors the worker's distill-time body cap (4k); the report
-// counts legacy bodies that exceed it.
-const MaxBodyChars = 4096
-
-// DatePrefixRE matches the event slug date convention enforced at extract
-// time (P2.1); the report counts legacy events without it.
-var DatePrefixRE = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}-`)
 
 // negationTokens: a deterministic contradiction heuristic — near-duplicate
 // bodies where exactly one side carries a negation are candidates for
@@ -189,7 +181,7 @@ func Report(ctx context.Context, database *sql.DB, dupLimit int) (HealthReport, 
 	}
 	if err := database.QueryRowContext(ctx, `
 		SELECT COUNT(*) FROM memories
-		WHERE superseded_at IS NULL AND length(COALESCE(body,'')) > ?`, MaxBodyChars).Scan(&out.BodiesOverCap); err != nil {
+		WHERE superseded_at IS NULL AND length(COALESCE(body,'')) > ?`, model.MaxBodyChars).Scan(&out.BodiesOverCap); err != nil {
 		return out, err
 	}
 	if err := orphanSceneCount(ctx, database).Scan(&out.OrphanScenes); err != nil {

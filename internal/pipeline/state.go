@@ -22,22 +22,6 @@ func (s Stage) statusCol() string  { return string(s) + "_status" }
 func (s Stage) startedCol() string { return string(s) + "_started_at" }
 func (s Stage) errorCol() string   { return string(s) + "_last_error" }
 
-// MarkRunning sets stage status to running and records started_at.
-func MarkRunning(ctx context.Context, db *sql.DB, sessionID string, stage Stage, now time.Time) error {
-	nowMS := now.UTC().UnixMilli()
-	query := fmt.Sprintf(`
-		UPDATE pipeline_state SET
-			%s = 'running',
-			%s = ?,
-			%s = NULL,
-			updated_at = ?
-		WHERE session_id = ?`,
-		stage.statusCol(), stage.startedCol(), stage.errorCol(),
-	)
-	_, err := db.ExecContext(ctx, query, nowMS, nowMS, sessionID)
-	return err
-}
-
 // MarkPending resets stage to pending (transient failure).
 func MarkPending(ctx context.Context, db *sql.DB, sessionID string, stage Stage, errMsg string, now time.Time) error {
 	nowMS := now.UTC().UnixMilli()
@@ -66,15 +50,6 @@ func MarkFailed(ctx context.Context, db *sql.DB, sessionID string, stage Stage, 
 		stage.statusCol(), stage.errorCol(),
 	)
 	_, err := db.ExecContext(ctx, query, rdb.NullIfEmpty(errMsg), nowMS, sessionID)
-	return err
-}
-
-// ClearRunning clears started_at after successful completion (status already updated).
-func ClearRunning(ctx context.Context, db *sql.DB, sessionID string, stage Stage) error {
-	query := fmt.Sprintf(`UPDATE pipeline_state SET %s = NULL, %s = NULL WHERE session_id = ?`,
-		stage.startedCol(), stage.errorCol(),
-	)
-	_, err := db.ExecContext(ctx, query, sessionID)
 	return err
 }
 

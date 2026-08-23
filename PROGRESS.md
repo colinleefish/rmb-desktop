@@ -2,25 +2,17 @@
 
 ## Current State
 
-Last commit: 0d785c4 (merge: harness foundation, #53–#55 closed) | `make check`: passing — verified 2026-08-24 on `chore/harness-foundation` (2 consecutive green runs; recall@5=0.500 ≥ 0.50 gate, dup-rate=0, recency-precision=1.0). Note: one non-reproducible flaky test failure on the very first run under load. Audit: 7/7 critical, 37/71 total.
+Last commit: 8073bff (merge: harness observability, #58 closed) | `make check`: passing — now includes `check-arch` as final stage | VCR: 2/2 (F01, F02 passing with evidence) | Final harness audit: 7/7 critical.
 
 ## In Progress
 
-- **harness-ready refactor** (milestone [#5](https://github.com/colinleefish/rmb-desktop/milestone/5)):
-  - #53 AGENTS.md + tool scoping — **done, closing**
-  - #54 PROGRESS.md + DECISIONS.md — **done, closing**
-  - #55 make check/setup/dev + runtime pins — **done, closing**
-  - #56 feature_list.json + verify-feature gate — next
-  - #57 arch-rules + check-arch
-  - #58 observability + clean-state protocol
+Nothing — **milestone harness-ready (#5) complete**: #53–#58 all closed (bonus: #59 flaky doctor test diagnosed and fixed en route).
 
 ## Next Steps
 
-1. #56 feature_list.json + `scripts/verify-feature.sh` + `make vcr` (branch `chore/harness-features`)
-2. #57 `.harness/arch-rules.json` + `scripts/check-arch.sh`, wire into `make check`
-3. #58 templates (sprint-contract, evaluator-rubric, clean-state-checklist) + session-trace + `docs/quality-document.md`
-4. P3.5 from `plan/memory-retrieval-remediation.md`: secrets → Keychain/env + key rotation (last open item)
-5. WebUI refactor per `plan/webui-refactor.md` (starts week of 2026-08-31; first = UX audit → `docs/audit/webui-ux-audit.md`)
+1. WebUI refactor per `plan/webui-refactor.md` (week of 2026-08-31): F03 UX audit first — `make verify-feature F=F03 A=1`, write `docs/audit/webui-ux-audit.md`, then F04 shell restructure, F05 settings strangler
+2. F06 secrets → Keychain/env + key rotation (P3.5, last open item from `plan/memory-retrieval-remediation.md`)
+3. Weekly sweep per AGENTS.md Observability: re-run `temp/learn-harness-engineering/tools/audit-harness.sh .`, re-score `docs/quality-document.md`, promote review findings into `.harness/arch-rules.json`
 
 ## Blockers
 

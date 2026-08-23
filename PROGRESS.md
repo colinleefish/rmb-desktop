@@ -2,7 +2,7 @@
 
 ## Current State
 
-Last commit: 43fa3b7 (docs: plan lifecycle cleanup) | `make check`: passing — verified 2026-08-24 on `chore/harness-foundation` (2 consecutive green runs; recall@5=0.500 ≥ 0.50 gate, dup-rate=0, recency-precision=1.0). Note: one non-reproducible flaky test failure on the very first run under load.
+Last commit: 0d785c4 (merge: harness foundation, #53–#55 closed) | `make check`: passing — verified 2026-08-24 on `chore/harness-foundation` (2 consecutive green runs; recall@5=0.500 ≥ 0.50 gate, dup-rate=0, recency-precision=1.0). Note: one non-reproducible flaky test failure on the very first run under load. Audit: 7/7 critical, 37/71 total.
 
 ## In Progress
 

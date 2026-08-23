@@ -59,12 +59,23 @@ func TestDoctorMetricsEndpoint(t *testing.T) {
 	// Async telemetry needs a beat to flush.
 	do(http.MethodGet, "/api/v1/search?q=kubectl+deployment", http.StatusOK)
 	do(http.MethodGet, "/api/v1/search?q=kubectl+deployment", http.StatusOK)
-	do(http.MethodGet, "/api/v1/inspect/cat?uri=rmb://entities/heat-target", http.StatusOK)
-	deadline := time.Now().Add(3 * time.Second)
+	// RecordQueryAsync inserts from goroutines; the cat's join only matches
+	// search rows committed BEFORE the cat (ts <= cat-time). Wait for both
+	// search rows to land, then cat — otherwise the join may never fire.
+	deadline := time.Now().Add(10 * time.Second)
 	for {
-		var n int
-		_ = database.QueryRow(`SELECT COUNT(*) FROM search_queries WHERE catted_uri IS NOT NULL`).Scan(&n)
-		if n == 1 || time.Now().After(deadline) {
+		var searches int
+		_ = database.QueryRow(`SELECT COUNT(*) FROM search_queries`).Scan(&searches)
+		if searches >= 2 || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	do(http.MethodGet, "/api/v1/inspect/cat?uri=rmb://entities/heat-target", http.StatusOK)
+	for {
+		var converted int
+		_ = database.QueryRow(`SELECT COUNT(*) FROM search_queries WHERE catted_uri IS NOT NULL`).Scan(&converted)
+		if converted >= 1 || time.Now().After(deadline) {
 			break
 		}
 		time.Sleep(20 * time.Millisecond)

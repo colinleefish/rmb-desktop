@@ -1,6 +1,8 @@
 package worker
 
 import (
+	"github.com/colinleefish/rmb-desktop/internal/db"
+
 	"context"
 	"database/sql"
 	"log/slog"
@@ -52,6 +54,11 @@ func (r *Runner) Start(ctx context.Context) {
 	}
 	if err := rebuildFTSIndexes(ctx, r.db); err != nil {
 		r.log.Warn("fts index rebuild failed", "err", err)
+	}
+	// Complete the occurred_at backfill (issue #30): events the slug-date
+	// migration could not date get their first body date. Idempotent.
+	if err := db.BackfillOccurredAt(ctx, r.db, r.log); err != nil {
+		r.log.Warn("occurred_at backfill failed", "err", err)
 	}
 
 	chat, err := llm.NewOpenAICompatibleClient(r.cfg.LLM, r.log)

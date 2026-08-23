@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/colinleefish/rmb-desktop/internal/config"
 	"github.com/colinleefish/rmb-desktop/internal/llm"
@@ -323,5 +324,72 @@ func embedIncumbent(t *testing.T, database *sql.DB, memoryURI string, vec []floa
 	}
 	if _, err := database.Exec(`UPDATE memories SET embedding = ? WHERE uri = ? AND superseded_at IS NULL`, blob, memoryURI); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestEventOccurredAtAtPersist (issue #30): persisted events carry
+// occurred_at resolved from the slug date, the body date, or distill time —
+// so the timeline reflects when things happened, not write time.
+func TestEventOccurredAtAtPersist(t *testing.T) {
+	database := openWorkerTestDB(t)
+	defer database.Close()
+	insertPendingSession(t, database, "s1")
+	w := testWorker(database, &recordingDistiller{})
+
+	// Slug-dated event.
+	bucketDated := Bucket{
+		Category: model.AtomCategoryEvents,
+		Slug:     "2026-06-13-ding-lby-pilot",
+		URI:      "rmb://events/2026-06-13-ding-lby-pilot",
+		Atoms:    []model.Atom{{ID: "a1", SessionID: "s1", Category: model.AtomCategoryEvents, Content: "On 2026-06-13 the pilot was deployed."}},
+	}
+	pm := ParsedMemory{Abstract: "pilot deployed", Body: "On 2026-06-13 the pilot was deployed."}
+	if err := w.persistMemory(context.Background(), bucketDated, pm, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	var occurred int64
+	if err := database.QueryRow(`SELECT occurred_at FROM memories WHERE uri = ? AND superseded_at IS NULL`, bucketDated.URI).Scan(&occurred); err != nil {
+		t.Fatal(err)
+	}
+	wantDated, _ := time.ParseInLocation("2006-01-02", "2026-06-13", time.UTC)
+	if occurred != wantDated.UnixMilli() {
+		t.Fatalf("slug-dated event: occurred_at=%d want %d", occurred, wantDated.UnixMilli())
+	}
+
+	// Slug WITHOUT a date: falls back to the first body date.
+	bucketBody := Bucket{
+		Category: model.AtomCategoryEvents,
+		Slug:     "duckdb-to-postgres-pbp",
+		URI:      "rmb://events/duckdb-to-postgres-pbp",
+		Atoms:    []model.Atom{{ID: "a2", SessionID: "s1", Category: model.AtomCategoryEvents, Content: "migrated"}},
+	}
+	pmBody := ParsedMemory{Abstract: "PBP migrated", Body: "On 2026-07-11 PBP migrated from DuckDB to Postgres (pbp_db)."}
+	if err := w.persistMemory(context.Background(), bucketBody, pmBody, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.QueryRow(`SELECT occurred_at FROM memories WHERE uri = ? AND superseded_at IS NULL`, bucketBody.URI).Scan(&occurred); err != nil {
+		t.Fatal(err)
+	}
+	wantBody, _ := time.ParseInLocation("2006-01-02", "2026-07-11", time.UTC)
+	if occurred != wantBody.UnixMilli() {
+		t.Fatalf("body-dated event: occurred_at=%d want %d", occurred, wantBody.UnixMilli())
+	}
+
+	// No date anywhere: distill time (non-zero).
+	bucketNone := Bucket{
+		Category: model.AtomCategoryEvents,
+		Slug:     "some-undated-event",
+		URI:      "rmb://events/some-undated-event",
+		Atoms:    []model.Atom{{ID: "a3", SessionID: "s1", Category: model.AtomCategoryEvents, Content: "undated"}},
+	}
+	pmNone := ParsedMemory{Abstract: "undated", Body: "Something happened with no date mentioned."}
+	if err := w.persistMemory(context.Background(), bucketNone, pmNone, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.QueryRow(`SELECT occurred_at FROM memories WHERE uri = ? AND superseded_at IS NULL`, bucketNone.URI).Scan(&occurred); err != nil {
+		t.Fatal(err)
+	}
+	if occurred == 0 {
+		t.Fatal("undated event must fall back to distill time (non-zero occurred_at)")
 	}
 }

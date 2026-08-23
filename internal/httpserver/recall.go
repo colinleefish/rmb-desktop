@@ -32,6 +32,12 @@ func lsOptionsFromQuery(r *http.Request) (inspect.LsOptions, error) {
 		}
 		opts.Offset = n
 	}
+	if v := strings.TrimSpace(q.Get("by")); v != "" {
+		if v != "updated" {
+			return opts, fmt.Errorf("by supports only 'updated' (events default to occurred_at)")
+		}
+		opts.ByUpdated = true
+	}
 	if v := strings.TrimSpace(q.Get("since")); v != "" {
 		ts, err := inspect.ParseTimeFilter(v, time.Now())
 		if err != nil {

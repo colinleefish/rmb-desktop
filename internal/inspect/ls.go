@@ -18,13 +18,17 @@ const maxLsLimit = 10000
 
 // LsOptions controls paging and filtering for ls listings.
 // Since/Until are inclusive bounds in unix milliseconds applied to the
-// container's time column (updated_at; session_turns uses created_at).
+// container's time column (updated_at; session_turns uses created_at;
+// events use occurred_at — when things happened — unless ByUpdated).
 type LsOptions struct {
 	Limit  int
 	Offset int
 	Since  int64
 	Until  int64
 	Count  bool
+	// ByUpdated restores write-time ordering/filtering for events
+	// (updated_at) instead of the default occurred_at (issue #30).
+	ByUpdated bool
 }
 
 // DefaultLsOptions returns the historical default behavior: 200 rows,

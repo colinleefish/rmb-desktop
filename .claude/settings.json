@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git:*)",
+      "Bash(make:*)",
+      "Bash(go:*)",
+      "Bash(cd:*)",
+      "Bash(ls:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(npm run:*)",
+      "Read(**)"
+    ],
+    "deny": [
+      "Bash(rm -rf /*)",
+      "Bash(git push --force:*)",
+      "Bash(git rebase:*)",
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(~/.rmb/release.env)",
+      "Write(internal/http/static/web/**)"
+    ]
+  }
+}

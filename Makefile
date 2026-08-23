@@ -20,6 +20,11 @@ check: webui-embed-check
 	CGO_ENABLED=1 go build -tags "$(GO_TAGS)" ./...
 	CGO_ENABLED=1 go test -tags "$(GO_TAGS)" ./...
 	$(MAKE) eval
+	$(MAKE) check-arch
+
+# Architecture boundary rules (.harness/arch-rules.json) — WHAT/WHY/FIX on violation.
+check-arch:
+	bash scripts/check-arch.sh
 
 test: webui-embed-check
 	CGO_ENABLED=1 go test -tags "$(GO_TAGS)" ./...

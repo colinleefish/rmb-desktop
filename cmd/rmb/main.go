@@ -361,6 +361,12 @@ func doctorCmd(args []string) int {
 		return doctorArchive(args[1:])
 	case "metrics":
 		return doctorMetrics()
+	case "report":
+		return doctorReport()
+	case "gc":
+		return doctorGC(args[1:])
+	case "reconsolidate":
+		return doctorReconsolidate(args[1:])
 	default:
 		fmt.Fprint(os.Stderr, doctorUsage())
 		return 2
@@ -492,6 +498,98 @@ func doctorMetrics() int {
 	}
 	fmt.Printf("window_days=%d searches=%d zero_cat_rate=%.2f heat_concentration=%.2f alarm=%v\n",
 		m.WindowDays, m.Searches, m.ZeroCatRate, m.HeatConcentration, m.HeatAlarm)
+	return 0
+}
+
+func doctorReport() int {
+	cl, err := apiClient()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "doctor report: %v\n", err)
+		return 1
+	}
+	rep, err := cl.DoctorReport(context.Background())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "doctor report: %v\n", err)
+		return 1
+	}
+	h := rep.Hygiene
+	fmt.Printf("memories: %d active / %d superseded (%d GC-reclaimable, keep 3 or 90d)\n",
+		h.ActiveMemories, h.SupersededRows, h.GCReclaimableRows)
+	fmt.Printf("high-version chains (>=20 versions): %d   (rmb doctor reconsolidate <uri> to rebuild)\n", h.HighVersionCount)
+	fmt.Printf("event slugs missing date prefix: %d\n", h.DatelessEventSlugs)
+	fmt.Printf("bodies over %d chars: %d\n", 4096, h.BodiesOverCap)
+	fmt.Printf("orphan scenes (no active memory links them): %d\n", h.OrphanScenes)
+	fmt.Printf("duplicate pairs (cos>0.90): %d\n", h.DuplicatePairs)
+	for i, p := range h.TopDuplicatePairs {
+		if i >= 10 {
+			fmt.Printf("  … %d more\n", h.DuplicatePairs-10)
+			break
+		}
+		fmt.Printf("  %.4f %s  <->  %s\n", p.Cos, p.A, p.B)
+	}
+	for _, c := range h.ContradictionCandidates {
+		fmt.Printf("  contradiction candidate (negated: %s): %s <-> %s\n", truncate(c.NegatedSide, 60), truncate(c.A, 60), truncate(c.B, 60))
+	}
+	fmt.Printf("archive candidates (90d cold): %d\n", rep.ArchiveCandidates)
+	fmt.Printf("zero-cat search rate: %.2f   heat concentration: %.2f alarm=%v\n",
+		rep.ZeroCatRate, rep.HeatConcentration, rep.HeatAlarm)
+	return 0
+}
+
+func doctorGC(args []string) int {
+	apply := false
+	for _, a := range args {
+		switch a {
+		case "--dry-run":
+		case "--apply":
+			apply = true
+		default:
+			fmt.Fprintf(os.Stderr, "unknown flag %q\n", a)
+			return 2
+		}
+	}
+	cl, err := apiClient()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "doctor gc: %v\n", err)
+		return 1
+	}
+	stats, err := cl.DoctorGC(context.Background(), apply)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "doctor gc: %v\n", err)
+		return 1
+	}
+	mode := "DRY-RUN"
+	if apply {
+		mode = "APPLIED"
+	}
+	fmt.Printf("[%s] superseded GC: %d uris scanned, %d superseded rows (%d kept, %d deleted, ~%d KB reclaimable)\n",
+		mode, stats.URIsScanned, stats.SupersededRows, stats.KeepRows, stats.DeletedRows, stats.ReclaimedBytes/1024)
+	if !apply && stats.DeletedRows > 0 {
+		fmt.Println("re-run with --apply to delete (superseded rows only; active memories untouched)")
+	}
+	return 0
+}
+
+func doctorReconsolidate(args []string) int {
+	if len(args) != 1 {
+		fmt.Fprintln(os.Stderr, "usage: rmb doctor reconsolidate <uri>")
+		return 2
+	}
+	cl, err := apiClient()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "doctor reconsolidate: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(os.Stderr, "reconsolidating %s from its atom evidence (LLM distill — this can take a minute)…\n", args[0])
+	res, err := cl.DoctorReconsolidate(context.Background(), args[0])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "doctor reconsolidate: %v\n", err)
+		return 1
+	}
+	fmt.Printf("%s rebuilt from %d atoms: v%d -> v%d (%d -> %d chars)\n",
+		res.URI, res.BucketAtoms, res.OldVersion, res.NewVersion, res.OldBodyChars, res.NewBodyChars)
+	fmt.Println()
+	fmt.Println(res.NewBody)
 	return 0
 }
 

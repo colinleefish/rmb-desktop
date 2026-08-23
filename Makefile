@@ -1,4 +1,4 @@
-.PHONY: test eval build build-all run-rmbd run-hook tidy app-dev app-build app-build-windows app-install webui-dev webui-build webui-embed-check icons-sync build-windows-sidecars notarize release release-upload release-publish
+.PHONY: setup check test eval e2e dev build build-all run-rmbd run-hook tidy app-dev app-build app-build-windows app-install webui-dev webui-build webui-embed-check icons-sync build-windows-sidecars notarize release release-upload release-publish
 
 GO_TAGS := sqlite_fts5
 EMBED_INDEX := internal/http/static/web/index.html
@@ -9,9 +9,23 @@ GO_LDFLAGS := -X github.com/colinleefish/rmb-desktop/internal/version.Version=$(
 ICON_SRC := icons/pyramid-dark-accent.svg
 TRAY_ICON_SRC := icons/pyramid-tray.svg
 
+# ── Harness: single-command pipeline (AGENTS.md "Verification") ──────────────
+# The repo is consistent iff `make check` exits 0. Run before every commit.
+setup:
+	go mod download
+	cd webui && npm ci
+
+check: webui-embed-check
+	go vet -tags "$(GO_TAGS)" ./...
+	CGO_ENABLED=1 go build -tags "$(GO_TAGS)" ./...
+	CGO_ENABLED=1 go test -tags "$(GO_TAGS)" ./...
+	$(MAKE) eval
+
 test: webui-embed-check
 	CGO_ENABLED=1 go test -tags "$(GO_TAGS)" ./...
 
+# e2e = offline recall regression gate over the committed golden fixture.
+e2e: eval
 # Offline recall regression gate (issue #22). Deterministic hash-embedder eval
 # over the committed golden fixture; fails the build if recall metrics regress.
 eval:
@@ -31,6 +45,8 @@ webui-embed-check:
 
 webui-dev:
 	cd webui && npm run dev
+
+dev: webui-dev
 
 webui-build: icons-sync
 	cd webui && npm run build

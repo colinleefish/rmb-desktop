@@ -2,7 +2,7 @@
 
 **Date**: 2026-08-22 · **Supersedes**: v1 (same day, prior commit — kept in git history)
 **Inputs**: `docs/audit/2026-08-22-memory-retrieval-audit/` + addendum; follow-up verification queries against the live db (read-only).
-**Status**: proposed
+**Status**: P0–P3.4 **complete** (all merged to main, PRs #36–#51; reconsolidate shipped with #51). **Open**: P3.5 (secrets → Keychain + key rotation).
 
 This version is the product of an adversarial self-review of v1: every claim re-checked against the database, every fix stress-tested for failure modes, impact re-ranked by query frequency rather than loudness.
 

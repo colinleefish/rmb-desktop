@@ -365,3 +365,134 @@ func apiError(path string, status int, body []byte) error {
 	}
 	return fmt.Errorf("%s returned %d", path, status)
 }
+
+// DoctorReport is the composed health snapshot from
+// GET /api/v1/doctor/report (issue #33).
+type DoctorReport struct {
+	Hygiene struct {
+		ActiveMemories     int `json:"active_memories"`
+		SupersededRows     int `json:"superseded_rows"`
+		GCReclaimableRows  int `json:"gc_reclaimable_rows"`
+		HighVersionCount   int `json:"high_version_count"`
+		DatelessEventSlugs int `json:"dateless_event_slugs"`
+		BodiesOverCap      int `json:"bodies_over_cap"`
+		OrphanScenes       int `json:"orphan_scenes"`
+		DuplicatePairs     int `json:"duplicate_pairs"`
+		TopDuplicatePairs  []struct {
+			A        string  `json:"a"`
+			B        string  `json:"b"`
+			Category string  `json:"category"`
+			Cos      float64 `json:"cos"`
+		} `json:"top_duplicate_pairs"`
+		ContradictionCandidates []struct {
+			A           string  `json:"a"`
+			B           string  `json:"b"`
+			Cos         float64 `json:"cos"`
+			NegatedSide string  `json:"negated_side"`
+		} `json:"contradiction_candidates"`
+	} `json:"hygiene"`
+	ArchiveCandidates int     `json:"archive_candidates"`
+	ZeroCatRate       float64 `json:"zero_cat_search_rate"`
+	HeatConcentration float64 `json:"heat_concentration"`
+	HeatAlarm         bool    `json:"heat_alarm"`
+}
+
+// DoctorReport fetches the full doctor snapshot.
+func (c *Client) DoctorReport(ctx context.Context) (DoctorReport, error) {
+	var out DoctorReport
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/api/v1/doctor/report", nil)
+	if err != nil {
+		return out, err
+	}
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return out, fmt.Errorf("doctor report request: %w", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
+	if resp.StatusCode != http.StatusOK {
+		return out, apiError("doctor report", resp.StatusCode, body)
+	}
+	if err := json.Unmarshal(body, &out); err != nil {
+		return out, fmt.Errorf("decode doctor report: %w", err)
+	}
+	return out, nil
+}
+
+// DoctorGCStats reports a superseded-GC run (dry or applied).
+type DoctorGCStats struct {
+	URIsScanned    int   `json:"uris_scanned"`
+	SupersededRows int   `json:"superseded_rows"`
+	KeepRows       int   `json:"keep_rows"`
+	DeletedRows    int   `json:"deleted_rows"`
+	DryRun         bool  `json:"dry_run"`
+	ReclaimedBytes int64 `json:"reclaimed_bytes"`
+}
+
+// DoctorGC runs (or dry-runs) the superseded-row GC.
+func (c *Client) DoctorGC(ctx context.Context, apply bool) (DoctorGCStats, error) {
+	var out DoctorGCStats
+	payload := map[string]any{"dry_run": !apply}
+	raw, _ := json.Marshal(payload)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/api/v1/doctor/gc", bytes.NewReader(raw))
+	if err != nil {
+		return out, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return out, fmt.Errorf("doctor gc request: %w", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+	if resp.StatusCode != http.StatusOK {
+		return out, apiError("doctor gc", resp.StatusCode, body)
+	}
+	if err := json.Unmarshal(body, &out); err != nil {
+		return out, fmt.Errorf("decode doctor gc: %w", err)
+	}
+	return out, nil
+}
+
+// ReconsolidateResult is the report from an evidence-grounded rebuild of
+// one memory (issue #33 / plan §9.3e).
+type ReconsolidateResult struct {
+	URI          string `json:"uri"`
+	OldVersion   int    `json:"old_version"`
+	NewVersion   int    `json:"new_version"`
+	OldBodyChars int    `json:"old_body_chars"`
+	NewBodyChars int    `json:"new_body_chars"`
+	BucketAtoms  int    `json:"bucket_atoms"`
+	NewAbstract  string `json:"new_abstract"`
+	NewBody      string `json:"new_body"`
+}
+
+// DoctorReconsolidate rebuilds a memory from its atom evidence.
+func (c *Client) DoctorReconsolidate(ctx context.Context, uri string) (ReconsolidateResult, error) {
+	var out ReconsolidateResult
+	payload := map[string]any{"uri": uri}
+	raw, _ := json.Marshal(payload)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/api/v1/debug/pipeline/reconsolidate", bytes.NewReader(raw))
+	if err != nil {
+		return out, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	// Distillation is slow (minutes); a generous client timeout.
+	httpClient := *c.httpClient
+	if httpClient.Timeout > 0 && httpClient.Timeout < 10*time.Minute {
+		httpClient.Timeout = 10 * time.Minute
+	}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return out, fmt.Errorf("reconsolidate request: %w", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+	if resp.StatusCode != http.StatusOK {
+		return out, apiError("reconsolidate", resp.StatusCode, body)
+	}
+	if err := json.Unmarshal(body, &out); err != nil {
+		return out, fmt.Errorf("decode reconsolidate: %w", err)
+	}
+	return out, nil
+}

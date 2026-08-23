@@ -89,9 +89,12 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /api/v1/sessions/{id}/upload", s.handleUpload)
 	s.mux.HandleFunc("GET /api/v1/search", s.handleSearch)
 	s.mux.HandleFunc("GET /api/v1/doctor/metrics", s.handleDoctorMetrics)
+	s.mux.HandleFunc("GET /api/v1/doctor/report", s.handleDoctorReport)
+	s.mux.HandleFunc("POST /api/v1/doctor/gc", s.handleDoctorGC)
 	s.mux.HandleFunc("GET /api/v1/doctor/archive", s.handleDoctorArchiveCandidates)
 	s.mux.HandleFunc("POST /api/v1/doctor/archive", s.handleDoctorArchiveAction)
 	s.mux.HandleFunc("POST /api/v1/maintenance/backfill-provenance", s.handleBackfillProvenance)
+	s.mux.HandleFunc("POST /api/v1/debug/pipeline/reconsolidate", s.handleDebugReconsolidate)
 	s.mux.HandleFunc("GET /api/v1/inspect/cat", func(w http.ResponseWriter, r *http.Request) {
 		s.handleInspect(w, r, "cat")
 	})

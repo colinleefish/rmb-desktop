@@ -393,3 +393,85 @@ func TestEventOccurredAtAtPersist(t *testing.T) {
 		t.Fatal("undated event must fall back to distill time (non-zero occurred_at)")
 	}
 }
+
+// TestBodyCap (issue #33): distilled bodies over 4096 runes are truncated at
+// a line boundary with a marker; short bodies pass through untouched.
+func TestBodyCap(t *testing.T) {
+	short := "short body"
+	if capBody(short) != short {
+		t.Fatal("short body must pass through")
+	}
+	long := strings.Repeat("line of text\n", 1000) // ~13k chars
+	capped := capBody(long)
+	if n := len([]rune(capped)); n > MaxBodyChars+200 {
+		t.Fatalf("capped body too long: %d", n)
+	}
+	if !strings.Contains(capped, "(body capped at 4096 chars") {
+		t.Fatal("capped body must carry the truncation marker")
+	}
+}
+
+// TestReconsolidateRoundTrip (issue #33 acceptance): rebuild an eroded
+// chain (v131) from its atom evidence — supersedes the active row, bumps the
+// version, and the new body comes from the fresh distill of ATOMS.
+func TestReconsolidateRoundTrip(t *testing.T) {
+	database := openWorkerTestDB(t)
+	defer database.Close()
+
+	// Evidence: three atoms across two sessions for subject "aliyun".
+	insertPendingSession(t, database, "s1")
+	insertPendingSession(t, database, "s2")
+	insertAtom(t, database, "a1", "s1", model.AtomCategoryEntities, "aliyun",
+		"Aliyun ECS hosts run the starlink workloads.")
+	insertAtom(t, database, "a2", "s2", model.AtomCategoryEntities, "aliyun",
+		"Aliyun RDS instances back the production databases.")
+	insertAtom(t, database, "a3", "s2", model.AtomCategoryEntities, "aliyun",
+		"Aliyun OSS buckets store deployment artifacts.")
+
+	// The eroded chain: an active v131 memory with drifted content.
+	oldBody := "drifted accumulated rewrite text that no longer reflects evidence"
+	insertMemoryRow(t, database, "old1", "rmb://entities/aliyun", oldBody)
+	if _, err := database.Exec(`UPDATE memories SET version = 131 WHERE id = 'old1'`); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := testCfg()
+	result, err := Reconsolidate(context.Background(), database, &recordingDistiller{}, cfg, nil, "rmb://entities/aliyun")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.OldVersion != 131 || result.NewVersion != 132 {
+		t.Fatalf("version round-trip: %d -> %d", result.OldVersion, result.NewVersion)
+	}
+	if result.BucketAtoms != 3 {
+		t.Fatalf("must distill from all 3 atoms, got %d", result.BucketAtoms)
+	}
+
+	var activeBody string
+	var version int
+	var active, superseded int
+	if err := database.QueryRow(`SELECT body, version FROM memories WHERE uri='rmb://entities/aliyun' AND superseded_at IS NULL`).Scan(&activeBody, &version); err != nil {
+		t.Fatal(err)
+	}
+	if version != 132 || activeBody == oldBody || activeBody == "" {
+		t.Fatalf("active row must be the fresh v132 distill, got v%d %q", version, activeBody[:min(40, len(activeBody))])
+	}
+	mustCount(database, `SELECT COUNT(*) FROM memories WHERE uri='rmb://entities/aliyun' AND superseded_at IS NULL`, &active)
+	mustCount(database, `SELECT COUNT(*) FROM memories WHERE uri='rmb://entities/aliyun' AND superseded_at IS NOT NULL`, &superseded)
+	if active != 1 || superseded != 1 {
+		t.Fatalf("exactly one active + one superseded, got %d/%d", active, superseded)
+	}
+}
+
+func mustCount(database *sql.DB, query string, dest *int) {
+	if err := database.QueryRow(query).Scan(dest); err != nil {
+		panic(err)
+	}
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}

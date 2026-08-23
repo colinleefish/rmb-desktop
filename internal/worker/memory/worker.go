@@ -43,6 +43,31 @@ const relatedEventsTopK = 5
 // independent corroboration.
 const graduationMinSessions = 2
 
+// MaxBodyChars caps distilled bodies at persist time (issue #33): giant
+// bodies dilute embeddings (the audit measured entities/rmb at 12,310
+// chars). Runbook-grade content should graduate to a skill (follow-up);
+// for now the cap keeps embeddings meaningful.
+const MaxBodyChars = 4096
+
+// capBody truncates a distilled body at MaxBodyChars runes on a line
+// boundary when possible, appending a truncation marker so readers know the
+// cut was mechanical.
+func capBody(body string) string {
+	r := []rune(body)
+	if len(r) <= MaxBodyChars {
+		return body
+	}
+	cut := MaxBodyChars
+	// Prefer cutting at the last newline within a 200-rune lookback.
+	for i := cut - 1; i > cut-200 && i > 0; i-- {
+		if r[i] == '\n' {
+			cut = i
+			break
+		}
+	}
+	return string(r[:cut]) + "\n\n(body capped at 4096 chars by distill-time limit)"
+}
+
 // Embedder is the optional embedding dependency for the pre-insert
 // incumbent check (issue #27 task 3): it is satisfied by the embed worker's
 // client. When nil, incumbent detection falls back to deterministic
@@ -441,6 +466,10 @@ func bodyUnchanged(activeBody, newBody string) bool {
 	return textsim.Jaccard(activeBody, newBody) >= bodyUnchangedJaccard
 }
 
+func hashAtomIDs(atoms []model.Atom) string {
+	return textsim.HashIDs(atomIDs(atoms))
+}
+
 func atomIDs(atoms []model.Atom) []string {
 	out := make([]string, 0, len(atoms))
 	for _, a := range atoms {
@@ -450,6 +479,7 @@ func atomIDs(atoms []model.Atom) []string {
 }
 
 func (w *Worker) persistMemory(ctx context.Context, bucket Bucket, pm ParsedMemory, sourceSceneURIs, sourceCorrectionURIs []string) error {
+	pm.Body = capBody(pm.Body)
 	tx, err := w.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err

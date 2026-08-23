@@ -31,8 +31,8 @@
       "name": "harness-observability",
       "behavior": "Session lifecycle artifacts: sprint-contract / evaluator-rubric / clean-state-checklist templates, session-trace.sh JSONL events, clean-state-check.sh idempotent verifier, docs/quality-document.md module scores",
       "verification": "clean-state-check.sh exits 0 twice (idempotent); session-start/session-end trace events append; make check exits 0",
-      "state": "planned",
-      "evidence": "",
+      "state": "passing",
+      "evidence": "commit cfdc4b7, verified 2026-08-23",
       "issue": 58,
       "layers": [
         {

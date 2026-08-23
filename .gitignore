@@ -36,6 +36,9 @@ internal/http/static/web/*
 temp/
 .wrangler/
 
+# Harness runtime artifacts (session traces — never source)
+.harness/traces/traces.jsonl
+
 # Python
 __pycache__/
 *.pyc

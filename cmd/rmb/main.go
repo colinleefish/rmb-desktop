@@ -177,7 +177,7 @@ func lsUsageHint(kind string) string {
 	if kind != "ls" {
 		return ""
 	}
-	return " [--limit N] [--offset N] [--since <date|7d>] [--until <date|7d>] [--count]"
+	return " [--limit N] [--offset N] [--since <date|7d>] [--until <date|7d>] [--count] [--by=updated]"
 }
 
 // parseLsArgs splits a uri from ls flags, accepting both --flag=value and
@@ -213,6 +213,15 @@ func parseLsArgs(args []string) (string, url.Values, error) {
 				v = val
 			}
 			extra.Set("count", v)
+		case "--by":
+			v, err := consume()
+			if err != nil {
+				return "", nil, err
+			}
+			if v != "updated" {
+				return "", nil, fmt.Errorf("bad --by %q (only 'updated' is supported)", v)
+			}
+			extra.Set("by", v)
 		case "--limit":
 			v, err := consume()
 			if err != nil {
@@ -502,7 +511,7 @@ func usageText() string {
   rmb hook-submit --source=<cursor> [--url=http://127.0.0.1:19019]
   rmb search "<query>" [--scope=memory,scene,skill,atom] [--k=n] [--since=<date|Nd>] [--until=<date|Nd>] [--no-boost]
   rmb ls <uri-prefix>            # list container contents (e.g. rmb://events/)
-  rmb ls <uri-prefix> [--limit=N] [--offset=N] [--since=<date|7d>] [--until=<date|7d>] [--count]
+  rmb ls <uri-prefix> [--limit=N] [--offset=N] [--since=<date|7d>] [--until=<date|7d>] [--count] [--by=updated]
   rmb cat <uri>
   rmb meta <uri>
   rmb pull <uri> [--out=<dir>]   # rmb://skills/<name> | rmb://skills/ (all)

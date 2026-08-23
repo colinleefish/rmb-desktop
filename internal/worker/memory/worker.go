@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
@@ -477,7 +478,8 @@ func (w *Worker) persistMemory(ctx context.Context, bucket Bucket, pm ParsedMemo
 		if count > 0 {
 			return tx.Commit()
 		}
-		if err := insertMemory(ctx, tx, bucket, pm, sceneJSON, corrJSON, atomHash, 1, nowMS); err != nil {
+		occurred := eventOccurredAt(bucket.Slug, pm, nowMS)
+		if err := insertMemory(ctx, tx, bucket, pm, sceneJSON, corrJSON, atomHash, 1, nowMS, occurred); err != nil {
 			return err
 		}
 		return tx.Commit()
@@ -506,7 +508,7 @@ func (w *Worker) persistMemory(ctx context.Context, bucket Bucket, pm ParsedMemo
 			w.log.Info("l3 merged new subject into incumbent", "uri", bucket.URI, "incumbent", inc.uri)
 			return tx.Commit()
 		}
-		if err := insertMemory(ctx, tx, bucket, pm, sceneJSON, corrJSON, atomHash, 1, nowMS); err != nil {
+		if err := insertMemory(ctx, tx, bucket, pm, sceneJSON, corrJSON, atomHash, 1, nowMS, 0); err != nil {
 			return err
 		}
 		return tx.Commit()
@@ -536,10 +538,37 @@ func (w *Worker) persistMemory(ctx context.Context, bucket Bucket, pm ParsedMemo
 	if err != nil {
 		return fmt.Errorf("supersede memory: %w", err)
 	}
-	if err := insertMemory(ctx, tx, bucket, pm, sceneJSON, corrJSON, atomHash, version+1, nowMS); err != nil {
+	if err := insertMemory(ctx, tx, bucket, pm, sceneJSON, corrJSON, atomHash, version+1, nowMS, 0); err != nil {
 		return err
 	}
 	return tx.Commit()
+}
+
+// eventOccurredAt resolves WHEN an event happened (issue #30): slug date
+// prefix first, then the first date mentioned in the distilled abstract or
+// body, then distill time.
+func eventOccurredAt(slug string, pm ParsedMemory, fallbackMS int64) int64 {
+	if t, err := time.ParseInLocation("2006-01-02", strings.TrimPrefix(slugDatePrefix(slug), "-"), time.UTC); err == nil {
+		return t.UnixMilli()
+	}
+	for _, text := range []string{pm.Abstract, pm.Body} {
+		if m := datePrefixRE.FindStringSubmatch(text); m != nil {
+			if t, err := time.ParseInLocation("2006-01-02", m[1], time.UTC); err == nil {
+				return t.UnixMilli()
+			}
+		}
+	}
+	return fallbackMS
+}
+
+var datePrefixRE = regexp.MustCompile(`(20\d{2}-\d{2}-\d{2})`)
+
+func slugDatePrefix(slug string) string {
+	m := eventSlugDatePrefix.FindStringSubmatch(slug)
+	if m == nil {
+		return ""
+	}
+	return strings.TrimSuffix(m[0], "-")
 }
 
 type incumbent struct {
@@ -626,7 +655,7 @@ func (w *Worker) mergeIntoIncumbent(ctx context.Context, tx *sql.Tx, bucket Buck
 	if slug, ok := strings.CutPrefix(inc.uri, "rmb://"+bucket.Category+"/"); ok {
 		incBucket.Slug = slug
 	}
-	return insertMemory(ctx, tx, incBucket, pm, sceneJSON, corrJSON, atomHash, inc.version+1, nowMS)
+	return insertMemory(ctx, tx, incBucket, pm, sceneJSON, corrJSON, atomHash, inc.version+1, nowMS, 0)
 }
 
 func storedEmbedding(ctx context.Context, database *sql.DB, id string) ([]float32, int, error) {
@@ -652,7 +681,7 @@ func refreshProvenance(ctx context.Context, tx *sql.Tx, id, sceneJSON, corrJSON,
 	return err
 }
 
-func insertMemory(ctx context.Context, tx *sql.Tx, bucket Bucket, pm ParsedMemory, sceneJSON, corrJSON, atomHash string, version int, nowMS int64) error {
+func insertMemory(ctx context.Context, tx *sql.Tx, bucket Bucket, pm ParsedMemory, sceneJSON, corrJSON, atomHash string, version int, nowMS int64, occurredAtMS int64) error {
 	id, err := uuid.NewV7()
 	if err != nil {
 		return err
@@ -661,10 +690,14 @@ func insertMemory(ctx context.Context, tx *sql.Tx, bucket Bucket, pm ParsedMemor
 	if bucket.Slug != "" {
 		slugPtr = &bucket.Slug
 	}
+	var occurredAt any
+	if occurredAtMS > 0 {
+		occurredAt = occurredAtMS
+	}
 	_, err = tx.ExecContext(ctx, `
-		INSERT INTO memories (id, uri, category, slug, version, abstract, body, source_scene_uris, source_correction_uris, source_atom_hash, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		id.String(), bucket.URI, bucket.Category, slugPtr, version, pm.Abstract, pm.Body, sceneJSON, corrJSON, atomHash, nowMS, nowMS,
+		INSERT INTO memories (id, uri, category, slug, version, abstract, body, source_scene_uris, source_correction_uris, source_atom_hash, occurred_at, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		id.String(), bucket.URI, bucket.Category, slugPtr, version, pm.Abstract, pm.Body, sceneJSON, corrJSON, atomHash, occurredAt, nowMS, nowMS,
 	)
 	if err != nil {
 		return fmt.Errorf("insert memory: %w", err)

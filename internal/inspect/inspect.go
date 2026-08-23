@@ -314,14 +314,23 @@ func (s *Service) lsScope(ctx context.Context, u uri.URI, opts LsOptions, w io.W
 	case uri.ScopeTurns:
 		return s.lsTable(ctx, "session_turns", u, "created_at ASC", "created_at", opts, uri.BuildTurn, w)
 	default:
-		// Memory categories (events/entities/preferences).
+		// Memory categories (events/entities/preferences). Events order and
+		// time-filter by occurred_at (when things happened) by default; rows
+		// without a resolvable date fall back to updated_at. --by=updated
+		// restores the write-time view (issue #30 / audit RC6: the backfill
+		// batch must sort into June/July, where it happened).
+		orderCol, timeCol := "updated_at DESC", "updated_at"
+		if u.Scope == uri.ScopeEvents && !opts.ByUpdated {
+			orderCol = "COALESCE(occurred_at, updated_at) DESC"
+			timeCol = "COALESCE(occurred_at, updated_at)"
+		}
 		conds := []string{"category = ?", "superseded_at IS NULL"}
 		args := []any{u.Scope}
 		if len(u.Segments) == 1 {
 			conds = append(conds, "uri LIKE ? ESCAPE '\\'")
 			args = append(args, likePrefix(uri.BuildMemory(u.Scope, u.Segments[0])))
 		}
-		items, total, err := s.queryList(ctx, "memories", "uri", conds, args, "updated_at DESC", "updated_at", opts)
+		items, total, err := s.queryList(ctx, "memories", "uri", conds, args, orderCol, timeCol, opts)
 		if err != nil {
 			return err
 		}

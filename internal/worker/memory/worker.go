@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -43,21 +44,15 @@ const relatedEventsTopK = 5
 // independent corroboration.
 const graduationMinSessions = 2
 
-// MaxBodyChars caps distilled bodies at persist time (issue #33): giant
-// bodies dilute embeddings (the audit measured entities/rmb at 12,310
-// chars). Runbook-grade content should graduate to a skill (follow-up);
-// for now the cap keeps embeddings meaningful.
-const MaxBodyChars = 4096
-
 // capBody truncates a distilled body at MaxBodyChars runes on a line
 // boundary when possible, appending a truncation marker so readers know the
 // cut was mechanical.
 func capBody(body string) string {
 	r := []rune(body)
-	if len(r) <= MaxBodyChars {
+	if len(r) <= model.MaxBodyChars {
 		return body
 	}
-	cut := MaxBodyChars
+	cut := model.MaxBodyChars
 	// Prefer cutting at the last newline within a 200-rune lookback.
 	for i := cut - 1; i > cut-200 && i > 0; i-- {
 		if r[i] == '\n' {
@@ -65,7 +60,7 @@ func capBody(body string) string {
 			break
 		}
 	}
-	return string(r[:cut]) + "\n\n(body capped at 4096 chars by distill-time limit)"
+	return string(r[:cut]) + "\n\n(body capped at " + strconv.Itoa(model.MaxBodyChars) + " chars by distill-time limit)"
 }
 
 // Embedder is the optional embedding dependency for the pre-insert

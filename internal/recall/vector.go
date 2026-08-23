@@ -90,30 +90,6 @@ func VectorScenes(ctx context.Context, db *sql.DB, queryVec []float32, k int, tw
 	return scanVecMatches(rows, "scenes")
 }
 
-func VectorSkills(ctx context.Context, db *sql.DB, queryVec []float32, k int, tw TimeWindow) ([]Match, error) {
-	if k <= 0 {
-		k = 5
-	}
-	blob, err := sqlite_vec.SerializeFloat32(queryVec)
-	if err != nil {
-		return nil, fmt.Errorf("serialize query vector: %w", err)
-	}
-	windowClause, windowArgs := tw.Clause("updated_at")
-	rows, err := db.QueryContext(ctx, `
-		SELECT uri,
-		       COALESCE(substr(description, 1, 160), ''),
-		       vec_distance_cosine(embedding, ?) AS distance
-		FROM skills
-		WHERE superseded_at IS NULL AND embedding IS NOT NULL`+windowClause+`
-		ORDER BY distance ASC
-		LIMIT ?`, prependAny(blob, append(windowArgs, any(k))...)...)
-	if err != nil {
-		return nil, fmt.Errorf("vector skills: %w", err)
-	}
-	defer rows.Close()
-	return scanVecMatches(rows, "skills")
-}
-
 // VectorAtoms returns atom results ranked by cosine similarity to the query
 // vector. Atoms carry the raw per-fact detail (audit Q8 style "resolver IPs"
 // dead-ends), so a vector hit surfaces the evidence the one-line memories

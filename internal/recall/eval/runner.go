@@ -3,9 +3,7 @@ package eval
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
-	"io"
 
 	"github.com/colinleefish/rmb-desktop/internal/recall"
 )
@@ -129,11 +127,4 @@ func (r *Report) GatesOK(g *GoldenGates) bool {
 	return r.RecallAt5 >= g.MinRecallAt5 &&
 		r.DupRate <= g.MaxDupRate &&
 		r.RecencyPrecision >= g.MinRecencyPrecision
-}
-
-// WriteJSON writes the report as pretty JSON.
-func (r *Report) WriteJSON(w io.Writer) error {
-	enc := json.NewEncoder(w)
-	enc.SetIndent("", "  ")
-	return enc.Encode(r)
 }

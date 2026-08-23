@@ -59,9 +59,6 @@ func NewDaemonManager() *DaemonManager {
 	}
 }
 
-// RmbdPath is the resolved daemon binary (dev/diagnostics).
-func (d *DaemonManager) RmbdPath() string { return d.rmbdPath }
-
 // LastError returns the most recent daemon spawn/exit failure for tray
 // display; empty while the last spawn is presumed healthy.
 func (d *DaemonManager) LastError() string {

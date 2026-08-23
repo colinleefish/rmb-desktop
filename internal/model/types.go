@@ -64,3 +64,8 @@ type PipelineState struct {
 	WarmupThreshold      int
 	UpdatedAt            int64
 }
+
+// MaxBodyChars caps distilled memory bodies (issue #33): giant bodies
+// dilute embeddings. Authoritative for both the worker's distill-time cap
+// and the hygiene report's over-cap scan.
+const MaxBodyChars = 4096

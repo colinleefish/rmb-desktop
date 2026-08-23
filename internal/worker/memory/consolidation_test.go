@@ -403,7 +403,7 @@ func TestBodyCap(t *testing.T) {
 	}
 	long := strings.Repeat("line of text\n", 1000) // ~13k chars
 	capped := capBody(long)
-	if n := len([]rune(capped)); n > MaxBodyChars+200 {
+	if n := len([]rune(capped)); n > model.MaxBodyChars+200 {
 		t.Fatalf("capped body too long: %d", n)
 	}
 	if !strings.Contains(capped, "(body capped at 4096 chars") {

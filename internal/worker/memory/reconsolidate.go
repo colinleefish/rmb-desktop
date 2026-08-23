@@ -131,10 +131,6 @@ func Reconsolidate(ctx context.Context, database *sql.DB, distiller MemoryDistil
 		if _, err := tx.ExecContext(ctx, `UPDATE memories SET superseded_at = ? WHERE id = ?`, nowMS, activeID); err != nil {
 			return nil, err
 		}
-		if category == model.AtomCategoryEvents {
-			var occurredAny any
-			_ = database.QueryRowContext(ctx, `SELECT occurred_at FROM memories WHERE id = ?`, activeID).Scan(&occurredAny)
-		}
 	}
 	if category == model.AtomCategoryEvents {
 		occurred = eventOccurredAt(b.Slug, pm, nowMS)

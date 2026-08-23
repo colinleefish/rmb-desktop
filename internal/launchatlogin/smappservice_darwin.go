@@ -148,10 +148,6 @@ func SetFromBundle(enabled bool) error {
 	return err
 }
 
-// BundleStatus exposes the SMAppService.mainApp status code. It is primarily
-// for tests and diagnostics.
-func BundleStatus() int { return smStatus() }
-
 // MigrateFromLegacy removes the pre-SMAppService LaunchAgent (label
 // me.remember.rmb.login) if its plist is present: boot it out, disable the
 // label, delete the file. Returns hadLegacy=true when artifacts were found.

@@ -16,6 +16,7 @@
 | `cmd/*` | B | A | B | A | B | thin entrypoints |
 | `webui/` | D | C | C | B | C | **known-weak: 604-line SettingsPage, tier-based nav, mock dead weight — refactor planned (F03–F05, plan/webui-refactor.md)** |
 | harness (Makefile/scripts/.harness) | B | A | A | A | A | this refactor (#53–#58); audit 7/7 critical |
+| `internal/hook`, `internal/setup` (agent integrations) | A | B | B | A | B | cursor/cc/codex/opencode/pi/workbuddy/zcode; ZCode payload shape (F07) inferred from local zcode-guide skill docs, not a captured live Stop hook payload — flag if it needs correction |
 
 ## Reading the table
 

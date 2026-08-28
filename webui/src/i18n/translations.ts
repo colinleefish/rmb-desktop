@@ -224,6 +224,11 @@ export const translations = {
         captureHint:
           "Adds a Stop hook to ~/.workbuddy/settings.json. Restart WorkBuddy after applying.",
       },
+      zcode: {
+        captureTitle: "Configure Stop hook",
+        captureHint:
+          "Adds a Stop hook to ~/.zcode/cli/config.json and enables hooks.enabled. Restart ZCode after applying.",
+      },
       fullyConnected: "Fully connected",
       setupIncomplete: "Setup incomplete",
       lastHook: "Last hook",
@@ -685,6 +690,11 @@ export const translations = {
         captureTitle: "配置 Stop 钩子",
         captureHint:
           "向 ~/.workbuddy/settings.json 添加 Stop 钩子。应用后请重启 WorkBuddy。",
+      },
+      zcode: {
+        captureTitle: "配置 Stop 钩子",
+        captureHint:
+          "向 ~/.zcode/cli/config.json 添加 Stop 钩子并启用 hooks.enabled。应用后请重启 ZCode。",
       },
       fullyConnected: "已完全连接",
       setupIncomplete: "设置未完成",

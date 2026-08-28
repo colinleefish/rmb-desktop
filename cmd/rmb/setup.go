@@ -64,7 +64,7 @@ func setupStatus(args []string) int {
 
 func setupAgent(args []string) int {
 	fs := flag.NewFlagSet("setup", flag.ExitOnError)
-	agent := fs.String("agent", "", "agent id (cursor, claude-code, cc, codex, opencode, pi)")
+	agent := fs.String("agent", "", "agent id (cursor, claude-code, cc, codex, opencode, pi, workbuddy, zcode)")
 	dryRun := fs.Bool("dry-run", false, "print preview JSON only")
 	apply := fs.String("apply", "", "comma-separated artifact ids to write")
 	_ = fs.Parse(args)

@@ -86,8 +86,13 @@ func Submit(ctx context.Context, in SubmitInput) error {
 			return logf("skip", "not a workbuddy payload")
 		}
 		sessionKey, messages, reason, err = ParseWorkBuddyPayload(in.StdinJSON)
+	case "zcode":
+		if !IsZCodePayload(in.StdinJSON) {
+			return logf("skip", "not a zcode payload")
+		}
+		sessionKey, messages, reason, err = ParseZCodePayload(in.StdinJSON)
 	default:
-		return fmt.Errorf("hook-submit: unsupported source %q (cursor, cc, codex, opencode, pi, workbuddy)", source)
+		return fmt.Errorf("hook-submit: unsupported source %q (cursor, cc, codex, opencode, pi, workbuddy, zcode)", source)
 	}
 	if err != nil {
 		return logf("skip", err.Error())

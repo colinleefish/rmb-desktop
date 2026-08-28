@@ -10,6 +10,7 @@ const (
 	AgentOpenCode   AgentID = "opencode"
 	AgentPi         AgentID = "pi"
 	AgentWorkBuddy  AgentID = "workbuddy"
+	AgentZCode      AgentID = "zcode"
 )
 
 type agentDef struct {
@@ -70,11 +71,19 @@ var agentDefs = []agentDef{
 		HookSource:  "workbuddy",
 		DetectPaths: []string{".workbuddy"},
 	},
+	{
+		ID:          AgentZCode,
+		Name:        "ZCode",
+		Label:       "ZCode",
+		Description: "Stop hook in config.json plus recall block in AGENTS.md.",
+		HookSource:  "zcode",
+		DetectPaths: []string{".zcode"},
+	},
 }
 
 func parseAgentID(raw string) (AgentID, bool) {
 	switch AgentID(raw) {
-	case AgentCursor, AgentClaudeCode, AgentCodex, AgentOpenCode, AgentPi, AgentWorkBuddy:
+	case AgentCursor, AgentClaudeCode, AgentCodex, AgentOpenCode, AgentPi, AgentWorkBuddy, AgentZCode:
 		return AgentID(raw), true
 	case "cc", "claude":
 		return AgentClaudeCode, true

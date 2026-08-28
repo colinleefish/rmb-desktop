@@ -40,6 +40,8 @@ func Preview(id AgentID) (AgentState, error) {
 		return previewPi(def)
 	case AgentWorkBuddy:
 		return previewWorkBuddy(def)
+	case AgentZCode:
+		return previewZCode(def)
 	default:
 		return AgentState{}, fmt.Errorf("unknown agent %q", id)
 	}
@@ -88,6 +90,8 @@ func applyArtifact(id AgentID, artifactID string) error {
 		return applyPi(artifactID)
 	case AgentWorkBuddy:
 		return applyWorkBuddy(artifactID)
+	case AgentZCode:
+		return applyZCode(artifactID)
 	default:
 		return fmt.Errorf("unknown agent %q", id)
 	}

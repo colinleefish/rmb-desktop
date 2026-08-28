@@ -140,6 +140,8 @@ export function sessionSourceLabel(source: string | null | undefined): string {
       return "OpenCode";
     case "workbuddy":
       return "WorkBuddy";
+    case "zcode":
+      return "ZCode";
     default:
       return source?.trim() || "—";
   }
@@ -160,6 +162,8 @@ export function sessionSourceShortLabel(source: string | null | undefined): stri
       return "Open";
     case "workbuddy":
       return "WB";
+    case "zcode":
+      return "ZCode";
     default:
       return sessionSourceLabel(source);
   }

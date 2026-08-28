@@ -150,6 +150,32 @@
           "repair": "Live keys still in config.yaml — complete the migration then rotate keys per P3.5."
         }
       ]
+    },
+    {
+      "id": "F07",
+      "name": "zcode-agent-integration",
+      "behavior": "ZCode added as a supported agent integration: internal/hook (Stop payload parsing, Claude-compatible transcript shape), internal/setup (~/.zcode/cli/config.json hooks.events.Stop merge + hooks.enabled gate, ~/.zcode/AGENTS.md recall block), webui/src/integrations/zcode (setup panel wired into the registry), i18n strings, format.ts source labels",
+      "verification": "go test ./internal/hook/... ./internal/setup/... passes with zcode cases; webui build succeeds with zcode integration registered; make check exits 0",
+      "state": "passing",
+      "evidence": "commit d14cadd, verified 2026-08-28",
+      "issue": 0,
+      "layers": [
+        {
+          "label": "L1 static",
+          "cmd": "go build -tags sqlite_fts5 ./... && cd webui && npx tsc -b",
+          "repair": "Go or TypeScript compile error in the zcode integration files — fix the reported error."
+        },
+        {
+          "label": "L2 runtime",
+          "cmd": "go test -tags sqlite_fts5 ./internal/hook/... ./internal/setup/... -run ZCode -v",
+          "repair": "A zcode-specific hook/setup test is failing — inspect the payload/config-merge logic in internal/hook/zcode.go or internal/setup/zcode.go."
+        },
+        {
+          "label": "L3 system",
+          "cmd": "make check",
+          "repair": "Full pipeline red after wiring in zcode — run make check locally and fix the failing stage (vet/build/test/eval/check-arch)."
+        }
+      ]
     }
   ]
 }

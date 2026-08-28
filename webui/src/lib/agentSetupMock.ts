@@ -282,6 +282,15 @@ export const MOCK_AGENTS: AgentSetupState[] = [
     recallStatus: "none",
     artifacts: [],
   },
+  {
+    id: "zcode",
+    name: "ZCode",
+    description: "Stop hook in config.json plus recall block in AGENTS.md.",
+    detected: false,
+    hookStatus: "none",
+    recallStatus: "none",
+    artifacts: [],
+  },
 ];
 
 export function getMockAgent(id: string): AgentSetupState | undefined {

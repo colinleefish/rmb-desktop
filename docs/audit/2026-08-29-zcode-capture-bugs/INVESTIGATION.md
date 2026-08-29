@@ -256,3 +256,25 @@ It already contains: `hook-capture` CLI subcommand, sidecar capture/parse in
 `internal/setup/zcode.go`, updated tests. The fixing agent may `git stash pop`
 on that branch, rebase onto main, and finish it — or start fresh; the test
 matrix above is the acceptance bar either way.
+
+---
+
+## 6. Fix-phase decisions (bug #61 fix branch)
+
+Recorded by the fixing agent on `fix/zcode-61-user-prompt-capture` (the stash
+was popped and finished; see §5.4).
+
+- **TC-4 (camel-only payload): REJECT.** `IsZCodePayload` keeps gating on the
+  snake-case `last_assistant_message` (or `stop_hook_active`). ZCode always
+  sends both spellings (§1.2 Fact C), so a camel-only payload would mean a
+  client contract change — the turn then skips loudly ("not a zcode payload")
+  instead of silently misparsing. Test:
+  `TestIsZCodePayload/camel_responseText_only…` in `internal/hook/zcode_test.go`.
+- **Prompt pairing channel:** sidecar file
+  `~/.rmb/cache/agent-prompts/zcode/<lower(session_id)>.json`, written by
+  `rmb hook-capture --agent=zcode` (UserPromptSubmit hook, atomic write,
+  last-write-wins, 7-day stale sweep, silent skip on incomplete/unsafe
+  payloads); consumed then deleted by `ParseZCodePayload` (Stop hook). Absent
+  sidecar ⇒ assistant-only, i.e. pre-fix behavior preserved as graceful
+  degradation. Session-key derivation untouched here — that is bug #62,
+  owned by the parallel fix branch.

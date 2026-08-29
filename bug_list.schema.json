@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "bug_list.schema.json",
+  "title": "rmb-desktop bug list",
+  "description": "Machine-readable bug track, mirror of feature_list.json. State machine: reported → investigating → diagnosed → fixing → passing. Transitions are gated by scripts/verify-bug.sh (make bug-state / make verify-bug); state=passing is never set by hand. Full workflow: AGENTS.md 'Bug workflow'.",
+  "type": "object",
+  "required": ["bugs"],
+  "additionalProperties": false,
+  "properties": {
+    "bugs": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/bug" }
+    }
+  },
+  "definitions": {
+    "bug": {
+      "type": "object",
+      "required": ["id", "title", "issue", "severity", "module", "state", "reported", "layers"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^B[0-9]{2,}$", "description": "Internal id; branch fix/<id>-<slug>, doc docs/bugs/<id>-investigation.md. The GitHub issue number is the external id (field: issue)." },
+        "title": { "type": "string", "minLength": 3, "description": "Issue title verbatim: bug(<scope>): <symptom>, or flaky: <TestName> <behavior>" },
+        "issue": { "type": "integer", "minimum": 1 },
+        "severity": { "enum": ["high", "medium", "low"], "description": "Maps to GitHub label sev-high|sev-medium|sev-low" },
+        "module": { "type": "string", "minLength": 3, "description": "Owning package path, e.g. internal/hook (scope↔module map in AGENTS.md)" },
+        "state": { "enum": ["reported", "investigating", "diagnosed", "fixing", "passing"] },
+        "reported": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+        "investigation": { "type": "string", "description": "Path to the phase-2 investigation doc (normally docs/bugs/<id>-investigation.md)" },
+        "branch": { "type": "string", "description": "fix/<id>-<slug>; created in phase 2, continued in phase 3 — one branch per bug" },
+        "regression": { "$ref": "#/definitions/regression" },
+        "evidence": { "type": "string", "description": "Written only by make verify-bug: commit + date; append 'issue closed' after merge" },
+        "layers": {
+          "type": "array",
+          "minItems": 3,
+          "items": { "$ref": "#/definitions/layer" },
+          "description": "L1 static / L2 runtime (the phase-2 regression test, now expected to pass) / L3 system (make check)"
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "state": { "enum": ["diagnosed", "fixing", "passing"] } } },
+          "then": { "required": ["investigation", "regression"] }
+        },
+        {
+          "if": { "properties": { "state": { "enum": ["fixing", "passing"] } } },
+          "then": { "required": ["branch"] }
+        },
+        {
+          "if": { "properties": { "state": { "enum": ["passing"] } } },
+          "then": { "required": ["evidence"] }
+        }
+      ]
+    },
+    "regression": {
+      "type": "object",
+      "required": ["file", "cmd"],
+      "additionalProperties": false,
+      "properties": {
+        "file": { "type": "string", "description": "Test file containing the failing test, tagged with a '// B<nn>' comment" },
+        "cmd": { "type": "string", "description": "Command that runs it, e.g. go test ./internal/hook -run TestZcodeUserPromptCaptured" }
+      }
+    },
+    "layer": {
+      "type": "object",
+      "required": ["label", "cmd", "repair"],
+      "additionalProperties": false,
+      "properties": {
+        "label": { "type": "string" },
+        "cmd": { "type": "string" },
+        "repair": { "type": "string", "description": "What to do when this layer fails (printed by verify-bug.sh)" }
+      }
+    }
+  }
+}

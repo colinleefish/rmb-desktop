@@ -25,15 +25,20 @@ else
   bad "D2 tests pass — run: go test -tags $GO_TAGS ./..."
 fi
 
-# D3 feature list valid & consistent (WIP<=1, passing ⇒ evidence)
+# D3 state files valid & consistent (features: WIP<=1, passing ⇒ evidence;
+#    bugs: ≤1 fixing, valid states, passing ⇒ evidence — same dimension, F08)
 if command -v jq >/dev/null 2>&1 && jq -e '
     ([.features[] | select(.state=="active")] | length) <= 1
     and all(.features[] | select(.state=="passing"); (.evidence // "") != "")
     and all(.features[]; .state == "planned" or .state == "active" or .state == "passing")
-  ' feature_list.json >/dev/null 2>&1; then
-  ok "D3 feature list updated"
+  ' feature_list.json >/dev/null 2>&1 && jq -e '
+    ([.bugs[] | select(.state=="fixing")] | length) <= 1
+    and all(.bugs[] | select(.state=="passing"); (.evidence // "") != "")
+    and all(.bugs[]; .state == "reported" or .state == "investigating" or .state == "diagnosed" or .state == "fixing" or .state == "passing")
+  ' bug_list.json >/dev/null 2>&1; then
+  ok "D3 state files updated (feature_list + bug_list)"
 else
-  bad "D3 feature list updated — jq check failed on feature_list.json (states valid? ≤1 active? passing has evidence?)"
+  bad "D3 state files updated — jq check failed on feature_list.json or bug_list.json (states valid? ≤1 active feature? ≤1 bug fixing? passing has evidence?)"
 fi
 
 # D4 no debug artifacts

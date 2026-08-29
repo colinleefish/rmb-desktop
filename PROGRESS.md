@@ -10,12 +10,14 @@ Last commit: 7454203 (main) | `make check`: passing | F01, F02, F07 passing.
 
 1. ✅ Issues filed: [#61](https://github.com/colinleefish/rmb-desktop/issues/61) (assistant-only turns), [#62](https://github.com/colinleefish/rmb-desktop/issues/62) (`sess_`-prefixed session keys)
 2. ✅ Investigation complete: `docs/audit/2026-08-29-zcode-capture-bugs/INVESTIGATION.md` (root causes verified against the installed ZCode client bundle, not docs; deterministic repro; test matrix TC-1…TC-7; fixer handoff §5)
-3. ✅ Fix #61 (assistant-only turns): branch `fix/zcode-61-user-prompt-capture` — two-hook design: `UserPromptSubmit → rmb hook-capture --agent=zcode` parks the prompt in `~/.rmb/cache/agent-prompts/zcode/<session>.json`; `Stop → rmb hook-submit` pairs it in `ParseZCodePayload` (sidecar consumed after read; absent ⇒ assistant-only degradation). Setup merge installs both hooks, `zcodeHookConfigured` requires both + `hooks.enabled`, stop-only installs migrate idempotently. TC-1/2/3 pass; TC-4 decision = reject camel-only payloads (INVESTIGATION.md §6). Session-key derivation untouched (that is #62).
-4. ⏳ Fix #62 (`sess_`-prefixed session keys): owned by a parallel fix branch — not in this one.
+3. ✅ Fixes complete — PRs submitted (two parallel sub-agents, two worktrees, integrated by coordinator session):
+   - **PR [#65](https://github.com/colinleefish/rmb-desktop/pull/65)** — #61: UserPromptSubmit capture hook + sidecar pairing (branch `fix/zcode-61-user-prompt-capture`)
+   - **PR [#66](https://github.com/colinleefish/rmb-desktop/pull/66)** — #62: `zcodeRMBSessionID` key normalizer, no-migration per owner decision (branch `fix/zcode-62-session-key-normalize`, stacked on #65 — merge #65 first)
+   - Coordinator caught + fixed a semantic merge conflict (sidecar lookup vs key normalization) and verified the integrated stack: `make check` + `clean-check` green on both branches
 
 ## Next Steps
 
-1. Fix #62 per INVESTIGATION.md §2 (normalize key derivation + decide migration for 3 existing rows)
+1. Review + merge #65, then #66; after both land: bump VERSION, rebuild + reinstall locally so the new hooks go live; remove fix worktrees/panes
 2. WebUI refactor per `plan/webui-refactor.md` (week of 2026-08-31): F03 UX audit first
 3. F06 secrets → Keychain/env + key rotation (P3.5)
 4. Weekly sweep per AGENTS.md Observability

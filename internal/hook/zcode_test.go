@@ -300,3 +300,30 @@ func runSubmit(t *testing.T, source string, payload []byte, baseURL string) stri
 	}
 	return out.String()
 }
+
+// Regression: the capture→pair handoff must key on the raw payload session_id,
+// not on the stored session key (issue #62 normalizes keys to bare UUIDs while
+// the UserPromptSubmit capture hook and the Stop hook both see the raw
+// sess_-prefixed id). If the lookup is ever re-coupled to the session key,
+// prompts are silently dropped again (issue #61).
+func TestParseZCodePayload_PairingIndependentOfSessionKey(t *testing.T) {
+	if err := CaptureZCodePrompt([]byte(`{"session_id":"sess_ABC-123","prompt":"pairing is key-agnostic"}`)); err != nil {
+		t.Fatalf("capture: %v", err)
+	}
+
+	payload := map[string]any{
+		"session_id":             "sess_abc-123",
+		"cwd":                    "/tmp",
+		"last_assistant_message": "reply",
+		"hook_event_name":        "Stop",
+	}
+	raw, _ := json.Marshal(payload)
+
+	_, msgs, reason, err := ParseZCodePayload(raw)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(msgs) != 2 || msgs[0].Role != "user" || msgs[0].Content != "pairing is key-agnostic" {
+		t.Fatalf("pairing lost across key formats: reason=%q msgs=%v", reason, msgs)
+	}
+}

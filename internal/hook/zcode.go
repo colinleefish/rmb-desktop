@@ -88,7 +88,11 @@ func ParseZCodePayload(raw []byte) (sessionKey string, messages []uploadMessage,
 		return "", nil, "", fmt.Errorf("zcode payload: last_assistant_message is empty")
 	}
 
-	userText := takeCapturedZCodePrompt(sessionKey)
+	// Sidecar lookup is keyed on the raw payload id (zcodeSidecarKey), NOT on
+	// the stored sessionKey: both hooks receive the same raw session_id, while
+	// sessionKey is owned by key normalization (issue #62). Decoupling keeps
+	// capture→pairing correct regardless of how keys are derived.
+	userText := takeCapturedZCodePrompt(zcodeSidecarKey(p.SessionID))
 
 	out := make([]uploadMessage, 0, 2)
 	if userText != "" {

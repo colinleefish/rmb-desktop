@@ -22,7 +22,11 @@ func zcodePaths() (configPath, agentsMDPath string) {
 
 func previewZCode(def agentDef) (AgentState, error) {
 	configPath, agentsMDPath := zcodePaths()
-	cmd, err := hookCommand(def.HookSource)
+	stopCmd, err := hookCommand(def.HookSource)
+	if err != nil {
+		return AgentState{}, err
+	}
+	captureCmd, err := hookCaptureCommand(def.ID)
 	if err != nil {
 		return AgentState{}, err
 	}
@@ -31,7 +35,7 @@ func previewZCode(def agentDef) (AgentState, error) {
 	if err != nil {
 		return AgentState{}, err
 	}
-	proposedConfig, _, err := mergeZCodeHooks(currentConfig, cmd)
+	proposedConfig, _, err := mergeZCodeHooks(currentConfig, stopCmd, captureCmd)
 	if err != nil {
 		return AgentState{}, err
 	}
@@ -53,7 +57,8 @@ func previewZCode(def agentDef) (AgentState, error) {
 
 	warnings := []string{
 		"ZCode disables configuration-file hooks unless hooks.enabled is true — this sets it.",
-		"Restart ZCode (or start a new session) after applying so the hook takes effect.",
+		"Two hooks are installed: UserPromptSubmit captures your prompt, Stop uploads the turn.",
+		"Restart ZCode (or start a new session) after applying so the hooks take effect.",
 	}
 
 	artifacts := []Artifact{
@@ -61,7 +66,7 @@ func previewZCode(def agentDef) (AgentState, error) {
 			"config",
 			"Conversation capture",
 			configPath,
-			"Adds a Stop hook to ~/.zcode/cli/config.json (hooks.events.Stop) and enables hooks.enabled.",
+			"Adds UserPromptSubmit + Stop hooks to ~/.zcode/cli/config.json and enables hooks.enabled. ZCode's Stop payload carries no user prompt, so the capture hook parks it for pairing.",
 			currentConfig,
 			proposedConfig,
 			currentPretty,
@@ -100,7 +105,11 @@ func previewZCode(def agentDef) (AgentState, error) {
 func applyZCode(artifactID string) error {
 	configPath, agentsMDPath := zcodePaths()
 	def, _ := agentDefByID(AgentZCode)
-	cmd, err := hookCommand(def.HookSource)
+	stopCmd, err := hookCommand(def.HookSource)
+	if err != nil {
+		return err
+	}
+	captureCmd, err := hookCaptureCommand(def.ID)
 	if err != nil {
 		return err
 	}
@@ -111,7 +120,7 @@ func applyZCode(artifactID string) error {
 		if err != nil {
 			return err
 		}
-		proposed, _, err := mergeZCodeHooks(current, cmd)
+		proposed, _, err := mergeZCodeHooks(current, stopCmd, captureCmd)
 		if err != nil {
 			return err
 		}
@@ -132,22 +141,11 @@ func applyZCode(artifactID string) error {
 	}
 }
 
-// zcodeStopGroups returns the hooks.events.Stop list from ~/.zcode/cli/config.json.
-func zcodeStopGroups(root map[string]any) []any {
-	if hooks, ok := root["hooks"].(map[string]any); ok {
-		if events, ok := hooks["events"].(map[string]any); ok {
-			if stop, ok := events["Stop"].([]any); ok {
-				return stop
-			}
-		}
-	}
-	return nil
-}
-
-// zcodeHookConfigured reports whether the rmb Stop hook is registered AND
-// hooks.enabled is true. ZCode config-file hooks silently never run without
-// the latter, so "configured" must reflect the runnable state, not just
-// presence in events.Stop.
+// zcodeHookConfigured reports whether the rmb Stop hook AND the
+// UserPromptSubmit capture hook are registered AND hooks.enabled is true.
+// ZCode config-file hooks silently never run without the latter, and without
+// the capture hook turns upload assistant-only (ZCode's Stop payload carries
+// no user prompt), so "configured" must reflect the fully working state.
 func zcodeHookConfigured(current string) bool {
 	if strings.TrimSpace(current) == "" {
 		return false
@@ -164,7 +162,16 @@ func zcodeHookConfigured(current string) bool {
 	if !enabled {
 		return false
 	}
-	for _, item := range zcodeStopGroups(root) {
+	events, _ := hooks["events"].(map[string]any)
+	if events == nil {
+		return false
+	}
+	return zcodeEventHasRMBHook(events, "Stop") && zcodeEventHasRMBHook(events, "UserPromptSubmit")
+}
+
+func zcodeEventHasRMBHook(events map[string]any, event string) bool {
+	groups, _ := events[event].([]any)
+	for _, item := range groups {
 		m, ok := item.(map[string]any)
 		if !ok {
 			continue
@@ -184,12 +191,18 @@ func zcodeHookConfigured(current string) bool {
 	return false
 }
 
-// mergeZCodeHooks merges the rmb Stop hook into ~/.zcode/cli/config.json
-// while preserving every other setting (mcp, plugins, ...). It always sets
-// hooks.enabled: true, since ZCode ignores configuration-file hooks
-// otherwise. rmb hook commands are normalized to the canonical CLI command
-// (no env prefix): the CLI resolves its endpoint dynamically.
-func mergeZCodeHooks(current, cmd string) (string, bool, error) {
+// mergeZCodeHooks merges the rmb hooks into ~/.zcode/cli/config.json while
+// preserving every other setting (mcp, plugins, ...). Two hooks are needed:
+//
+//   - UserPromptSubmit → rmb hook-capture --agent=zcode, which parks the
+//     user's prompt (the Stop payload does not carry it);
+//   - Stop → rmb hook-submit --source=zcode, which pairs the parked prompt
+//     with the assistant reply and uploads the turn.
+//
+// It always sets hooks.enabled: true, since ZCode ignores configuration-file
+// hooks otherwise. rmb hook commands are normalized to the canonical CLI
+// command (no env prefix): the CLI resolves its endpoint dynamically.
+func mergeZCodeHooks(current, stopCmd, captureCmd string) (string, bool, error) {
 	root := map[string]any{}
 	if strings.TrimSpace(current) != "" {
 		if err := json.Unmarshal([]byte(current), &root); err != nil {
@@ -210,10 +223,23 @@ func mergeZCodeHooks(current, cmd string) (string, bool, error) {
 		hooks["events"] = events
 	}
 
-	stop, _ := events["Stop"].([]any)
+	stopConfigured := mergeZCodeEvent(events, "Stop", stopCmd)
+	captureConfigured := mergeZCodeEvent(events, "UserPromptSubmit", captureCmd)
+
+	out, err := json.MarshalIndent(root, "", "  ")
+	if err != nil {
+		return "", false, err
+	}
+	return string(out), stopConfigured && captureConfigured, nil
+}
+
+// mergeZCodeEvent normalizes (or appends) the rmb hook group for one event
+// and reports whether the event now carries an rmb hook.
+func mergeZCodeEvent(events map[string]any, event, cmd string) bool {
+	groups, _ := events[event].([]any)
 	var kept []any
 	configured := false
-	for _, item := range stop {
+	for _, item := range groups {
 		m, ok := item.(map[string]any)
 		if !ok {
 			kept = append(kept, item)
@@ -265,11 +291,6 @@ func mergeZCodeHooks(current, cmd string) (string, bool, error) {
 		})
 		configured = true
 	}
-	events["Stop"] = kept
-
-	out, err := json.MarshalIndent(root, "", "  ")
-	if err != nil {
-		return "", false, err
-	}
-	return string(out), configured, nil
+	events[event] = kept
+	return configured
 }

@@ -24,7 +24,7 @@ Last commit: 7454203 (main) | `make check`: passing | F01, F02, F07 passing.
 
 ## Blockers
 
-None.
+None. (Paused stash `WIP zcode two-hook fix` was consumed by the #61 fix branch; no longer pending.)
 
 ---
 

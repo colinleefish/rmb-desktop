@@ -30,6 +30,8 @@ func run() int {
 	switch os.Args[1] {
 	case "hook-submit":
 		return hookSubmit(os.Args[2:])
+	case "hook-capture":
+		return hookCapture(os.Args[2:])
 	case "search":
 		return search(os.Args[2:])
 	case "cat":
@@ -62,6 +64,34 @@ func run() int {
 		printUsage()
 		return 2
 	}
+}
+
+// hookCapture parks a UserPromptSubmit prompt so the matching Stop hook can
+// pair it with the assistant reply. Best-effort: always exit 0 so the agent
+// never sees a hook failure for a capture miss.
+func hookCapture(args []string) int {
+	fs := flag.NewFlagSet("hook-capture", flag.ExitOnError)
+	agent := fs.String("agent", "", "agent source (zcode)")
+	_ = fs.Parse(args)
+
+	if strings.TrimSpace(*agent) == "" {
+		fmt.Fprintln(os.Stderr, "hook-capture: --agent is required")
+		return 2
+	}
+	if *agent != "zcode" {
+		fmt.Fprintf(os.Stderr, "hook-capture: unsupported agent %q (zcode)\n", *agent)
+		return 2
+	}
+
+	stdin, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "hook-capture: read stdin: %v\n", err)
+		return 0 // best-effort: never fail the agent's hook run
+	}
+	if err := hook.CaptureZCodePrompt(stdin); err != nil {
+		fmt.Fprintf(os.Stderr, "hook-capture: %v\n", err)
+	}
+	return 0
 }
 
 func apiClient() (*client.Client, error) {
@@ -607,6 +637,7 @@ func printUsage() {
 func usageText() string {
 	return `Usage:
   rmb hook-submit --source=<cursor> [--url=http://127.0.0.1:19019]
+  rmb hook-capture --agent=zcode            # UserPromptSubmit sidecar capture
   rmb search "<query>" [--scope=memory,scene,skill,atom] [--k=n] [--since=<date|Nd>] [--until=<date|Nd>] [--no-boost]
   rmb ls <uri-prefix>            # list container contents (e.g. rmb://events/)
   rmb ls <uri-prefix> [--limit=N] [--offset=N] [--since=<date|7d>] [--until=<date|7d>] [--count] [--by=updated]

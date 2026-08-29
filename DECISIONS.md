@@ -16,3 +16,4 @@ One line per resolved decision. Pointer = where the full rationale lives. Append
 | 2026-08-24 | `make check` (vet+build+test+eval) is the repo's consistent-state predicate | AGENTS.md, #55 |
 | 2026-08-24 | Plans move to `plan/done/` when complete (tauri-to-go-shell first) | repo convention |
 | 2026-08-28 | ZCode added as a 7th supported agent integration; config lives at `~/.zcode/cli/config.json` (`hooks.events.Stop`, forces `hooks.enabled: true`), recall block at `~/.zcode/AGENTS.md` | feature_list.json F07 |
+| 2026-08-29 | #62 ZCode session keys: normalize at parse time only (`zcodeRMBSessionID`); NO backfill migration — owner is the sole ZCode user, 3 legacy `sess_…` rows accepted as orphaned | `internal/hook/zcode.go`, `docs/audit/2026-08-29-zcode-capture-bugs/INVESTIGATION.md` §5.1 |

@@ -7,7 +7,13 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
+
+// zcodeSessionNamespace maps non-reducible ZCode session ids to deterministic
+// rmb UUIDs (uuid5), mirroring opencodeSessionNamespace in opencode.go.
+var zcodeSessionNamespace = uuid.MustParse("9f3c7b2a-5d41-4e68-a7c9-2b4d6e8f1a3c")
 
 // ZCode hook contract (verified against ZCode's CLI bundle, glm/zcode.cjs —
 // createClaudeCompatibleHookStdin / formatClaudeTranscript):
@@ -78,9 +84,9 @@ func ParseZCodePayload(raw []byte) (sessionKey string, messages []uploadMessage,
 		return "", nil, "", fmt.Errorf("decode zcode payload: %w", err)
 	}
 
-	sessionKey = strings.ToLower(strings.TrimSpace(p.SessionID))
-	if sessionKey == "" {
-		return "", nil, "", fmt.Errorf("zcode payload missing session_id")
+	sessionKey, err = zcodeRMBSessionID(p.SessionID)
+	if err != nil {
+		return "", nil, "", err
 	}
 
 	assistant := strings.TrimSpace(p.LastAssistantMessage)
@@ -216,4 +222,30 @@ func zcodeSweepStalePrompts(dir string) {
 			_ = os.Remove(filepath.Join(dir, e.Name()))
 		}
 	}
+}
+
+// zcodeRMBSessionID normalizes ZCode's native session ids to the bare-UUID
+// form every other agent stores (issue #62). ZCode uses sess_<uuid> for
+// interactive sessions and sess_subagent_agent_<uuid> for subagent children.
+//
+// The function is total: valid UUID out for ANY non-empty input. Bare UUIDs
+// pass through canonicalized; a sess_ prefix is stripped only when the
+// remainder is a valid UUID (a pure strip is NOT total — the subagent form
+// does not reduce to a UUID); anything else derives a deterministic uuid5,
+// so the same native id always maps to the same stored session.
+func zcodeRMBSessionID(raw string) (string, error) {
+	sessionID := strings.TrimSpace(raw)
+	if sessionID == "" {
+		return "", fmt.Errorf("zcode payload missing session_id")
+	}
+	if parsed, err := uuid.Parse(sessionID); err == nil {
+		return strings.ToLower(parsed.String()), nil
+	}
+	if rest, ok := strings.CutPrefix(strings.ToLower(sessionID), "sess_"); ok {
+		if parsed, err := uuid.Parse(rest); err == nil {
+			return strings.ToLower(parsed.String()), nil
+		}
+	}
+	derived := uuid.NewSHA1(zcodeSessionNamespace, []byte("zcode:"+sessionID))
+	return strings.ToLower(derived.String()), nil
 }

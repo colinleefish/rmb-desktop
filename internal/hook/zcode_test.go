@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/google/uuid"
 )
 
 func TestIsZCodePayload(t *testing.T) {
@@ -58,6 +60,98 @@ func TestIsZCodePayload(t *testing.T) {
 	}
 }
 
+// TestZcodeRMBSessionID covers the session-key normalization for issue #62
+// (INVESTIGATION §4 TC-5, TC-6): bare UUIDs pass through canonicalized, the
+// sess_ prefix is stripped when the remainder is a valid UUID, and any other
+// id gets a deterministic uuid5 derive (total function).
+func TestZcodeRMBSessionID(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{
+			"bare uuid passthrough",
+			"f9c1b16f-b6d1-4bd3-adb0-d0212af43158",
+			"f9c1b16f-b6d1-4bd3-adb0-d0212af43158",
+		},
+		{
+			"uppercase uuid canonicalized",
+			"F9C1B16F-B6D1-4BD3-ADB0-D0212AF43158",
+			"f9c1b16f-b6d1-4bd3-adb0-d0212af43158",
+		},
+		{
+			"sess_ prefix stripped (interactive session id)",
+			"sess_f9c1b16f-b6d1-4bd3-adb0-d0212af43158",
+			"f9c1b16f-b6d1-4bd3-adb0-d0212af43158",
+		},
+		{
+			"uppercase sess_ prefix stripped",
+			"SESS_F9C1B16F-B6D1-4BD3-ADB0-D0212AF43158",
+			"f9c1b16f-b6d1-4bd3-adb0-d0212af43158",
+		},
+		{
+			"subagent id falls back to deterministic uuid5",
+			"sess_subagent_agent_a6f1b071-e073-411c-81d4-04f787791151",
+			"d7d0e347-8296-59f1-8ea7-fcadec2dbacb",
+		},
+		{
+			"garbage input falls back to deterministic uuid5",
+			"abc-123",
+			"93823071-8a64-5a8c-9c7b-381ecffa23ba",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := zcodeRMBSessionID(tt.in)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.want {
+				t.Fatalf("zcodeRMBSessionID(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+
+	for _, in := range []string{"", "   ", "\t\n"} {
+		if _, err := zcodeRMBSessionID(in); err == nil || !strings.Contains(err.Error(), "missing session_id") {
+			t.Fatalf("zcodeRMBSessionID(%q) error = %v, want missing session_id", in, err)
+		}
+	}
+}
+
+// TestZcodeRMBSessionID_Deterministic locks in TC-6's totality contract:
+// the same native id always maps to the same stored session, and different
+// ids never collide (uuid5 derive is a pure function of the input).
+func TestZcodeRMBSessionID_Deterministic(t *testing.T) {
+	inputs := []string{
+		"sess_subagent_agent_a6f1b071-e073-411c-81d4-04f787791151",
+		"sess_subagent_agent_f9c1b16f-b6d1-4bd3-adb0-d0212af43158",
+		"abc-123",
+	}
+	for _, in := range inputs {
+		first, err := zcodeRMBSessionID(in)
+		if err != nil {
+			t.Fatalf("%q: unexpected error: %v", in, err)
+		}
+		second, err := zcodeRMBSessionID(in)
+		if err != nil {
+			t.Fatalf("%q: unexpected error: %v", in, err)
+		}
+		if first != second {
+			t.Fatalf("%q: not deterministic: %q vs %q", in, first, second)
+		}
+		if _, err := uuid.Parse(first); err != nil {
+			t.Fatalf("%q: derived key %q is not a valid UUID: %v", in, first, err)
+		}
+	}
+	a, _ := zcodeRMBSessionID(inputs[0])
+	b, _ := zcodeRMBSessionID(inputs[1])
+	if a == b {
+		t.Fatalf("distinct inputs derived the same key %q", a)
+	}
+}
+
 func TestParseZCodePayload_WithUserAndAssistant(t *testing.T) {
 	transcriptPath := filepath.Join(t.TempDir(), "session.jsonl")
 	rawTranscript := strings.Join([]string{
@@ -70,7 +164,7 @@ func TestParseZCodePayload_WithUserAndAssistant(t *testing.T) {
 	}
 
 	payload := map[string]any{
-		"session_id":             "abc-123",
+		"session_id":             "Sess_A2FBEA3F-E073-411C-81D4-04F787791151",
 		"transcript_path":        transcriptPath,
 		"cwd":                    "/tmp",
 		"last_assistant_message": "Go is a compiled language.",
@@ -83,7 +177,7 @@ func TestParseZCodePayload_WithUserAndAssistant(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if sid != "abc-123" {
+	if sid != "a2fbea3f-e073-411c-81d4-04f787791151" {
 		t.Fatalf("session_id = %q", sid)
 	}
 	if reason != "user from transcript + assistant from payload" {
@@ -181,7 +275,7 @@ func TestSubmit_ZCode_UploadsToAPI(t *testing.T) {
 
 	payload := map[string]any{
 		"hook_event_name":        "Stop",
-		"session_id":             "abc-123",
+		"session_id":             "sess_f9c1b16f-b6d1-4bd3-adb0-d0212af43158",
 		"transcript_path":        transcriptPath,
 		"cwd":                    "/tmp",
 		"last_assistant_message": "zcode reply",
@@ -200,7 +294,7 @@ func TestSubmit_ZCode_UploadsToAPI(t *testing.T) {
 		t.Fatalf("Submit: %v", err)
 	}
 
-	if gotPath != "/api/v1/sessions/abc-123/upload" {
+	if gotPath != "/api/v1/sessions/f9c1b16f-b6d1-4bd3-adb0-d0212af43158/upload" {
 		t.Fatalf("path = %q", gotPath)
 	}
 	if gotBody.Source != "zcode" {

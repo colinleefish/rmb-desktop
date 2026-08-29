@@ -10,11 +10,13 @@ Last commit: 7454203 (main) | `make check`: passing | F01, F02, F07 passing.
 
 1. ✅ Issues filed: [#61](https://github.com/colinleefish/rmb-desktop/issues/61) (assistant-only turns), [#62](https://github.com/colinleefish/rmb-desktop/issues/62) (`sess_`-prefixed session keys)
 2. ✅ Investigation complete: `docs/audit/2026-08-29-zcode-capture-bugs/INVESTIGATION.md` (root causes verified against the installed ZCode client bundle, not docs; deterministic repro; test matrix TC-1…TC-7; fixer handoff §5)
-3. ⏳ Fix: NOT started — handed off to the fixing agent. A paused direct-fix attempt is stashed on branch `fix/zcode-user-prompt-capture` (see INVESTIGATION.md §5.4).
+3. ⏳ Fix in flight (parallel worktrees per `plan/parallel-work-and-versioning.md`):
+   - **#62** — fix complete on branch `fix/zcode-62-session-key-normalize` (worktree `rmb-desktop-fix-62`): `zcodeRMBSessionID` total normalizer + migration `00014_zcode_session_key_normalize.sql` + tests; TC-5/TC-6/TC-7 pass; `make check` green. Awaiting merge to main.
+   - **#61** — owned by a parallel agent (message pairing / UserPromptSubmit capture); do not touch `ParseZCodePayload` pairing logic, `internal/setup/*`, `cmd/rmb/main.go` until it lands.
 
 ## Next Steps
 
-1. Fixing agent: implement per INVESTIGATION.md (acceptance = TC-1…TC-7), branch + worktree per `plan/parallel-work-and-versioning.md`
+1. Merging agent: land `fix/zcode-62-session-key-normalize` (#62), then #61's branch; both touch `internal/hook/zcode.go` — merge commits keep provenance
 2. WebUI refactor per `plan/webui-refactor.md` (week of 2026-08-31): F03 UX audit first
 3. F06 secrets → Keychain/env + key rotation (P3.5)
 4. Weekly sweep per AGENTS.md Observability

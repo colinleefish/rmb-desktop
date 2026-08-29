@@ -5,7 +5,7 @@
 
 1. **Build passes** — `go build` (with sqlite_fts5 tags) succeeds.
 2. **Tests pass** — `go test ./...` green (eval gate + check-arch live in `make check`; run that for the full predicate).
-3. **Feature list updated** — `feature_list.json` valid; ≤1 active feature; every `passing` feature carries evidence.
+3. **State files updated** — `feature_list.json` valid (≤1 active feature; every `passing` feature carries evidence) and `bug_list.json` valid (≤1 bug `fixing`; every `passing` bug carries evidence; states in the five-state machine).
 4. **No debug artifacts** — no `.orig/.rej/.swp/.DS_Store` tracked or left in the tree; no `fmt.Print*` outside cmd/ (R5).
 5. **Startup path works** — embedded webui present (`internal/http/static/web/index.html`); `bin/` binaries either current or absent (never stale).
 

@@ -15,7 +15,7 @@
 | `internal/config` | C | B | C | B | C | **secrets still plaintext in config.yaml — P3.5 open (F06)** |
 | `cmd/*` | B | A | B | A | B | thin entrypoints |
 | `webui/` | D | C | C | B | C | **known-weak: 604-line SettingsPage, tier-based nav, mock dead weight — refactor planned (F03–F05, plan/webui-refactor.md)** |
-| `internal/db` | A | B | B | A | B | goose SQL migrations embedded; upgrade-scenario tests (00008, 00014 idempotent backfills) |
+| `internal/db` | A | B | B | A | B | goose SQL migrations embedded; upgrade-scenario tests (00008) |
 | harness (Makefile/scripts/.harness) | B | A | A | A | A | this refactor (#53–#58); audit 7/7 critical |
 | `internal/hook`, `internal/setup` (agent integrations) | A | B | B | A | B | cursor/cc/codex/opencode/pi/workbuddy/zcode; #62 session-key normalization mirrors opencode precedent with total-function tests; ZCode payload shape (F07) inferred from local zcode-guide skill docs, not a captured live Stop hook payload — flag if it needs correction |
 

@@ -42,6 +42,7 @@ Each rule carries a `source:` — do not remove a rule without addressing its so
 | `PROGRESS.md` | Current state, in-progress, next steps, blockers — update every clock-out |
 | `DECISIONS.md` | Resolved decisions + rationale, one line each, pointer to the full plan |
 | `feature_list.json` | Machine-readable feature states + verification + evidence (see #56) |
+| `bug_list.json` | Machine-readable bug states (three-phase workflow, schema `bug_list.schema.json`, gates `make bug-state` / `make verify-bug`) |
 | `plan/*.md` | Active plans; `plan/done/` = completed |
 | `docs/audit/` | Audit reports feeding plans |
 
@@ -78,11 +79,29 @@ Layer model: `cmd/` thin entrypoints (user-facing CLI output lives here) → `in
 - Granularity: each feature must be completable in one session. If it spans sessions, split it.
 - New features get an entry (with verification layers) *before* implementation starts.
 
+## Bug workflow (three-phase, issue #63)
+
+Bugs live in `bug_list.json` (schema: `bug_list.schema.json`; gates: `scripts/verify-bug.sh`). Every bug = one GitHub issue + one entry. **One phase = one agent session**; phases 1 and 2 exist to hand the fixer enough context that phase 3 never re-investigates.
+
+State machine: `reported → investigating → diagnosed → fixing → passing` — advance with `make bug-state B=<id> S=<state>` (gated, adjacent transitions only); `passing` only via `make verify-bug B=<id>`, **never by hand** (same rule as features). Run the gates inside the bug's worktree.
+
+1. **Triage** (anyone): file the issue — title `bug(<scope>): <symptom>` (flaky tests: `flaky: <TestName> <behavior>`), labels `bug` + `area/<scope>` + `sev-high|sev-medium|sev-low` — then add the entry to `bug_list.json` (state `reported`). Fill `templates/bug-report.md` as the issue body; humans get the same form at `.github/ISSUE_TEMPLATE/bug.md`, and the triage agent normalizes title/labels/entry.
+2. **Investigation** (dedicated session): claim (`→ investigating`), create the branch `fix/B<nn>-<slug>` + worktree, then produce `docs/bugs/B<nn>-investigation.md` from `templates/bug-investigation.md` **plus a regression test that fails on unfixed code** (tag it `// B<nn>`; record `regression {file, cmd}` on the entry). The `→ diagnosed` gate runs the regression and **requires it to fail** — a passing test means the bug was not reproduced. Investigation artifacts live on the bug branch so main never carries a red test.
+3. **Fix** (new session, same branch): read the investigation doc, make the regression green, fill a sprint contract, then `make verify-bug B=<id>` (runs the entry's L1/L2/L3) → `passing`. Merge via PR with a green `pr-check` (F09). After merge: close the issue and append `issue closed` to the entry's evidence.
+
+Rules:
+
+- **Bug WIP**: at most one bug in `fixing` (enforced by the gate). Bugs do NOT count against feature WIP=1 — prod fixes may interleave with an active feature; path collisions are settled by the §2.5 ownership table in `plan/parallel-work-and-versioning.md`.
+- Backfilled entries may point `investigation` at pre-convention docs (e.g. `docs/audit/...`); the field is authoritative.
+
+Scope ↔ module map (extend as needed): `zcode`→`internal/hook`, `worker`→`internal/worker`, `recall`→`internal/recall`, `db`→`internal/db`, `cli`→`cmd/rmb`, `update`→`internal/update`, `webui`→`webui/`, `shell`→`cmd/rmb-app`.
+
 ## Tools
 
-- Build/test: `make` targets only (`check`, `test`, `eval`, `build`, `dev`, `setup`) — do not invoke raw go/npm commands that bypass the pipeline.
+- Build/test: `make` targets only (`check`, `test`, `eval`, `build`, `dev`, `setup`, `verify-bug`, `bug-state`) — do not invoke raw go/npm commands that bypass the pipeline.
+- GitHub access goes through the local proxy: `bash scripts/with-proxy.sh gh ...` / `bash scripts/with-proxy.sh git fetch` (issue/label for the bug workflow, pr/run/api for the CI gate).
 - Release pipeline: `make release VERSION=x.y.z` — see `.cursor/rules/release.mdc`; run it yourself when asked, credentials from `~/.rmb/release.env`.
-- Tool permissions: `.claude/settings.json` scopes agent tooling (git/make/go allowed; destructive ops denied).
+- Tool permissions: `.claude/settings.json` scopes agent tooling (git/make/go/gh allowed; destructive ops denied).
 - No MCP servers are wired for this repo yet; add them to `.mcp.json` + document here first.
 
 ## Topic docs

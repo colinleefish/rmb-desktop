@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"sync"
 	"testing"
 )
@@ -21,6 +22,11 @@ func testManifest(version string) *Manifest {
 			},
 			"windows": {
 				"amd64": {Sidecars: "rmb-desktop_" + version + "_windows_amd64.zip", SHA256: "bb"},
+			},
+			// Cover the CURRENT runtime too so Check() resolves on any GOOS
+			// (fixture was macos/windows-only; caught by the Linux CI, 2026-08-29).
+			platformKey(): {
+				archKey(): {Sidecars: "rmb-desktop_" + version + "_" + runtime.GOOS + "_" + runtime.GOARCH + ".tar.gz", SHA256: "cc"},
 			},
 		},
 	}
@@ -124,7 +130,7 @@ func TestCheckAgainstTestServer(t *testing.T) {
 	if rel.Manifest.Version != "0.9.0" {
 		t.Fatalf("version = %s", rel.Manifest.Version)
 	}
-	if want := srv.URL + "/rmb-desktop_0.9.0_darwin_arm64.tar.gz"; rel.BundleURL() != want {
+	if want := srv.URL + "/rmb-desktop_0.9.0_" + runtime.GOOS + "_" + runtime.GOARCH + ".tar.gz"; rel.BundleURL() != want {
 		t.Fatalf("bundle url = %s, want %s", rel.BundleURL(), want)
 	}
 

@@ -111,6 +111,7 @@ func TestZCodeHookConfigured(t *testing.T) {
 }
 
 func TestPreviewZCodeDetected(t *testing.T) {
+	fakeRMBHome(t)
 	def, _ := agentDefByID(AgentZCode)
 	state, err := previewZCode(def)
 	if err != nil {

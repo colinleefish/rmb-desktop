@@ -5,6 +5,7 @@ import { codexIntegration } from "./codex";
 import { opencodeIntegration } from "./opencode";
 import { piIntegration } from "./pi";
 import { workbuddyIntegration } from "./workbuddy";
+import { zcodeIntegration } from "./zcode";
 
 export const INTEGRATIONS: IntegrationDefinition[] = [
   cursorIntegration,
@@ -13,6 +14,7 @@ export const INTEGRATIONS: IntegrationDefinition[] = [
   opencodeIntegration,
   piIntegration,
   workbuddyIntegration,
+  zcodeIntegration,
 ];
 
 export function getIntegration(id: IntegrationAgentId): IntegrationDefinition | undefined {

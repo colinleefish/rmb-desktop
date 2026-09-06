@@ -1,8 +1,8 @@
-.PHONY: setup check test eval e2e dev vcr verify-feature build build-all run-rmbd run-hook tidy app-dev app-build app-build-windows app-install webui-dev webui-build webui-embed-check icons-sync build-windows-sidecars notarize release release-upload release-publish
+.PHONY: setup check test eval e2e dev vcr verify-feature verify-bug bug-state build build-all run-rmbd run-hook tidy app-dev app-build app-build-windows app-install webui-dev webui-build webui-embed-check icons-sync build-windows-sidecars notarize release release-upload release-publish
 
 GO_TAGS := sqlite_fts5
 EMBED_INDEX := internal/http/static/web/index.html
-VERSION ?= 0.2.10-dev.0
+VERSION ?= 0.2.10-dev.1
 COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 GO_LDFLAGS := -X github.com/colinleefish/rmb-desktop/internal/version.Version=$(VERSION) -X github.com/colinleefish/rmb-desktop/internal/version.Commit=$(COMMIT)
 
@@ -45,6 +45,20 @@ vcr:
 	passing=$$(jq '[.features[] | select(.state=="passing")] | length' feature_list.json); \
 	if [ $$((active + passing)) -eq 0 ]; then echo "VCR: no features activated yet"; \
 	else echo "VCR: $$passing/$$((active+passing)) (passing/activated)"; fi
+
+# ── Harness: bug workflow gate (F08, issue #63) ──────────────────────────────
+# Three-phase bug track, mirror of the feature gate. Full rules: AGENTS.md "Bug workflow".
+# State machine: reported → investigating → diagnosed → fixing → passing.
+verify-bug:
+	@test -n "$(B)" || (echo "usage: make verify-bug B=<id>  (no B to list)"; bash scripts/verify-bug.sh --list; exit 1)
+	bash scripts/verify-bug.sh "$(B)"
+
+# Gated adjacent transition. S=diagnosed runs the regression test and requires
+# it to FAIL on unfixed code; S=fixing enforces bug WIP=1. Run in the bug's worktree.
+bug-state:
+	@test -n "$(B)" && test -n "$(S)" || (echo "usage: make bug-state B=<id> S=<investigating|diagnosed|fixing>"; exit 1)
+	bash scripts/verify-bug.sh "$(B)" --state "$(S)"
+
 # Offline recall regression gate (issue #22). Deterministic hash-embedder eval
 # over the committed golden fixture; fails the build if recall metrics regress.
 eval:

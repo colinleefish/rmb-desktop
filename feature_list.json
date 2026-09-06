@@ -150,6 +150,58 @@
           "repair": "Live keys still in config.yaml — complete the migration then rotate keys per P3.5."
         }
       ]
+    },
+    {
+      "id": "F07",
+      "name": "zcode-agent-integration",
+      "behavior": "ZCode added as a supported agent integration: internal/hook (Stop payload parsing, Claude-compatible transcript shape), internal/setup (~/.zcode/cli/config.json hooks.events.Stop merge + hooks.enabled gate, ~/.zcode/AGENTS.md recall block), webui/src/integrations/zcode (setup panel wired into the registry), i18n strings, format.ts source labels",
+      "verification": "go test ./internal/hook/... ./internal/setup/... passes with zcode cases; webui build succeeds with zcode integration registered; make check exits 0",
+      "state": "passing",
+      "evidence": "commit d14cadd, verified 2026-08-28",
+      "issue": 0,
+      "layers": [
+        {
+          "label": "L1 static",
+          "cmd": "go build -tags sqlite_fts5 ./... && cd webui && npx tsc -b",
+          "repair": "Go or TypeScript compile error in the zcode integration files — fix the reported error."
+        },
+        {
+          "label": "L2 runtime",
+          "cmd": "go test -tags sqlite_fts5 ./internal/hook/... ./internal/setup/... -run ZCode -v",
+          "repair": "A zcode-specific hook/setup test is failing — inspect the payload/config-merge logic in internal/hook/zcode.go or internal/setup/zcode.go."
+        },
+        {
+          "label": "L3 system",
+          "cmd": "make check",
+          "repair": "Full pipeline red after wiring in zcode — run make check locally and fix the failing stage (vet/build/test/eval/check-arch)."
+        }
+      ]
+    },
+    {
+      "id": "F08",
+      "name": "bug-workflow-track",
+      "behavior": "Three-phase bug workflow mirroring the feature track: bug_list.json + bug_list.schema.json (states reported→investigating→diagnosed→fixing→passing), scripts/verify-bug.sh with gated transitions (diagnosed requires a failing regression test; bug WIP=1 on fixing), bug templates + GitHub issue template, AGENTS.md Bug workflow section, clean-state D3 extended, open bugs #61/#62/#15 backfilled as B01–B03",
+      "verification": "make verify-bug lists bugs and refuses illegal transitions; make bug-state B=<id> S=<state> enforces gates; make check green with bug_list validated",
+      "state": "passing",
+      "evidence": "commit d7d9554, verified 2026-08-29",
+      "issue": 63,
+      "layers": [
+        {
+          "label": "L1 static",
+          "cmd": "bash -n scripts/verify-bug.sh && test -f templates/bug-report.md && test -f templates/bug-investigation.md && test -f .github/ISSUE_TEMPLATE/bug.md && test -f bug_list.schema.json && jq -e '(.bugs | length) == 3 and all(.bugs[]; (.id | test(\"^B[0-9]{2,}$\")) and (.issue | type == \"number\") and (.layers | length >= 3))' bug_list.json",
+          "repair": "Missing template/schema, syntax error in verify-bug.sh, or bug_list.json entries lack required fields — see bug_list.schema.json and AGENTS.md Bug workflow."
+        },
+        {
+          "label": "L2 runtime",
+          "cmd": "bash scripts/verify-bug.sh --list && ! bash scripts/verify-bug.sh B01 --state fixing && ! bash scripts/verify-bug.sh B99 --state investigating",
+          "repair": "Gate logic broken: --list must exit 0; a state-skip (reported→fixing) and an unknown id must both be refused — read scripts/verify-bug.sh adjacency/gate code."
+        },
+        {
+          "label": "L3 system",
+          "cmd": "make check",
+          "repair": "Full pipeline red: run make check locally, fix the failing stage (now includes bug_list.json validity via clean-state D3 wiring)."
+        }
+      ]
     }
   ]
 }

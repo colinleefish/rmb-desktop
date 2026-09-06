@@ -1,0 +1,84 @@
+{
+  "bugs": [
+    {
+      "id": "B01",
+      "title": "bug(zcode): captured turns are assistant-only — user prompts are never recorded",
+      "issue": 61,
+      "severity": "high",
+      "module": "internal/hook",
+      "state": "reported",
+      "reported": "2026-08-29",
+      "investigation": "docs/audit/2026-08-29-zcode-capture-bugs/INVESTIGATION.md",
+      "layers": [
+        {
+          "label": "L1 static",
+          "cmd": "jq -e --arg id \"B01\" '(.bugs[] | select(.id == $id) | .issue) == 61 and (.bugs[] | select(.id == $id) | .regression.file | test(\"_test\\\\.go$\"))' bug_list.json",
+          "repair": "B01 entry lost its issue linkage or regression file — check bug_list.json against bug_list.schema.json."
+        },
+        {
+          "label": "L2 runtime",
+          "cmd": "c=$(jq -r '.bugs[] | select(.id == \"B01\") | .regression.cmd // empty' bug_list.json); test -n \"$c\" && bash -c \"$c\"",
+          "repair": "Phase-2 regression test not green yet — read docs/audit/2026-08-29-zcode-capture-bugs/INVESTIGATION.md (root cause + test matrix) and finish the fix."
+        },
+        {
+          "label": "L3 system",
+          "cmd": "make check",
+          "repair": "Full pipeline red: run make check locally, fix the failing stage."
+        }
+      ]
+    },
+    {
+      "id": "B02",
+      "title": "bug(zcode): session keys are sess_-prefixed slugs instead of the exact UUID (inconsistent with all other agents)",
+      "issue": 62,
+      "severity": "medium",
+      "module": "internal/hook",
+      "state": "reported",
+      "reported": "2026-08-29",
+      "investigation": "docs/audit/2026-08-29-zcode-capture-bugs/INVESTIGATION.md",
+      "layers": [
+        {
+          "label": "L1 static",
+          "cmd": "jq -e --arg id \"B02\" '(.bugs[] | select(.id == $id) | .issue) == 62 and (.bugs[] | select(.id == $id) | .regression.file | test(\"_test\\\\.go$\"))' bug_list.json",
+          "repair": "B02 entry lost its issue linkage or regression file — check bug_list.json against bug_list.schema.json."
+        },
+        {
+          "label": "L2 runtime",
+          "cmd": "c=$(jq -r '.bugs[] | select(.id == \"B02\") | .regression.cmd // empty' bug_list.json); test -n \"$c\" && bash -c \"$c\"",
+          "repair": "Phase-2 regression test not green yet — read docs/audit/2026-08-29-zcode-capture-bugs/INVESTIGATION.md (root cause + test matrix) and finish the fix."
+        },
+        {
+          "label": "L3 system",
+          "cmd": "make check",
+          "repair": "Full pipeline red: run make check locally, fix the failing stage."
+        }
+      ]
+    },
+    {
+      "id": "B03",
+      "title": "Tray keeps offering an update that is already installed (check compares feed against shell version, not installed sidecars)",
+      "issue": 15,
+      "severity": "medium",
+      "module": "internal/update",
+      "state": "reported",
+      "reported": "2026-08-29",
+      "layers": [
+        {
+          "label": "L1 static",
+          "cmd": "jq -e --arg id \"B03\" '(.bugs[] | select(.id == $id) | .issue) == 15 and (.bugs[] | select(.id == $id) | .regression.file | test(\"_test\\\\.go$\"))' bug_list.json",
+          "repair": "B03 entry lost its issue linkage or regression file — check bug_list.json against bug_list.schema.json."
+        },
+        {
+          "label": "L2 runtime",
+          "cmd": "c=$(jq -r '.bugs[] | select(.id == \"B03\") | .regression.cmd // empty' bug_list.json); test -n \"$c\" && bash -c \"$c\"",
+          "repair": "No regression yet — B03 still needs a phase-2 investigation (root cause is hypothesized in the issue title, not verified)."
+        },
+        {
+          "label": "L3 system",
+          "cmd": "make check",
+          "repair": "Full pipeline red: run make check locally, fix the failing stage."
+        }
+      ]
+    }
+  ]
+}

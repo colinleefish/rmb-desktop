@@ -1,6 +1,7 @@
 package setup
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -39,7 +40,20 @@ func hookCommand(source string) (string, error) {
 	return strings.TrimSpace(bin) + " hook-submit --source=" + source, nil
 }
 
+// hookCaptureCommand returns the UserPromptSubmit capture command for an
+// agent whose Stop payload lacks the user prompt (currently ZCode only).
+func hookCaptureCommand(id AgentID) (string, error) {
+	if id != AgentZCode {
+		return "", fmt.Errorf("no prompt capture hook for agent %q", id)
+	}
+	bin, err := RMBPath()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(bin) + " hook-capture --agent=" + string(id), nil
+}
+
 func isRMBHookCommand(cmd string) bool {
 	c := strings.ToLower(strings.TrimSpace(cmd))
-	return strings.Contains(c, "rmb hook-submit")
+	return strings.Contains(c, "rmb hook-submit") || strings.Contains(c, "rmb hook-capture")
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -73,7 +74,7 @@ func (s *Service) Upload(ctx context.Context, in UploadInput) (UploadResult, err
 	err = tx.QueryRowContext(ctx,
 		`SELECT id FROM sessions WHERE session_key = ?`, sessionKey,
 	).Scan(&sessionID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		sessionID = uuid.NewString()
 		_, err = tx.ExecContext(ctx, `
 			INSERT INTO sessions (id, session_key, source, created_at, updated_at)

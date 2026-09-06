@@ -1,12 +1,14 @@
 package memory
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"regexp"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -195,11 +197,8 @@ func (w *Worker) rollup(ctx context.Context) error {
 		if ctx.Err() != nil {
 			break
 		}
-		bucket := bucket
-		wg.Add(1)
 		sem <- struct{}{}
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			defer func() { <-sem }()
 
 			srcScenes := sourceSceneURIsFor(bucket, index)
@@ -258,7 +257,7 @@ func (w *Worker) rollup(ctx context.Context) error {
 				}
 				return
 			}
-		}()
+		})
 	}
 	wg.Wait()
 
@@ -420,7 +419,7 @@ func (w *Worker) bucketUnchanged(ctx context.Context, bucket Bucket, srcScenes, 
 		SELECT source_scene_uris, source_correction_uris, category, COALESCE(source_atom_hash, '')
 		FROM memories WHERE uri = ? AND superseded_at IS NULL`, bucket.URI,
 	).Scan(&sourceScenesJSON, &sourceCorrJSON, &category, &storedHash)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
 	}
 	if err != nil {
@@ -516,7 +515,7 @@ func (w *Worker) persistMemory(ctx context.Context, bucket Bucket, pm ParsedMemo
 		SELECT id, COALESCE(body, ''), version FROM memories
 		WHERE uri = ? AND superseded_at IS NULL`, bucket.URI,
 	).Scan(&activeID, &activeBody, &version)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		// Pre-insert incumbent check (issue #27 task 3): before minting a new
 		// subject slug, look for an existing same-category active that IS the
 		// same subject (deterministic slug normalization, optionally backed
@@ -639,7 +638,9 @@ func (w *Worker) findIncumbent(ctx context.Context, bucket Bucket, pm ParsedMemo
 	}
 	if len(bySlug) > 0 {
 		// Deterministic: lowest URI wins ties.
-		sort.Slice(bySlug, func(i, j int) bool { return bySlug[i].uri < bySlug[j].uri })
+		slices.SortFunc(bySlug, func(a, b incumbent) int {
+			return cmp.Compare(a.uri, b.uri)
+		})
 		return bySlug[0], nil
 	}
 
@@ -686,7 +687,7 @@ func (w *Worker) mergeIntoIncumbent(ctx context.Context, tx *sql.Tx, bucket Buck
 func storedEmbedding(ctx context.Context, database *sql.DB, id string) ([]float32, int, error) {
 	var blob []byte
 	err := database.QueryRowContext(ctx, `SELECT embedding FROM memories WHERE id = ?`, id).Scan(&blob)
-	if err == sql.ErrNoRows || err != nil {
+	if err != nil {
 		return nil, 0, err
 	}
 	if len(blob) == 0 {

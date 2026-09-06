@@ -1,7 +1,6 @@
 package browse_test
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -27,7 +26,7 @@ func TestSearchWhereDoesNotBypassFilters(t *testing.T) {
 	// A query whose LIKE terms match the superseded row too ("rmb" is in
 	// its slug/body) must still return only the active version, and must
 	// not pull rows from other categories.
-	page, err := svc.ListMemories(context.Background(), browse.ListParams{
+	page, err := svc.ListMemories(t.Context(), browse.ListParams{
 		Limit: 25, Query: "rmb", Category: "entities", Sort: "updated", Order: "desc",
 	})
 	if err != nil {
@@ -46,7 +45,7 @@ func TestSearchWhereDoesNotBypassFilters(t *testing.T) {
 		('s-new', 'rmb://skills/demo', 'demo', 'Demo', 'new', 2, 'x', NULL, 2, 2),
 		('s-plain', 'rmb://skills/plain', 'plain', 'Plain', 'zzz', 1, 'x', NULL, 3, 3)`,
 		now)
-	skillPage, err := svc.ListSkills(context.Background(), browse.ListParams{Limit: 25, Query: "demo"})
+	skillPage, err := svc.ListSkills(t.Context(), browse.ListParams{Limit: 25, Query: "demo"})
 	if err != nil {
 		t.Fatalf("ListSkills with query: %v", err)
 	}
@@ -72,7 +71,7 @@ func TestSearchIgnoresURIScheme(t *testing.T) {
 
 	// q=rmb must NOT match every row via the "rmb://" scheme: only the slug
 	// hit and the event whose path genuinely contains "rmb".
-	page, err := svc.ListMemories(context.Background(), browse.ListParams{
+	page, err := svc.ListMemories(t.Context(), browse.ListParams{
 		Limit: 25, Query: "rmb",
 	})
 	if err != nil {
@@ -83,7 +82,7 @@ func TestSearchIgnoresURIScheme(t *testing.T) {
 	}
 
 	// Pasted full URI still resolves to the row (scheme stripped, path matched).
-	page, err = svc.ListMemories(context.Background(), browse.ListParams{
+	page, err = svc.ListMemories(t.Context(), browse.ListParams{
 		Limit: 25, Query: "RMB://entities/rmb",
 	})
 	if err != nil {
@@ -94,7 +93,7 @@ func TestSearchIgnoresURIScheme(t *testing.T) {
 	}
 
 	// Query that is only the scheme is treated as no query at all.
-	page, err = svc.ListMemories(context.Background(), browse.ListParams{
+	page, err = svc.ListMemories(t.Context(), browse.ListParams{
 		Limit: 25, Query: "rmb://",
 	})
 	if err != nil {
@@ -105,7 +104,7 @@ func TestSearchIgnoresURIScheme(t *testing.T) {
 	}
 
 	// Path fragments still work, e.g. scope or date.
-	page, err = svc.ListMemories(context.Background(), browse.ListParams{
+	page, err = svc.ListMemories(t.Context(), browse.ListParams{
 		Limit: 25, Query: "2026-08-09",
 	})
 	if err != nil {
@@ -119,7 +118,7 @@ func TestSearchIgnoresURIScheme(t *testing.T) {
 	mustExec(t, database, `INSERT INTO skills (id, uri, slug, name, description, version, bundle_sha256, created_at, updated_at) VALUES
 		('s-rmb', 'rmb://skills/rmb-tips', 'rmb-tips', 'RMB Tips', 'how to use', 1, 'x', 1, 1),
 		('s-other', 'rmb://skills/plain', 'plain', 'Plain', 'zzz', 1, 'x', 2, 2)`)
-	skillPage, err := svc.ListSkills(context.Background(), browse.ListParams{Limit: 25, Query: "rmb"})
+	skillPage, err := svc.ListSkills(t.Context(), browse.ListParams{Limit: 25, Query: "rmb"})
 	if err != nil {
 		t.Fatalf("ListSkills q=rmb: %v", err)
 	}

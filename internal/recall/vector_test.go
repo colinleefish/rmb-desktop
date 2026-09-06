@@ -1,7 +1,6 @@
 package recall_test
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -32,7 +31,7 @@ func TestVectorMemories_KNN(t *testing.T) {
 	insert("m-c", "rmb://entities/c", "diagonal", []float32{0.7071, 0.7071, 0, 0})
 
 	// Query close to the x-axis vector: expect m-a first, m-c second, m-b last.
-	matches, err := recall.VectorMemories(context.Background(), database, []float32{1, 0, 0, 0}, 3, recall.TimeWindow{})
+	matches, err := recall.VectorMemories(t.Context(), database, []float32{1, 0, 0, 0}, 3, recall.TimeWindow{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +82,7 @@ func TestVectorMemories_SkipsNilAndSuperseded(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	matches, err := recall.VectorMemories(context.Background(), database, []float32{1, 0, 0, 0}, 5, recall.TimeWindow{})
+	matches, err := recall.VectorMemories(t.Context(), database, []float32{1, 0, 0, 0}, 5, recall.TimeWindow{})
 	if err != nil {
 		t.Fatal(err)
 	}

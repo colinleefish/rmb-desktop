@@ -1,11 +1,12 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"io"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/colinleefish/rmb-desktop/internal/client"
@@ -104,13 +105,15 @@ func printSkillsCatalog(ctx context.Context, cl *client.Client, out io.Writer) e
 		return nil
 	}
 
-	sort.Slice(items, func(i, j int) bool { return items[i].URI < items[j].URI })
+	slices.SortFunc(items, func(a, b client.SkillSummary) int {
+		return cmp.Compare(a.URI, b.URI)
+	})
 
 	limit := len(items)
 	if limit > helpSkillCatalogLimit {
 		limit = helpSkillCatalogLimit
 	}
-	for i := 0; i < limit; i++ {
+	for i := range limit {
 		printHelpSkillEntry(out, items[i])
 		if i < limit-1 {
 			fmt.Fprintln(out)

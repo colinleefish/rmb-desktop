@@ -5,7 +5,6 @@ import (
 	"archive/zip"
 	"bytes"
 	"compress/gzip"
-	"context"
 	"crypto/ed25519"
 	"encoding/base64"
 	"fmt"
@@ -124,7 +123,7 @@ func TestApplyEndToEnd(t *testing.T) {
 	}
 
 	var stages []string
-	if err := Apply(context.Background(), rel, install, func(s string) { stages = append(stages, s) }); err != nil {
+	if err := Apply(t.Context(), rel, install, func(s string) { stages = append(stages, s) }); err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
 	if len(stages) == 0 || stages[0] != "Downloading" {
@@ -176,7 +175,7 @@ func TestApplyBadSHA(t *testing.T) {
 		Bundle:   PlatformArt{Sidecars: bundleName, SHA256: "deadbeef"},
 	}
 
-	if err := Apply(context.Background(), rel, install, nil); err == nil {
+	if err := Apply(t.Context(), rel, install, nil); err == nil {
 		t.Fatal("sha mismatch must fail Apply")
 	}
 
@@ -226,7 +225,7 @@ func TestApplyMissingDaemonKeepsOld(t *testing.T) {
 		FeedURL:  srv.URL + "/latest.json",
 		Bundle:   PlatformArt{Sidecars: "partial.tar.gz", SHA256: SHA256Hex(buf.Bytes())},
 	}
-	if err := Apply(context.Background(), rel, install, nil); err == nil {
+	if err := Apply(t.Context(), rel, install, nil); err == nil {
 		t.Fatal("bundle missing rmbd must fail")
 	}
 	data, err := os.ReadFile(filepath.Join(install, firstInstallName()))
@@ -274,13 +273,13 @@ func TestCheckAndApplyViaServer(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	rel, err := Check(context.Background(), []string{srv.URL + "/latest.json"}, "0.1.0")
+	rel, err := Check(t.Context(), []string{srv.URL + "/latest.json"}, "0.1.0")
 	if err != nil || rel == nil {
 		t.Fatalf("Check: rel=%v err=%v", rel, err)
 	}
 
 	install := filepath.Join(work, "bin")
-	if err := Apply(context.Background(), rel, install, nil); err != nil {
+	if err := Apply(t.Context(), rel, install, nil); err != nil {
 		t.Fatalf("Apply: %v", err)
 	}
 	for srcName, dst := range installNames() {

@@ -100,13 +100,11 @@ func (r *Runner) Start(ctx context.Context) {
 }
 
 func (r *Runner) startWorker(ctx context.Context, name string, fn func(context.Context) error) {
-	r.wg.Add(1)
-	go func() {
-		defer r.wg.Done()
+	r.wg.Go(func() {
 		if err := fn(ctx); err != nil && ctx.Err() == nil {
 			r.log.Error("worker exited", "name", name, "err", err)
 		}
-	}()
+	})
 }
 
 // Wait blocks until all workers stop (ctx cancelled).

@@ -8,10 +8,11 @@
 package hygiene
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -265,7 +266,9 @@ func duplicatePairs(ctx context.Context, database *sql.DB, limit int) ([]DupPair
 			}
 		}
 	}
-	sort.Slice(pairs, func(i, j int) bool { return pairs[i].Cos > pairs[j].Cos })
+	slices.SortFunc(pairs, func(a, b DupPair) int {
+		return cmp.Compare(b.Cos, a.Cos)
+	})
 
 	// Contradiction heuristic: near-dup pairs where exactly one body has a
 	// negation token.

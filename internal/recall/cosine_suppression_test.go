@@ -1,7 +1,6 @@
 package recall_test
 
 import (
-	"context"
 	"database/sql"
 	"math"
 	"strings"
@@ -89,7 +88,7 @@ func TestSearch_cosineSuppression_identicalEmbedding(t *testing.T) {
 		"cluster-admin-toolbox", "cluster admin toolbox removed rejected", vec)
 
 	svc := recall.NewService(database)
-	m, err := svc.Search(context.Background(), nil, "cluster admin toolbox removed rejected",
+	m, err := svc.Search(t.Context(), nil, "cluster admin toolbox removed rejected",
 		10, []string{"memory", "scene"}, recall.TimeWindow{})
 	if err != nil {
 		t.Fatal(err)
@@ -126,7 +125,7 @@ func TestSearch_cosineSuppression_distinctEmbeddingsKept(t *testing.T) {
 		"cluster-admin-toolbox", "cluster admin toolbox removed rejected", []float32{0, 1, 0, 0})
 
 	svc := recall.NewService(database)
-	m, err := svc.Search(context.Background(), nil, "cluster admin toolbox removed rejected",
+	m, err := svc.Search(t.Context(), nil, "cluster admin toolbox removed rejected",
 		10, []string{"memory", "scene"}, recall.TimeWindow{})
 	if err != nil {
 		t.Fatal(err)
@@ -170,7 +169,7 @@ func TestSearch_cosineSuppression_thresholdBoundary(t *testing.T) {
 		"cluster-admin-toolbox", "cluster admin toolbox removed rejected", unit(0.97))
 
 	svc := recall.NewService(database)
-	m, err := svc.Search(context.Background(), nil, "cluster admin toolbox removed rejected",
+	m, err := svc.Search(t.Context(), nil, "cluster admin toolbox removed rejected",
 		10, []string{"memory", "scene"}, recall.TimeWindow{})
 	if err != nil {
 		t.Fatal(err)
@@ -232,7 +231,7 @@ func TestSearch_cosineSuppression_otherTiersUntouched(t *testing.T) {
 	}
 
 	svc := recall.NewService(database)
-	m, err := svc.Search(context.Background(), nil, "openresty request time dns resolver",
+	m, err := svc.Search(t.Context(), nil, "openresty request time dns resolver",
 		10, []string{"memory", "atom", "skill"}, recall.TimeWindow{})
 	if err != nil {
 		t.Fatal(err)
@@ -266,7 +265,7 @@ func TestSearch_cosineSuppression_missingEmbeddingKept(t *testing.T) {
 		"cluster-admin-toolbox", "cluster admin toolbox removed rejected", nil)
 
 	svc := recall.NewService(database)
-	m, err := svc.Search(context.Background(), nil, "cluster admin toolbox removed rejected",
+	m, err := svc.Search(t.Context(), nil, "cluster admin toolbox removed rejected",
 		10, []string{"memory", "scene"}, recall.TimeWindow{})
 	if err != nil {
 		t.Fatal(err)
@@ -297,7 +296,7 @@ func TestSearch_cosineSuppression_sceneRankIrrelevant(t *testing.T) {
 		"cluster-admin-toolbox", "cluster admin toolbox removed rejected", vec)
 
 	svc := recall.NewService(database)
-	m, err := svc.Search(context.Background(), nil, "cluster admin toolbox removed rejected",
+	m, err := svc.Search(t.Context(), nil, "cluster admin toolbox removed rejected",
 		10, []string{"memory", "scene"}, recall.TimeWindow{})
 	if err != nil {
 		t.Fatal(err)

@@ -1,7 +1,6 @@
 package recall_test
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 	"path/filepath"
@@ -33,7 +32,7 @@ func TestSearch_FTS_memories(t *testing.T) {
 	}
 
 	svc := recall.NewService(database)
-	matches, err := svc.Search(context.Background(), nil, "kubectl deployment", 5, []string{"memory"}, recall.TimeWindow{})
+	matches, err := svc.Search(t.Context(), nil, "kubectl deployment", 5, []string{"memory"}, recall.TimeWindow{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -93,7 +92,7 @@ func TestSearch_defaultScope_excludesScenes(t *testing.T) {
 
 	svc := recall.NewService(database)
 	// Default scope: memory + skill only — no scenes.
-	m, err := svc.Search(context.Background(), nil, "openresty dynamic dns", 10, nil, recall.TimeWindow{})
+	m, err := svc.Search(t.Context(), nil, "openresty dynamic dns", 10, nil, recall.TimeWindow{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +138,7 @@ func TestSearch_linkSuppression_dedupesScene(t *testing.T) {
 	svc := recall.NewService(database)
 	// Explicit multi-scope search: the linked scene is suppressed, the owning
 	// memory is annotated with the drill-down path.
-	m, err := svc.Search(context.Background(), nil, "openresty dynamic dns", 10, []string{"memory", "scene"}, recall.TimeWindow{})
+	m, err := svc.Search(t.Context(), nil, "openresty dynamic dns", 10, []string{"memory", "scene"}, recall.TimeWindow{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +179,7 @@ func TestSearch_skillCap_singleSlot(t *testing.T) {
 	}
 
 	svc := recall.NewService(database)
-	m, err := svc.Search(context.Background(), nil, "generic ops english description", 10, nil, recall.TimeWindow{})
+	m, err := svc.Search(t.Context(), nil, "generic ops english description", 10, nil, recall.TimeWindow{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -195,7 +194,7 @@ func TestSearch_skillCap_singleSlot(t *testing.T) {
 	}
 
 	// Explicit skill-only scope lifts the cap.
-	m, err = svc.Search(context.Background(), nil, "generic ops english description", 10, []string{"skill"}, recall.TimeWindow{})
+	m, err = svc.Search(t.Context(), nil, "generic ops english description", 10, []string{"skill"}, recall.TimeWindow{})
 	if err != nil {
 		t.Fatal(err)
 	}

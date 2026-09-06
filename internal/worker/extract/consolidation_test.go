@@ -1,7 +1,6 @@
 package extract
 
 import (
-	"context"
 	"database/sql"
 	"log/slog"
 	"strings"
@@ -138,7 +137,7 @@ func TestDedupAtoms(t *testing.T) {
 		{Category: model.AtomCategoryEntities, Slug: "jenkins",
 			Content: "Jenkins home directory is /var/lib/jenkins."},
 	}
-	got, suppressed := w.dedupAtoms(context.Background(), parsed)
+	got, suppressed := w.dedupAtoms(t.Context(), parsed)
 
 	if suppressed != 3 {
 		t.Fatalf("want 3 suppressed (2 restatements + 1 in-batch dup), got %d", suppressed)
@@ -166,7 +165,7 @@ func TestCandidateSlugs(t *testing.T) {
 		"The user prefers SQL keywords written in uppercase.")
 
 	w := &Worker{db: database, log: testLogger()}
-	got := w.candidateSlugs(context.Background(),
+	got := w.candidateSlugs(t.Context(),
 		`{"role":"user","content":"configure the jenkins build agent for starlink"}`)
 
 	foundJenkins, foundSQL := false, false

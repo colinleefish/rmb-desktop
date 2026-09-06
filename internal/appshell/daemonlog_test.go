@@ -125,14 +125,12 @@ func TestDaemonLogWriterConcurrent(t *testing.T) {
 	defer w.Close()
 
 	var wg sync.WaitGroup
-	for g := 0; g < 4; g++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for i := 0; i < 200; i++ {
-				_, _ = fmt.Fprintf(w, "goroutine line %d\n", i)
+	for range 4 {
+		wg.Go(func() {
+			for range 200 {
+				_, _ = fmt.Fprintf(w, "goroutine line\n")
 			}
-		}()
+		})
 	}
 	wg.Wait()
 

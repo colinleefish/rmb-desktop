@@ -2,7 +2,6 @@ package hook
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -211,7 +210,7 @@ func TestSubmit_Codex_UploadsToAPI(t *testing.T) {
 	raw, _ := json.Marshal(payload)
 
 	var out bytes.Buffer
-	if err := Submit(context.Background(), SubmitInput{
+	if err := Submit(t.Context(), SubmitInput{
 		Source:     "codex",
 		StdinJSON:  raw,
 		OutputSink: &out,
@@ -242,7 +241,7 @@ func TestSubmit_Codex_SkipsNonCodexPayload(t *testing.T) {
 	raw, _ := json.Marshal(payload)
 
 	var out bytes.Buffer
-	if err := Submit(context.Background(), SubmitInput{
+	if err := Submit(t.Context(), SubmitInput{
 		Source:     "codex",
 		StdinJSON:  raw,
 		OutputSink: &out,

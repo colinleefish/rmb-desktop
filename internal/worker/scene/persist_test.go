@@ -105,7 +105,7 @@ func TestPersistScenes_FirstCreateDoesNotCorruptFTS(t *testing.T) {
 		SourceAtoms: []string{"rmb://atoms/x"},
 	}}
 
-	ctx := context.Background()
+	ctx := t.Context()
 	if err := w.persistScenes(ctx, batch, scenes, "session abstract"); err != nil {
 		t.Fatalf("persistScenes first create: %v", err)
 	}
@@ -140,7 +140,7 @@ func TestPersistScenes_UpdateReplacesOldFTSTerms(t *testing.T) {
 	mustExec(t, d, `INSERT INTO pipeline_state (session_id, l1_status, l2_status, l3_status, warmup_threshold, updated_at) VALUES (?, 'idle', 'pending', 'idle', 0, ?)`, sessionID, nowMS)
 
 	batch := &sceneBatch{SessionKey: "sess-key", SessionID: sessionID}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// First create with term "alpha".
 	if err := w.persistScenes(ctx, batch, []ParsedScene{{
@@ -185,7 +185,7 @@ func TestPersistScenes_PruneRemovedScenes(t *testing.T) {
 	mustExec(t, d, `INSERT INTO pipeline_state (session_id, l1_status, l2_status, l3_status, warmup_threshold, updated_at) VALUES (?, 'idle', 'pending', 'idle', 0, ?)`, sessionID, nowMS)
 
 	batch := &sceneBatch{SessionKey: "sess-key", SessionID: sessionID}
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := w.persistScenes(ctx, batch, []ParsedScene{
 		{DisplayName: "Keep", Abstract: "keepterm", Body: "k", SourceAtoms: []string{"rmb://atoms/k"}},

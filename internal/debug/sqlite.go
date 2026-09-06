@@ -12,7 +12,7 @@ type SQLiteStats struct {
 	JournalMode  string `json:"journal_mode"`
 	PageCount    int64  `json:"page_count"`
 	PageSize     int64  `json:"page_size"`
-	WALPages     int64  `json:"wal_pages,omitempty"`
+	WALPages     int64  `json:"wal_pages,omitzero"`
 	MaxOpenConns int    `json:"max_open_conns"`
 	OpenConns    int    `json:"open_conns"`
 	InUse        int    `json:"in_use"`

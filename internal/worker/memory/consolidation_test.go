@@ -52,7 +52,7 @@ func TestMaterialityGate_IdenticalAtomsSkipRedistill(t *testing.T) {
 
 	distiller := &recordingDistiller{}
 	w := testWorker(database, distiller)
-	if err := w.rollup(context.Background()); err != nil {
+	if err := w.rollup(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	if got := len(distiller.calls); got != 1 {
@@ -73,7 +73,7 @@ func TestMaterialityGate_IdenticalAtomsSkipRedistill(t *testing.T) {
 	insertPendingSession(t, database, "s3")
 	insertAtom(t, database, "a3", "s3", model.AtomCategoryEvents, "2026-07-16-fix-tag-bug",
 		"On 2026-07-16 the tag bug was fixed.")
-	if err := w.rollup(context.Background()); err != nil {
+	if err := w.rollup(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	if got := len(distiller.calls) - callsBefore; got != 1 {
@@ -116,7 +116,7 @@ func TestSemanticBodyGate_ParaphraseNoVersionBump(t *testing.T) {
 
 	d := &fixedBodyDistiller{body: original}
 	w := testWorker(database, d)
-	if err := w.rollup(context.Background()); err != nil {
+	if err := w.rollup(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -126,7 +126,7 @@ func TestSemanticBodyGate_ParaphraseNoVersionBump(t *testing.T) {
 	insertPendingSession(t, database, "s3")
 	insertAtom(t, database, "a3", "s3", model.AtomCategoryProfile, "", original+" Also likes tea.")
 	d.body = paraphrase
-	if err := w.rollup(context.Background()); err != nil {
+	if err := w.rollup(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -185,7 +185,7 @@ func TestIncumbentMerge_PluralSlugVariant(t *testing.T) {
 	insertAtom(t, database, "a2", "s2", model.AtomCategoryPreferences, "docs-language",
 		"The user prefers documentation written in Chinese.")
 	w := testWorker(database, &recordingDistiller{})
-	if err := w.rollup(context.Background()); err != nil {
+	if err := w.rollup(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -197,7 +197,7 @@ func TestIncumbentMerge_PluralSlugVariant(t *testing.T) {
 		"Documentation for the user should be written in Chinese.")
 	insertAtom(t, database, "a4", "s4", model.AtomCategoryPreferences, "doc-language",
 		"Documentation for the user should be written in Chinese.")
-	if err := w.rollup(context.Background()); err != nil {
+	if err := w.rollup(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -227,7 +227,7 @@ func TestIncumbentMerge_CosinePath(t *testing.T) {
 	insertAtom(t, database, "a2", "s2", model.AtomCategoryPreferences, "redis-credentials-storage",
 		"Redis credentials live in the ops vault, never in repos.")
 	w := NewWorker(database, &recordingDistiller{}, nil, testCfg(), nil, nil)
-	if err := w.rollup(context.Background()); err != nil {
+	if err := w.rollup(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -242,7 +242,7 @@ func TestIncumbentMerge_CosinePath(t *testing.T) {
 	insertAtom(t, database, "a4", "s4", model.AtomCategoryPreferences, "redis-secrets",
 		"Redis credentials live in the ops vault, never in repos.")
 	wEmbed := NewWorker(database, &recordingDistiller{}, stubEmbedder{vec: []float32{1, 0, 0, 0}}, testCfg(), nil, nil)
-	if err := wEmbed.rollup(context.Background()); err != nil {
+	if err := wEmbed.rollup(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -285,7 +285,7 @@ func TestReduceInputCarriesAtomEvidence(t *testing.T) {
 
 	distiller := &recordingDistiller{}
 	w := NewWorker(database, distiller, nil, cfg, nil, nil)
-	if _, err := w.distillBucket(context.Background(), bucket, nil); err != nil {
+	if _, err := w.distillBucket(t.Context(), bucket, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -344,7 +344,7 @@ func TestEventOccurredAtAtPersist(t *testing.T) {
 		Atoms:    []model.Atom{{ID: "a1", SessionID: "s1", Category: model.AtomCategoryEvents, Content: "On 2026-06-13 the pilot was deployed."}},
 	}
 	pm := ParsedMemory{Abstract: "pilot deployed", Body: "On 2026-06-13 the pilot was deployed."}
-	if err := w.persistMemory(context.Background(), bucketDated, pm, nil, nil); err != nil {
+	if err := w.persistMemory(t.Context(), bucketDated, pm, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	var occurred int64
@@ -364,7 +364,7 @@ func TestEventOccurredAtAtPersist(t *testing.T) {
 		Atoms:    []model.Atom{{ID: "a2", SessionID: "s1", Category: model.AtomCategoryEvents, Content: "migrated"}},
 	}
 	pmBody := ParsedMemory{Abstract: "PBP migrated", Body: "On 2026-07-11 PBP migrated from DuckDB to Postgres (pbp_db)."}
-	if err := w.persistMemory(context.Background(), bucketBody, pmBody, nil, nil); err != nil {
+	if err := w.persistMemory(t.Context(), bucketBody, pmBody, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := database.QueryRow(`SELECT occurred_at FROM memories WHERE uri = ? AND superseded_at IS NULL`, bucketBody.URI).Scan(&occurred); err != nil {
@@ -383,7 +383,7 @@ func TestEventOccurredAtAtPersist(t *testing.T) {
 		Atoms:    []model.Atom{{ID: "a3", SessionID: "s1", Category: model.AtomCategoryEvents, Content: "undated"}},
 	}
 	pmNone := ParsedMemory{Abstract: "undated", Body: "Something happened with no date mentioned."}
-	if err := w.persistMemory(context.Background(), bucketNone, pmNone, nil, nil); err != nil {
+	if err := w.persistMemory(t.Context(), bucketNone, pmNone, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := database.QueryRow(`SELECT occurred_at FROM memories WHERE uri = ? AND superseded_at IS NULL`, bucketNone.URI).Scan(&occurred); err != nil {
@@ -436,7 +436,7 @@ func TestReconsolidateRoundTrip(t *testing.T) {
 	}
 
 	cfg := testCfg()
-	result, err := Reconsolidate(context.Background(), database, &recordingDistiller{}, cfg, nil, "rmb://entities/aliyun")
+	result, err := Reconsolidate(t.Context(), database, &recordingDistiller{}, cfg, nil, "rmb://entities/aliyun")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -467,11 +467,4 @@ func mustCount(database *sql.DB, query string, dest *int) {
 	if err := database.QueryRow(query).Scan(dest); err != nil {
 		panic(err)
 	}
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }

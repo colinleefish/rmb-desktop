@@ -10,12 +10,7 @@ func RunParallel(ctx context.Context, ids []string, limit int, fn func(ctx conte
 	if len(ids) == 0 {
 		return
 	}
-	if limit < 1 {
-		limit = 1
-	}
-	if limit > len(ids) {
-		limit = len(ids)
-	}
+	limit = max(1, min(limit, len(ids)))
 
 	sem := make(chan struct{}, limit)
 	var wg sync.WaitGroup
@@ -29,13 +24,10 @@ func RunParallel(ctx context.Context, ids []string, limit int, fn func(ctx conte
 			return
 		case sem <- struct{}{}:
 		}
-		id := id
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			defer func() { <-sem }()
 			fn(ctx, id)
-		}()
+		})
 	}
 	wg.Wait()
 }

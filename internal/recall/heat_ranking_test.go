@@ -64,7 +64,7 @@ func TestHeatRanking_promotesHotOverEqualOpponent(t *testing.T) {
 	})
 
 	first := func(opts ...recall.SearchOption) string {
-		m, err := svc.Search(context.Background(), embed, "kubectl deployment", 5, []string{"memory"}, recall.TimeWindow{}, opts...)
+		m, err := svc.Search(t.Context(), embed, "kubectl deployment", 5, []string{"memory"}, recall.TimeWindow{}, opts...)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -126,7 +126,7 @@ func TestHeatRanking_ageDecayPromotesFresh(t *testing.T) {
 		return []float32{1, 0, 0, 0}, nil
 	})
 	first := func(opts ...recall.SearchOption) string {
-		m, err := svc.Search(context.Background(), embed, "kubectl deployment", 5, []string{"memory"}, recall.TimeWindow{}, opts...)
+		m, err := svc.Search(t.Context(), embed, "kubectl deployment", 5, []string{"memory"}, recall.TimeWindow{}, opts...)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -177,7 +177,7 @@ func TestHeatRanking_disabledMatchesNoBoost(t *testing.T) {
 
 	svc := recall.NewService(database)
 	uris := func(opts ...recall.SearchOption) []string {
-		m, err := svc.Search(context.Background(), nil, "kubectl deployment", 5, []string{"memory"}, recall.TimeWindow{}, opts...)
+		m, err := svc.Search(t.Context(), nil, "kubectl deployment", 5, []string{"memory"}, recall.TimeWindow{}, opts...)
 		if err != nil {
 			t.Fatal(err)
 		}

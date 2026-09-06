@@ -16,8 +16,8 @@ func TestRunPollLifecycle(t *testing.T) {
 	buf := debug.NewLogBuffer(20)
 	log := debug.NewLogger(buf, slog.NewTextHandler(io.Discard, nil))
 
-	var cycles int32
-	ctx, cancel := context.WithCancel(context.Background())
+	var cycles atomic.Int32
+	ctx, cancel := context.WithCancel(t.Context())
 
 	done := make(chan struct{})
 	go func() {
@@ -29,13 +29,13 @@ func TestRunPollLifecycle(t *testing.T) {
 			Registry:   reg,
 			Log:        log,
 			StartAttrs: []any{"extra", 1},
-			Cycle:      func(context.Context) { atomic.AddInt32(&cycles, 1) },
+			Cycle:      func(context.Context) { cycles.Add(1) },
 		})
 	}()
 
 	// Wait for several ticker-driven cycles, then cancel.
 	deadline := time.Now().Add(2 * time.Second)
-	for atomic.LoadInt32(&cycles) < 3 && time.Now().Before(deadline) {
+	for cycles.Load() < 3 && time.Now().Before(deadline) {
 		time.Sleep(2 * time.Millisecond)
 	}
 	w, ok := reg.Snapshot().Workers["l9"]
@@ -66,7 +66,7 @@ func TestRunPollLifecycle(t *testing.T) {
 	if !started || !stopped {
 		t.Fatalf("missing lifecycle logs (started=%v stopped=%v): %#v", started, stopped, entries)
 	}
-	if got := atomic.LoadInt32(&cycles); got < 2 {
+	if got := cycles.Load(); got < 2 {
 		t.Fatalf("expected immediate first cycle plus ticker cycles, got %d", got)
 	}
 }

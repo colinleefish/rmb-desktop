@@ -20,10 +20,10 @@ type workerState struct {
 	Name         string     `json:"name"`
 	Alive        bool       `json:"alive"`
 	LastCycleAt  *time.Time `json:"last_cycle_at,omitempty"`
-	LastCycleMS  int64      `json:"last_cycle_duration_ms,omitempty"`
+	LastCycleMS  int64      `json:"last_cycle_duration_ms,omitzero"`
 	InFlight     int        `json:"in_flight"`
 	LastError    string     `json:"last_error,omitempty"`
-	Concurrency  int        `json:"concurrency,omitempty"`
+	Concurrency  int        `json:"concurrency,omitzero"`
 	BlockedSince *time.Time `json:"blocked_since,omitempty"`
 	CycleCount   int64      `json:"cycle_count"`
 }
@@ -41,7 +41,7 @@ type backpressureSnap struct {
 	Min         int `json:"min"`
 	Max         int `json:"max"`
 	Current     int `json:"current"`
-	PendingHint int `json:"pending_hint,omitempty"`
+	PendingHint int `json:"pending_hint,omitzero"`
 }
 
 // ProcessInfo is process-level metadata.

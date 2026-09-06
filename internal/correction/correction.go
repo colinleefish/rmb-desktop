@@ -100,7 +100,7 @@ func (s *Service) Retract(ctx context.Context, correctionURI string) ([]string, 
 		SELECT target_uris FROM corrections
 		WHERE id = ? AND retracted_at IS NULL`, id,
 	).Scan(&targetJSON)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, fmt.Errorf("%w: %s", ErrNotFound, correctionURI)
 	}
 	if err != nil {

@@ -2,7 +2,6 @@ package inspect
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"strings"
 	"testing"
@@ -24,7 +23,7 @@ func insertMemory(t *testing.T, s *Service, uri string, updatedAt int64) {
 func lsOut(t *testing.T, s *Service, raw string, opts LsOptions) string {
 	t.Helper()
 	var buf bytes.Buffer
-	if err := s.LsWith(context.Background(), raw, opts, &buf); err != nil {
+	if err := s.LsWith(t.Context(), raw, opts, &buf); err != nil {
 		t.Fatalf("LsWith(%q): %v", raw, err)
 	}
 	return buf.String()
@@ -165,7 +164,7 @@ func TestLsBackwardCompatNoFlags(t *testing.T) {
 	insertMemory(t, s, "rmb://events/b", 2)
 
 	var buf bytes.Buffer
-	if err := s.Ls(context.Background(), "rmb://events/", &buf); err != nil {
+	if err := s.Ls(t.Context(), "rmb://events/", &buf); err != nil {
 		t.Fatalf("Ls: %v", err)
 	}
 	if !strings.HasPrefix(buf.String(), "rmb://events/b\nrmb://events/a\n") {

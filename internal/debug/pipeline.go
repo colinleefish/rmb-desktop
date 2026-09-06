@@ -3,6 +3,7 @@ package debug
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -227,7 +228,7 @@ func Requeue(ctx context.Context, db *sql.DB, req RequeueRequest) error {
 
 	var sessionID string
 	err := db.QueryRowContext(ctx, `SELECT id FROM sessions WHERE session_key = ?`, sessionKey).Scan(&sessionID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("session not found")
 	}
 	if err != nil {
@@ -251,7 +252,7 @@ func ResolveSessionID(ctx context.Context, db *sql.DB, sessionKey string) (strin
 	}
 	var sessionID string
 	err := db.QueryRowContext(ctx, `SELECT id FROM sessions WHERE session_key = ?`, sessionKey).Scan(&sessionID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", fmt.Errorf("session not found")
 	}
 	return sessionID, err

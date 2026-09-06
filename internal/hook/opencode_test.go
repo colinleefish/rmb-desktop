@@ -2,7 +2,6 @@ package hook
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -144,7 +143,7 @@ func TestSubmit_OpenCode_UploadsToAPI(t *testing.T) {
 	}
 
 	var out bytes.Buffer
-	if err := Submit(context.Background(), SubmitInput{
+	if err := Submit(t.Context(), SubmitInput{
 		Source:     "opencode",
 		StdinJSON:  raw,
 		OutputSink: &out,

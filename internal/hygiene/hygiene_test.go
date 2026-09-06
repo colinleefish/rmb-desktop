@@ -1,7 +1,6 @@
 package hygiene
 
 import (
-	"context"
 	"database/sql"
 	"path/filepath"
 	"strings"
@@ -56,7 +55,7 @@ func TestSupersededGC_KeepThreeOr90Days(t *testing.T) {
 	insertVersionRow(t, d, "v4", uri, 2, true, daysAgo(40))  // within 90d -> kept
 	insertVersionRow(t, d, "v5", uri, 1, true, daysAgo(120)) // older than 90d -> reclaimable
 
-	stats, err := SupersededGC(context.Background(), d, 3, 90, true)
+	stats, err := SupersededGC(t.Context(), d, 3, 90, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +66,7 @@ func TestSupersededGC_KeepThreeOr90Days(t *testing.T) {
 		t.Fatalf("dry-run: want 1 reclaimable (the 120d-old row), got %d", stats.DeletedRows)
 	}
 
-	if _, err := SupersededGC(context.Background(), d, 3, 90, false); err != nil {
+	if _, err := SupersededGC(t.Context(), d, 3, 90, false); err != nil {
 		t.Fatal(err)
 	}
 	var active, superseded, gone int
@@ -119,7 +118,7 @@ func TestReport_Scans(t *testing.T) {
 	mustExec(t, d, `INSERT INTO scenes (id, session_id, abstract, body, source_atoms, created_at, updated_at)
 		VALUES ('orphan-scene-1', 'sess1', 'a', 'b', '[]', ?, ?)`, now, now)
 
-	rep, err := Report(context.Background(), d, 50)
+	rep, err := Report(t.Context(), d, 50)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,7 +158,7 @@ func TestDuplicatePairs_NearIdenticalEmbeddings(t *testing.T) {
 	mustExec(t, d, `INSERT INTO memories (id, uri, category, version, superseded_at, abstract, body, source_scene_uris, embedding, created_at, updated_at)
 		VALUES ('d3', 'rmb://entities/beta', 'entities', 1, NULL, 'a', 'Totally unrelated system.', '[]', ?, ?, ?)`, vec2, now, now)
 
-	rep, err := Report(context.Background(), d, 50)
+	rep, err := Report(t.Context(), d, 50)
 	if err != nil {
 		t.Fatal(err)
 	}

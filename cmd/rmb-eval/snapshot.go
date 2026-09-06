@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/colinleefish/rmb-desktop/internal/recall/eval"
@@ -21,7 +22,7 @@ func snapshotMemories(db *sql.DB, expected map[string]bool, stride int, fix *eva
 		err := db.QueryRow(q, args...).Scan(&m.ID, &m.URI, &m.Category, &m.Slug, &m.Version, &sup,
 			&m.Abstract, &m.Body, &m.CreatedAt, &m.UpdatedAt)
 		if err != nil {
-			if err == sql.ErrNoRows {
+			if errors.Is(err, sql.ErrNoRows) {
 				return fmt.Errorf("expected URI %s not found in store (check golden.yaml)", uri)
 			}
 			return err

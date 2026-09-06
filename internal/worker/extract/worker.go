@@ -1,12 +1,14 @@
 package extract
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -197,7 +199,7 @@ func (w *Worker) prepareBatch(ctx context.Context, sessionID string) (*extractBa
 
 	var sessionKey string
 	err = tx.QueryRowContext(ctx, `SELECT session_key FROM sessions WHERE id = ?`, sessionID).Scan(&sessionKey)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -213,7 +215,7 @@ func (w *Worker) prepareBatch(ctx context.Context, sessionID string) (*extractBa
 		SELECT l1_status, l1_turns_since_advanced, warmup_threshold
 		FROM pipeline_state WHERE session_id = ?`, sessionID,
 	).Scan(&l1Status, &l1TurnsSinceAdvanced, &warmupThreshold)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		nowMS := w.now().UTC().UnixMilli()
 		_, err = tx.ExecContext(ctx, `
 			INSERT INTO pipeline_state (session_id, l1_status, l2_status, l3_status, warmup_threshold, updated_at)
@@ -546,11 +548,11 @@ func (w *Worker) candidateSlugs(ctx context.Context, messagesJSONL string) []llm
 			out = append(out, llm.SlugCandidate{Category: category, Slug: slug})
 		}
 	}
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].Category != out[j].Category {
-			return out[i].Category < out[j].Category
+	slices.SortFunc(out, func(a, b llm.SlugCandidate) int {
+		if c := cmp.Compare(a.Category, b.Category); c != 0 {
+			return c
 		}
-		return out[i].Slug < out[j].Slug
+		return cmp.Compare(a.Slug, b.Slug)
 	})
 	return out
 }
@@ -584,7 +586,7 @@ func candidateQuery(messagesJSONL string) string {
 	if len(words) == 0 {
 		return ""
 	}
-	sort.Strings(words)
+	slices.Sort(words)
 	if len(words) > 12 {
 		words = words[:12]
 	}

@@ -197,15 +197,15 @@ func workbuddyExtractContent(raw json.RawMessage, blockType string) string {
 // WorkBuddy appends the user's message as <user_query>...</user_query> after
 // the injected system reminder in the same content block.
 func workbuddyUserQuery(s string) string {
-	start := strings.Index(s, "<user_query>")
-	if start < 0 {
+	_, after, ok := strings.Cut(s, "<user_query>")
+	if !ok {
 		return ""
 	}
-	end := strings.Index(s, "</user_query>")
-	if end < 0 || end <= start+len("<user_query>") {
+	q, _, ok := strings.Cut(after, "</user_query>")
+	if !ok {
 		return ""
 	}
-	q := strings.TrimSpace(s[start+len("<user_query>") : end])
+	q = strings.TrimSpace(q)
 	if q == "" {
 		return ""
 	}

@@ -2,7 +2,6 @@ package inspect
 
 import (
 	"bytes"
-	"context"
 	"strings"
 	"testing"
 	"time"
@@ -13,7 +12,7 @@ import (
 // both resolve, and cat/meta accept both forms too.
 func TestSessionLadder_KeyAndIDUnification(t *testing.T) {
 	s := newTestService(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	nowMS := time.Now().UTC().UnixMilli()
 	sessionID := "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
@@ -69,7 +68,7 @@ func TestSessionLadder_KeyAndIDUnification(t *testing.T) {
 // session_key so a caller can jump to ls rmb://sessions/<...>/.
 func TestSceneMeta_ExposesBothIDs(t *testing.T) {
 	s := newTestService(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	nowMS := time.Now().UTC().UnixMilli()
 	sessionID := "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
@@ -104,7 +103,7 @@ func TestSceneMeta_ExposesBothIDs(t *testing.T) {
 // returns the sibling identifier.
 func TestSessionMeta_ExposesID(t *testing.T) {
 	s := newTestService(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	nowMS := time.Now().UTC().UnixMilli()
 	sessionID := "dddddddd-dddd-4ddd-8ddd-dddddddddddd"

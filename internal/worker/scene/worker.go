@@ -3,6 +3,7 @@ package scene
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -172,7 +173,7 @@ func (w *Worker) prepareBatch(ctx context.Context, sessionID string) (*sceneBatc
 
 	var sessionKey string
 	err = tx.QueryRowContext(ctx, `SELECT session_key FROM sessions WHERE id = ?`, sessionID).Scan(&sessionKey)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {

@@ -1,7 +1,6 @@
 package inspect
 
 import (
-	"context"
 	"strings"
 	"testing"
 	"time"
@@ -107,7 +106,7 @@ func TestBackfillOccurredAtFromBodies(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := db.BackfillOccurredAt(context.Background(), s.db, nil); err != nil {
+	if err := db.BackfillOccurredAt(t.Context(), s.db, nil); err != nil {
 		t.Fatal(err)
 	}
 	var occurred int64
@@ -119,7 +118,7 @@ func TestBackfillOccurredAtFromBodies(t *testing.T) {
 	}
 
 	// Idempotent: a second run changes nothing.
-	if err := db.BackfillOccurredAt(context.Background(), s.db, nil); err != nil {
+	if err := db.BackfillOccurredAt(t.Context(), s.db, nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := s.db.QueryRow(`SELECT occurred_at FROM memories WHERE id = 'e1'`).Scan(&occurred); err != nil {

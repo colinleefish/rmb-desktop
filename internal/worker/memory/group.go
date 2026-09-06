@@ -1,9 +1,10 @@
 package memory
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/colinleefish/rmb-desktop/internal/model"
@@ -74,11 +75,11 @@ func groupAtomsIntoBuckets(atoms []model.Atom) ([]Bucket, int) {
 		})
 	}
 
-	sort.Slice(order, func(i, j int) bool {
-		if order[i].category != order[j].category {
-			return order[i].category < order[j].category
+	slices.SortFunc(order, func(a, b key) int {
+		if c := cmp.Compare(a.category, b.category); c != 0 {
+			return c
 		}
-		return order[i].slug < order[j].slug
+		return cmp.Compare(a.slug, b.slug)
 	})
 	for _, k := range order {
 		buckets = append(buckets, *slugged[k])
@@ -171,7 +172,7 @@ func sourceSceneURIsFor(bucket Bucket, index map[string][]string) []string {
 	for sceneURI := range seen {
 		out = append(out, sceneURI)
 	}
-	sort.Strings(out)
+	slices.Sort(out)
 	return out
 }
 

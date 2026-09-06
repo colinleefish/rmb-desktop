@@ -1,7 +1,6 @@
 package archive_test
 
 import (
-	"context"
 	"database/sql"
 	"path/filepath"
 	"testing"
@@ -150,7 +149,7 @@ func TestApplyRestore_roundTrip(t *testing.T) {
 	insertMem(t, database, "b-1", "rmb://events/cold-b", "cold event b", memOpts{updatedMS: old})
 
 	// Bulk apply the proposed set (empty uris).
-	n, err := svc.Apply(context.Background(), nil, nowMS)
+	n, err := svc.Apply(t.Context(), nil, nowMS)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +161,7 @@ func TestApplyRestore_roundTrip(t *testing.T) {
 	}
 
 	// Restore a single uri.
-	n, err = svc.Restore(context.Background(), []string{"rmb://entities/cold-a"}, false)
+	n, err = svc.Restore(t.Context(), []string{"rmb://entities/cold-a"}, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -178,7 +177,7 @@ func TestApplyRestore_roundTrip(t *testing.T) {
 	}
 
 	// Restore everything.
-	if n, err = svc.Restore(context.Background(), nil, true); err != nil {
+	if n, err = svc.Restore(t.Context(), nil, true); err != nil {
 		t.Fatal(err)
 	}
 	if n != 1 {
@@ -191,7 +190,7 @@ func TestApplyRestore_roundTrip(t *testing.T) {
 
 func mustCandidates(t *testing.T, svc *archive.Service, days int) []archive.Candidate {
 	t.Helper()
-	c, err := svc.Candidates(context.Background(), days)
+	c, err := svc.Candidates(t.Context(), days)
 	if err != nil {
 		t.Fatal(err)
 	}

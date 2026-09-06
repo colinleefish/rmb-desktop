@@ -1,7 +1,6 @@
 package eval_test
 
 import (
-	"context"
 	"math"
 	"path/filepath"
 	"testing"
@@ -29,7 +28,7 @@ func TestGoldenRegression(t *testing.T) {
 	}
 	defer database.Close()
 
-	report, err := eval.Run(context.Background(), database, golden)
+	report, err := eval.Run(t.Context(), database, golden)
 	if err != nil {
 		t.Fatal(err)
 	}

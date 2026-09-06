@@ -24,7 +24,7 @@ type ReconsolidateResult struct {
 	NewBodyChars  int    `json:"new_body_chars"`
 	BucketAtoms   int    `json:"bucket_atoms"`
 	AtomIDsHashed string `json:"source_atom_hash"`
-	OccurredAtMS  int64  `json:"occurred_at_ms,omitempty"`
+	OccurredAtMS  int64  `json:"occurred_at_ms,omitzero"`
 	NewAbstract   string `json:"new_abstract"`
 	NewBody       string `json:"new_body"`
 }

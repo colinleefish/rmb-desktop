@@ -2,7 +2,6 @@ package backfill
 
 import (
 	"bytes"
-	"context"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -53,7 +52,7 @@ func TestProvenanceWalkableEndToEnd(t *testing.T) {
 	}
 
 	// Backfill the empty provenance.
-	stats, err := BackfillProvenance(context.Background(), database, Options{})
+	stats, err := BackfillProvenance(t.Context(), database, Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -64,7 +63,7 @@ func TestProvenanceWalkableEndToEnd(t *testing.T) {
 	// Walk: memory meta → scene uri.
 	svc := inspect.NewService(database)
 	var mBuf bytes.Buffer
-	if err := svc.Meta(context.Background(), memURI, &mBuf); err != nil {
+	if err := svc.Meta(t.Context(), memURI, &mBuf); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(mBuf.String(), `"source_scene_uris"`) || !strings.Contains(mBuf.String(), "rmb://scenes/"+sceneID) {
@@ -73,7 +72,7 @@ func TestProvenanceWalkableEndToEnd(t *testing.T) {
 
 	// Scene meta → both session identifiers.
 	var sBuf bytes.Buffer
-	if err := svc.Meta(context.Background(), "rmb://scenes/"+sceneID, &sBuf); err != nil {
+	if err := svc.Meta(t.Context(), "rmb://scenes/"+sceneID, &sBuf); err != nil {
 		t.Fatal(err)
 	}
 	for _, want := range []string{`"session_id": "` + sessionID + `"`, `"session_key": "starlink-openresty"`} {
@@ -84,7 +83,7 @@ func TestProvenanceWalkableEndToEnd(t *testing.T) {
 
 	// ls session by the scene's session_id → turns + atoms.
 	var lsBuf bytes.Buffer
-	if err := svc.Ls(context.Background(), "rmb://sessions/"+sessionID+"/", &lsBuf); err != nil {
+	if err := svc.Ls(t.Context(), "rmb://sessions/"+sessionID+"/", &lsBuf); err != nil {
 		t.Fatalf("ls by session_id: %v", err)
 	}
 	for _, want := range []string{"turn-1", "atom-1"} {

@@ -2,7 +2,6 @@ package hook
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -131,7 +130,7 @@ func TestSubmit_Pi_UploadsToAPI(t *testing.T) {
 	raw, _ := json.Marshal(payload)
 
 	var out bytes.Buffer
-	if err := Submit(context.Background(), SubmitInput{
+	if err := Submit(t.Context(), SubmitInput{
 		Source:     "pi",
 		StdinJSON:  raw,
 		OutputSink: &out,

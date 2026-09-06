@@ -27,7 +27,7 @@ func TestRunBackpressuredCycleProcessesAllBatches(t *testing.T) {
 	var mu sync.Mutex
 	processed := map[string]bool{}
 
-	RunBackpressuredCycle(context.Background(), "t1", bp, reg, log, CycleDeps{
+	RunBackpressuredCycle(t.Context(), "t1", bp, reg, log, CycleDeps{
 		SelectCandidates: func(context.Context) ([]string, error) { return ids, nil },
 		CountPending:     func(context.Context) (int, error) { return len(ids), nil },
 		ProcessSession: func(_ context.Context, id string) error {
@@ -69,7 +69,7 @@ func TestRunBackpressuredCycleStopsOnPressure(t *testing.T) {
 	}
 	deps.SelectCandidates = func(context.Context) ([]string, error) { return ids, nil }
 
-	RunBackpressuredCycle(context.Background(), "t2", bp, reg, log, deps)
+	RunBackpressuredCycle(t.Context(), "t2", bp, reg, log, deps)
 
 	// Seeded at max=2, the first batch of 2 fails transiently; EndCycle halves
 	// concurrency (2 -> 1) and the cycle must stop instead of continuing.
@@ -89,7 +89,7 @@ func TestRunBackpressuredCycleEmptyCandidates(t *testing.T) {
 	bp := backpressure.New(1, 2)
 
 	called := false
-	RunBackpressuredCycle(context.Background(), "t3", bp, reg, log, CycleDeps{
+	RunBackpressuredCycle(t.Context(), "t3", bp, reg, log, CycleDeps{
 		SelectCandidates: func(context.Context) ([]string, error) { return nil, nil },
 		CountPending:     func(context.Context) (int, error) { return 0, nil },
 		ProcessSession: func(context.Context, string) error {
@@ -111,7 +111,7 @@ func TestRunBackpressuredCycleSelectErrorLogsAndStops(t *testing.T) {
 	bp := backpressure.New(1, 2)
 
 	called := false
-	RunBackpressuredCycle(context.Background(), "t4", bp, reg, log, CycleDeps{
+	RunBackpressuredCycle(t.Context(), "t4", bp, reg, log, CycleDeps{
 		SelectCandidates: func(context.Context) ([]string, error) { return nil, fmt.Errorf("boom") },
 		CountPending:     func(context.Context) (int, error) { return 0, nil },
 		ProcessSession: func(context.Context, string) error {

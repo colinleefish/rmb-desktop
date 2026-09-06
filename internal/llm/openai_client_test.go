@@ -1,7 +1,6 @@
 package llm
 
 import (
-	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -34,7 +33,7 @@ func TestOpenAICompatibleClientLogsRequestTrace(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = client.BuildScenes(context.Background(), `{"atoms":[]}`)
+	_, err = client.BuildScenes(t.Context(), `{"atoms":[]}`)
 	if err != nil {
 		t.Fatalf("BuildScenes: %v", err)
 	}
@@ -75,7 +74,7 @@ func TestOpenAICompatibleClientLogsFailedRequest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = client.BuildScenes(context.Background(), `{"atoms":[]}`)
+	_, err = client.BuildScenes(t.Context(), `{"atoms":[]}`)
 	if err == nil {
 		t.Fatal("expected error")
 	}

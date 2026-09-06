@@ -72,7 +72,7 @@ func TestRunParallelRespectsLimit(t *testing.T) {
 		ids[i] = string(rune('a' + i))
 	}
 
-	backpressure.RunParallel(context.Background(), ids, 3, func(_ context.Context, _ string) {
+	backpressure.RunParallel(t.Context(), ids, 3, func(_ context.Context, _ string) {
 		cur := inFlight.Add(1)
 		for {
 			old := maxSeen.Load()

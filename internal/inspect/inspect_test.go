@@ -2,7 +2,6 @@ package inspect
 
 import (
 	"bytes"
-	"context"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -26,7 +25,7 @@ func newTestService(t *testing.T) *Service {
 // memories table for the agent scope).
 func TestAgentServedFromBundle(t *testing.T) {
 	s := newTestService(t)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// cat returns the exact bundled body.
 	var buf bytes.Buffer

@@ -7,7 +7,7 @@
 | Module | Tests | Complexity | Docs | Coupling | Observability | Notes / evidence |
 |---|---|---|---|---|---|---|
 | `internal/recall` (+eval) | A | B | A | B | A | golden-set eval gate wired into `make check` (#38/#22); usage-heat phased (P1.3) |
-| `internal/worker/*` (distill) | A | B | B | B | B | consolidation gates (P2.1 #49); extract/scene/memory layered |
+| `internal/worker/*` (distill) | A | B | B | B | B | consolidation gates (P2.1 #49); extract/scene/memory layered; modern-Go idiom sweep (PR #69): errors.Is/range-int/wg.Go |
 | `internal/httpserver` | B | C | B | B | B | doctor metrics endpoints; TestDoctorMetricsEndpoint was flaky (#59, fixed) |
 | `internal/inspect` | B | B | B | A | B | pagination + prefix filters (#37) |
 | `internal/hygiene` | B | B | B | A | B | doctor report + reconsolidate (P3.4 #51) |
@@ -17,7 +17,7 @@
 | `webui/` | D | C | C | B | C | **known-weak: 604-line SettingsPage, tier-based nav, mock dead weight — refactor planned (F03–F05, plan/webui-refactor.md)** |
 | `internal/db` | A | B | B | A | B | goose SQL migrations embedded; upgrade-scenario tests (00008) |
 | harness (Makefile/scripts/.harness) | B | A | A | A | A | this refactor (#53–#58); audit 7/7 critical |
-| `internal/hook`, `internal/setup` (agent integrations) | A | B | B | A | B | cursor/cc/codex/opencode/pi/workbuddy/zcode; ZCode payload shape verified against the installed client bundle (#61 fix, 2026-08-29): Stop carries no user prompt → UserPromptSubmit capture hook + sidecar pairing; #62 session-key normalization mirrors the opencode precedent with total-function tests |
+| `internal/hook`, `internal/setup` (agent integrations) | A | B | B | A | B | cursor/cc/codex/opencode/pi/workbuddy/zcode; ZCode payload shape verified against the installed client bundle (#61 fix, 2026-08-29): Stop carries no user prompt → UserPromptSubmit capture hook + sidecar pairing; #62 session-key normalization mirrors the opencode precedent with total-function tests; hook tests modernized in PR #69 |
 
 ## Reading the table
 

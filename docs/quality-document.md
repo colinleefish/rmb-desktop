@@ -11,7 +11,7 @@
 | `internal/httpserver` | B | C | B | B | B | doctor metrics endpoints; TestDoctorMetricsEndpoint was flaky (#59, fixed) |
 | `internal/inspect` | B | B | B | A | B | pagination + prefix filters (#37) |
 | `internal/hygiene` | B | B | B | A | B | doctor report + reconsolidate (P3.4 #51) |
-| `internal/appshell` | B | B | B | A | C | tray + sidecar supervision; release-signed |
+| `internal/appshell` | B | B | B | A | C | tray + sidecar supervision; release-signed; B04 flake root-caused to the test's fixed 5s log-poll window (#70, 2026-09-06) — deterministic delay-injection regression (`RMB_TEST_DAEMON_WRITE_DELAY`, test-only) on `fix/B04-flaky-daemon-log-poll`; `*os.File` guard intact; tolerant detection pending phase 3, then re-grade Tests |
 | `internal/config` | C | B | C | B | C | **secrets still plaintext in config.yaml — P3.5 open (F06)** |
 | `cmd/*` | B | A | B | A | B | thin entrypoints |
 | `webui/` | D | C | C | B | C | **known-weak: 604-line SettingsPage, tier-based nav, mock dead weight — refactor planned (F03–F05, plan/webui-refactor.md)** |

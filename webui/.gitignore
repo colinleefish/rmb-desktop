@@ -11,6 +11,7 @@ node_modules
 package-lock.json
 dist
 dist-ssr
+.mock-selftest.mjs
 *.local
 
 # Editor directories and files

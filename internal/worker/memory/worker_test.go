@@ -283,7 +283,7 @@ func TestPersistEventBodyRetainsResolvesLink(t *testing.T) {
 	body := "On 2026-07-16 the one-tag-diff solutions were cleaned up.\n\n- **Decision:** Clean up bad one-tag-diff rows.\n- **Outcome:** Soft-deleted 29,800, 67 remain.\n- **Related:** resolves " + problemURI
 	pm := ParsedMemory{Abstract: "one-tag cleaned after tag bug", Body: body}
 
-	if err := w.persistMemory(t.Context(), bucket, pm, nil, nil); err != nil {
+	if err := w.persistMemory(t.Context(), newRollupBatch(), bucket, pm, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 

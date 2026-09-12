@@ -78,8 +78,8 @@
       "name": "webui-shell-restructure",
       "behavior": "Job-oriented shell: flat Overview/Sessions/Memories/Agents/Settings; memory category tabs; Skills under Agents; daemon heartbeat; global recall bar. F10 mocks kept.",
       "verification": "webui builds; Sidebar has /agents and no acrossSessions; Topbar exists; make check exits 0",
-      "state": "active",
-      "evidence": "",
+      "state": "passing",
+      "evidence": "commit 8ae3fae, verified 2026-09-12",
       "issue": 0,
       "layers": [
         {

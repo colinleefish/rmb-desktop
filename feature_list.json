@@ -278,7 +278,7 @@
           "repair": "Full pipeline red — run make check locally; webui-verify is the first webui stage in the predicate."
         }
       ],
-      "evidence": "commit dcac0d1, verified 2026-09-12"
+      "evidence": "commit 1695245, verified 2026-09-12"
     }
   ]
 }

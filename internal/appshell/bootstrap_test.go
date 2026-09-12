@@ -3,6 +3,7 @@ package appshell
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -49,22 +50,10 @@ func TestNeedsRefreshClobberedDest(t *testing.T) {
 func TestIsExecutableImage(t *testing.T) {
 	dir := t.TempDir()
 
-	macho := filepath.Join(dir, "macho")
-	write(t, macho, machoFake)
-	if !isExecutableImage(macho) {
-		t.Error("Mach-O 64 magic must be accepted")
-	}
-
 	text := filepath.Join(dir, "text")
 	write(t, text, "plain log line\n")
 	if isExecutableImage(text) {
 		t.Error("text file must be rejected")
-	}
-
-	elf := filepath.Join(dir, "elf")
-	write(t, elf, "\x7fELF\x02\x01\x01\x00")
-	if isExecutableImage(elf) {
-		t.Error("ELF must be rejected on darwin")
 	}
 
 	empty := filepath.Join(dir, "empty")
@@ -76,27 +65,81 @@ func TestIsExecutableImage(t *testing.T) {
 	if isExecutableImage(filepath.Join(dir, "missing")) {
 		t.Error("missing file must be rejected")
 	}
+
+	// Native image magic must be accepted; the other platform's rejected —
+	// hasExecutableMagic switches on runtime.GOOS, so must these expectations
+	// (caught by the Linux CI runner, 2026-08-29).
+	if runtime.GOOS == "darwin" {
+		macho := filepath.Join(dir, "macho")
+		write(t, macho, machoFake)
+		if !isExecutableImage(macho) {
+			t.Error("Mach-O 64 magic must be accepted on darwin")
+		}
+		elf := filepath.Join(dir, "elf")
+		write(t, elf, "\x7fELF\x02\x01\x01\x00")
+		if isExecutableImage(elf) {
+			t.Error("ELF must be rejected on darwin")
+		}
+	} else {
+		elf := filepath.Join(dir, "elf")
+		write(t, elf, "\x7fELF\x02\x01\x01\x00")
+		if !isExecutableImage(elf) {
+			t.Errorf("ELF magic must be accepted on %s", runtime.GOOS)
+		}
+		macho := filepath.Join(dir, "macho")
+		write(t, macho, machoFake)
+		if isExecutableImage(macho) {
+			t.Errorf("Mach-O must be rejected on %s", runtime.GOOS)
+		}
+	}
 }
 
 func TestHasExecutableMagic(t *testing.T) {
-	for _, m := range [][4]byte{
-		{0xcf, 0xfa, 0xed, 0xfe}, // MH_MAGIC_64 LE
-		{0xce, 0xfa, 0xed, 0xfe}, // MH_MAGIC LE
-		{0xca, 0xfe, 0xba, 0xbe}, // FAT_MAGIC
-		{0xca, 0xfe, 0xba, 0xbf}, // FAT_MAGIC_64
-	} {
-		if !hasExecutableMagic(m) {
-			t.Errorf("magic %x must be accepted on darwin", m)
-		}
-	}
+	// 2026-08-29 log-clobber regression sentinel must be rejected everywhere.
 	for _, m := range [][4]byte{
 		{0x32, 0x30, 0x32, 0x36}, // "2026" — clobbered log text
-		{0x7f, 'E', 'L', 'F'},    // ELF
-		{'M', 'Z', 0x90, 0x00},   // PE
 		{'#', '!', '/', 'b'},     // script
 	} {
 		if hasExecutableMagic(m) {
-			t.Errorf("magic %x must be rejected on darwin", m)
+			t.Errorf("magic %x must be rejected on %s", m, runtime.GOOS)
+		}
+	}
+
+	// Native magics accepted, foreign executable magics rejected — per GOOS.
+	var native, foreign [][4]byte
+	switch runtime.GOOS {
+	case "darwin":
+		native = [][4]byte{
+			{0xcf, 0xfa, 0xed, 0xfe}, // MH_MAGIC_64 LE
+			{0xce, 0xfa, 0xed, 0xfe}, // MH_MAGIC LE
+			{0xca, 0xfe, 0xba, 0xbe}, // FAT_MAGIC
+			{0xca, 0xfe, 0xba, 0xbf}, // FAT_MAGIC_64
+		}
+		foreign = [][4]byte{
+			{0x7f, 'E', 'L', 'F'},  // ELF
+			{'M', 'Z', 0x90, 0x00}, // PE
+		}
+	case "windows":
+		native = [][4]byte{{'M', 'Z', 0x90, 0x00}} // PE
+		foreign = [][4]byte{
+			{0xcf, 0xfa, 0xed, 0xfe}, // MH_MAGIC_64
+			{0x7f, 'E', 'L', 'F'},    // ELF
+		}
+	default:
+		native = [][4]byte{{0x7f, 'E', 'L', 'F'}} // ELF
+		foreign = [][4]byte{
+			{0xcf, 0xfa, 0xed, 0xfe}, // MH_MAGIC_64
+			{'M', 'Z', 0x90, 0x00},   // PE
+		}
+	}
+	for _, m := range native {
+		if !hasExecutableMagic(m) {
+			t.Errorf("native magic %x must be accepted on %s", m, runtime.GOOS)
+		}
+	}
+	for _, m := range foreign {
+		if hasExecutableMagic(m) {
+			t.Errorf("foreign magic %x must be rejected on %s", m, runtime.GOOS)
 		}
 	}
 }

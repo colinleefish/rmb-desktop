@@ -1,0 +1,54 @@
+name: pr-check
+
+# Full local parity of the AGENTS.md green baseline: the repo is consistent
+# iff `make check` exits 0 — the same predicate CI enforces on every PR.
+# Revived from the eval.yml experiment (removed in fc7c5e4 because without
+# branch protection nothing blocked PRs); this time protection requires it.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          # issue #40: setup-go's own toolchain cache hits the well-known
+          # tar-extraction race — disable it and cache the build dir explicitly below.
+          cache: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.16.0 # pinned by .tool-versions
+          cache: npm
+          cache-dependency-path: webui/package-lock.json
+
+      - name: Go build cache (CGO/sqlite is the expensive part)
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/go-build
+          key: go-build-${{ runner.os }}-${{ hashFiles('go.mod', 'go.sum') }}
+
+      # The embedded webui (internal/http/static/web/index.html) is gitignored —
+      # make check's webui-embed-check needs it, so build it exactly like locally.
+      - name: Bootstrap (go mod download + webui npm ci)
+        run: make setup
+
+      - name: Build embedded webui
+        run: make webui-build
+
+      - name: Full pipeline (vet + build + test + recall-eval + check-arch)
+        run: make check

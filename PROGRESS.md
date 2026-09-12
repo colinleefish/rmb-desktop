@@ -2,16 +2,17 @@
 
 ## Current State
 
-Branch `fix/B05-incumbent-materiality-race` (worktree `../rmb-desktop-fix-b05`): B05 fix + deterministic regression; `make verify-bug B=B05` → **passing**; `make check` green (2026-09-12). PR pending merge.
+**main** after merging #78 (F11), #77 (B03); **#79** (B05) rebasing on main for conflict resolve. VERSION target: `0.2.11-dev.1`.
 
 ## In Progress
 
-- PR for B05 (issue #72) awaiting review/CI.
+- PR #79 merge (B05 / #72)
+- PR #80 (bug-track hygiene + #17)
 
 ## Next Steps
 
-1. Merge B05 PR; close #72
-2. B04 phase-3 fix (`fix/B04-flaky-daemon-log-poll`)
+1. Merge #79, #80; bump `Makefile` VERSION → `0.2.11-dev.1`
+2. B04 (#70), #16 logos, close #17/#40/#60/#15/#72 on merge
 3. F05 settings strangler per `plan/webui-refactor.md`
 
 ## Blockers

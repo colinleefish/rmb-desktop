@@ -291,6 +291,9 @@ func TestCheckAndApplyViaServer(t *testing.T) {
 			t.Errorf("%s = %q, want %q", dst, data, want)
 		}
 	}
+	if got := ReadSidecarStamp(install); got != "9.9.9" {
+		t.Fatalf("sidecar stamp = %q, want 9.9.9", got)
+	}
 }
 
 func readSHA(t *testing.T, path string) string {

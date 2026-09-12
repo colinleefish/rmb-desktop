@@ -1,4 +1,4 @@
-.PHONY: setup check test eval e2e dev vcr verify-feature verify-bug bug-state build build-all run-rmbd run-hook tidy app-dev app-build app-build-windows app-install webui-dev webui-build webui-embed-check icons-sync build-windows-sidecars notarize release release-upload release-publish
+.PHONY: setup check test eval e2e dev vcr verify-feature verify-bug bug-state build build-all run-rmbd run-hook tidy app-dev app-build app-build-windows app-install webui-dev webui-build webui-verify webui-embed-check icons-sync build-windows-sidecars notarize release release-upload release-publish
 
 GO_TAGS := sqlite_fts5
 EMBED_INDEX := internal/http/static/web/index.html
@@ -15,7 +15,7 @@ setup:
 	go mod download
 	cd webui && pnpm install --frozen-lockfile
 
-check: webui-embed-check
+check: webui-verify webui-embed-check
 	go vet -tags "$(GO_TAGS)" ./...
 	CGO_ENABLED=1 go build -tags "$(GO_TAGS)" ./...
 	CGO_ENABLED=1 go test -tags "$(GO_TAGS)" ./...
@@ -75,6 +75,10 @@ build-all: webui-build build
 
 webui-embed-check:
 	@test -f $(EMBED_INDEX) || (echo "Missing $(EMBED_INDEX). Run: make webui-build  (or make build-all)" >&2; exit 1)
+
+# Typecheck + lint + production build of webui/src (issue #60). Does not refresh the go:embed tree.
+webui-verify:
+	cd webui && pnpm run lint && pnpm run build
 
 webui-dev:
 	cd webui && pnpm run dev

@@ -13,7 +13,7 @@ TRAY_ICON_SRC := icons/pyramid-tray.svg
 # The repo is consistent iff `make check` exits 0. Run before every commit.
 setup:
 	go mod download
-	cd webui && npm ci
+	cd webui && pnpm install --frozen-lockfile
 
 check: webui-embed-check
 	go vet -tags "$(GO_TAGS)" ./...
@@ -77,7 +77,7 @@ webui-embed-check:
 	@test -f $(EMBED_INDEX) || (echo "Missing $(EMBED_INDEX). Run: make webui-build  (or make build-all)" >&2; exit 1)
 
 webui-dev:
-	cd webui && npm run dev
+	cd webui && pnpm run dev
 
 dev: webui-dev
 
@@ -92,7 +92,7 @@ clean-check:
 	bash scripts/clean-state-check.sh .
 
 webui-build: icons-sync
-	cd webui && npm run build
+	cd webui && pnpm run build
 	rm -rf internal/http/static/web/assets internal/http/static/web/index.html internal/http/static/web/vite.svg
 	cp -R webui/dist/. internal/http/static/web/
 

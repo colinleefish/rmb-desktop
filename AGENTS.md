@@ -98,7 +98,7 @@ Scope ↔ module map (extend as needed): `zcode`→`internal/hook`, `worker`→`
 
 ## Tools
 
-- Build/test: `make` targets only (`check`, `test`, `eval`, `build`, `dev`, `setup`, `verify-bug`, `bug-state`) — do not invoke raw go/npm commands that bypass the pipeline.
+- Build/test: `make` targets only (`check`, `test`, `eval`, `build`, `dev`, `setup`, `verify-bug`, `bug-state`) — do not invoke raw go/pnpm commands that bypass the pipeline. Webui deps: `cd webui && pnpm install` (or `make setup`).
 - GitHub access goes through the local proxy: `bash scripts/with-proxy.sh gh ...` / `bash scripts/with-proxy.sh git fetch` (issue/label for the bug workflow, pr/run/api for the CI gate).
 - Release pipeline: `make release VERSION=x.y.z` — see `.cursor/rules/release.mdc`; run it yourself when asked, credentials from `~/.rmb/release.env`.
 - Tool permissions: `.claude/settings.json` scopes agent tooling (git/make/go/gh allowed; destructive ops denied).

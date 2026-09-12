@@ -344,7 +344,7 @@ func TestEventOccurredAtAtPersist(t *testing.T) {
 		Atoms:    []model.Atom{{ID: "a1", SessionID: "s1", Category: model.AtomCategoryEvents, Content: "On 2026-06-13 the pilot was deployed."}},
 	}
 	pm := ParsedMemory{Abstract: "pilot deployed", Body: "On 2026-06-13 the pilot was deployed."}
-	if err := w.persistMemory(t.Context(), bucketDated, pm, nil, nil); err != nil {
+	if err := w.persistMemory(t.Context(), newRollupBatch(), bucketDated, pm, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	var occurred int64
@@ -364,7 +364,7 @@ func TestEventOccurredAtAtPersist(t *testing.T) {
 		Atoms:    []model.Atom{{ID: "a2", SessionID: "s1", Category: model.AtomCategoryEvents, Content: "migrated"}},
 	}
 	pmBody := ParsedMemory{Abstract: "PBP migrated", Body: "On 2026-07-11 PBP migrated from DuckDB to Postgres (pbp_db)."}
-	if err := w.persistMemory(t.Context(), bucketBody, pmBody, nil, nil); err != nil {
+	if err := w.persistMemory(t.Context(), newRollupBatch(), bucketBody, pmBody, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := database.QueryRow(`SELECT occurred_at FROM memories WHERE uri = ? AND superseded_at IS NULL`, bucketBody.URI).Scan(&occurred); err != nil {
@@ -383,7 +383,7 @@ func TestEventOccurredAtAtPersist(t *testing.T) {
 		Atoms:    []model.Atom{{ID: "a3", SessionID: "s1", Category: model.AtomCategoryEvents, Content: "undated"}},
 	}
 	pmNone := ParsedMemory{Abstract: "undated", Body: "Something happened with no date mentioned."}
-	if err := w.persistMemory(t.Context(), bucketNone, pmNone, nil, nil); err != nil {
+	if err := w.persistMemory(t.Context(), newRollupBatch(), bucketNone, pmNone, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := database.QueryRow(`SELECT occurred_at FROM memories WHERE uri = ? AND superseded_at IS NULL`, bucketNone.URI).Scan(&occurred); err != nil {

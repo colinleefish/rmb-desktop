@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -51,9 +52,23 @@ func updaterCanRun() bool {
 	return isKnownCommit(version.Commit)
 }
 
+// updateCheckVersion is the semver baseline for feed comparison (sidecar install,
+// not the menu-bar shell). See B03 / issue #15.
+func updateCheckVersion(installDir string) string {
+	if v := update.ReadSidecarStamp(installDir); v != "" {
+		return v
+	}
+	if remote, ok := fetchVersion(BaseURL()); ok {
+		if v := strings.TrimSpace(remote.Version); v != "" {
+			return v
+		}
+	}
+	return version.Version
+}
+
 // checkForUpdate wraps update.Check with this install's feeds and version.
 func checkForUpdate(ctx context.Context) (*update.Release, error) {
-	return update.Check(ctx, updateFeeds(), version.Version)
+	return update.Check(ctx, updateFeeds(), updateCheckVersion(installDir()))
 }
 
 // CheckForUpdate is the exported headless entry (cmd/rmb-app -check-update).

@@ -2,6 +2,7 @@
 
 ## Current State
 
+<<<<<<< HEAD
 Last commit on **main**: `d83070f` — VERSION **0.2.10** shipped (F04 webui IA shell + pnpm). `make check` green on main when `webui-build` artifact present (2026-09-12).
 
 **Open PRs (merge order suggestion: #78 → #77 → #79, or parallel after CI green):**
@@ -23,6 +24,20 @@ Last commit on **main**: `d83070f` — VERSION **0.2.10** shipped (F04 webui IA 
 2. Merge `chore/bug-track-hygiene` after bug_list backfill review.
 3. Comment/close #17 (Sessions logos — `AgentChip` on main since F04); optional #40 (release `ci` workflow superseded by `pr-check` + local `make release`).
 4. F05 settings strangler per `plan/webui-refactor.md`.
+=======
+**main** after merging #78 (F11), #77 (B03); **#79** (B05) rebasing on main for conflict resolve. VERSION target: `0.2.11-dev.1`.
+
+## In Progress
+
+- PR #79 merge (B05 / #72)
+- PR #80 (bug-track hygiene + #17)
+
+## Next Steps
+
+1. Merge #79, #80; bump `Makefile` VERSION → `0.2.11-dev.1`
+2. B04 (#70), #16 logos, close #17/#40/#60/#15/#72 on merge
+3. F05 settings strangler per `plan/webui-refactor.md`
+>>>>>>> origin/main
 
 ## Blockers
 

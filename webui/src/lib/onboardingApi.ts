@@ -1,4 +1,6 @@
 import { putConfig } from "./api";
+import { isFullMock } from "./mockMode";
+import { mockApiFetch } from "./mock/server";
 import * as mock from "./onboardingApiMock";
 import { isOnboardingDemo } from "./onboardingMock";
 
@@ -47,11 +49,17 @@ function connectionTestError(res: Response, body: { error?: string }): Error | n
 }
 
 async function postConfigTestSide(path: string, body: unknown): Promise<ConfigTestSide> {
-  const res = await fetch(path, {
-    method: "POST",
-    headers: { Accept: "application/json", "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  const res = await (isFullMock()
+    ? mockApiFetch(path, {
+        method: "POST",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      })
+    : fetch(path, {
+        method: "POST",
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }));
   const parsed = (await res.json().catch(() => ({}))) as ConfigTestSide | { error?: string };
   const err = connectionTestError(res, parsed as { error?: string });
   if (err) {

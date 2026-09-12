@@ -220,6 +220,15 @@ export interface Page<T> {
   offset: number;
 }
 
+export interface PageRequest {
+  limit: number;
+  offset: number;
+  q?: string;
+  category?: string;
+  sort?: string;
+  order?: "asc" | "desc";
+}
+
 export interface ConfigView {
   addr: string;
   db_path: string;

@@ -1,4 +1,6 @@
 import { clearOnboardingState } from "./onboardingState";
+import { isFullMock } from "./mockMode";
+import { mockApiFetch } from "./mock/server";
 import { isOnboardingDemo } from "./onboardingMock";
 import { isPipelineMocked } from "./pipelineMock";
 
@@ -13,7 +15,9 @@ type OnboardingStatus = {
 };
 
 async function onboardingGet<T>(path: string): Promise<T> {
-  const res = await fetch(`${API}${path}`, { headers: { Accept: "application/json" } });
+  const res = await (isFullMock()
+    ? mockApiFetch(`${API}${path}`, { headers: { Accept: "application/json" } })
+    : fetch(`${API}${path}`, { headers: { Accept: "application/json" } }));
   const body = (await res.json().catch(() => ({}))) as T | { error?: string };
   if (!res.ok) {
     throw new Error((body as { error?: string }).error ?? res.statusText);
@@ -22,14 +26,17 @@ async function onboardingGet<T>(path: string): Promise<T> {
 }
 
 async function onboardingPost<T>(path: string, payload?: unknown): Promise<T> {
-  const res = await fetch(`${API}${path}`, {
+  const req: RequestInit = {
     method: "POST",
     headers: {
       Accept: "application/json",
       ...(payload !== undefined ? { "Content-Type": "application/json" } : {}),
     },
     body: payload !== undefined ? JSON.stringify(payload) : undefined,
-  });
+  };
+  const res = await (isFullMock()
+    ? mockApiFetch(`${API}${path}`, req)
+    : fetch(`${API}${path}`, req));
   const body = (await res.json().catch(() => ({}))) as T | { error?: string };
   if (!res.ok) {
     throw new Error((body as { error?: string }).error ?? res.statusText);

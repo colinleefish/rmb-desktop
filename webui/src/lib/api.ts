@@ -1,12 +1,27 @@
-import type { ConfigView, ConfigUpdateRequest } from "./types";
+import type {
+  ConfigView,
+  ConfigUpdateRequest,
+  Page,
+  PageRequest,
+} from "./types";
+
+export type { Page, PageRequest };
+import { isFullMock } from "./mockMode";
+import { mockApiFetch, mockHealthOk } from "./mock/server";
 import { isPipelineMocked } from "./pipelineMock";
 import { mockPipelineHealth } from "./pipelineHealthMock";
 import { mockOverview } from "./overviewMock";
 
 const API = "/api/v1";
 
+/** Full-app mock mode (VITE_MOCK / npm run dev:mock) serves every request below from memory. */
+function rawFetch(path: string, init?: RequestInit): Promise<Response> {
+  if (isFullMock()) return mockApiFetch(path, init);
+  return fetch(path, init);
+}
+
 async function apiGet<T>(path: string): Promise<T> {
-  const res = await fetch(`${API}${path}`, {
+  const res = await rawFetch(`${API}${path}`, {
     headers: { Accept: "application/json" },
   });
   const body = (await res.json().catch(() => ({}))) as T | { error?: string };
@@ -19,7 +34,7 @@ async function apiGet<T>(path: string): Promise<T> {
 }
 
 async function apiPut<T>(path: string, payload: unknown): Promise<T> {
-  const res = await fetch(`${API}${path}`, {
+  const res = await rawFetch(`${API}${path}`, {
     method: "PUT",
     headers: {
       Accept: "application/json",
@@ -37,7 +52,7 @@ async function apiPut<T>(path: string, payload: unknown): Promise<T> {
 }
 
 async function apiSend<T>(method: string, path: string, payload?: unknown): Promise<T> {
-  const res = await fetch(`${API}${path}`, {
+  const res = await rawFetch(`${API}${path}`, {
     method,
     headers: {
       Accept: "application/json",
@@ -55,14 +70,15 @@ async function apiSend<T>(method: string, path: string, payload?: unknown): Prom
 }
 
 export function getOverview() {
-  if (isPipelineMocked()) {
+  // Legacy pipeline-preview story; full-app mock serves dataset-derived counts instead.
+  if (isPipelineMocked() && !isFullMock()) {
     return Promise.resolve(mockOverview());
   }
   return apiGet<import("./types").Overview>("/browse/overview");
 }
 
 export function getPipelineHealth() {
-  if (isPipelineMocked()) {
+  if (isPipelineMocked() && !isFullMock()) {
     return Promise.resolve(mockPipelineHealth());
   }
   return apiGet<import("./types").PipelineHealth>("/browse/pipeline-health");
@@ -93,6 +109,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 async function healthOk(): Promise<boolean> {
+  if (isFullMock()) return mockHealthOk();
   try {
     const res = await fetch("/healthz", { cache: "no-store" });
     return res.ok;
@@ -129,22 +146,6 @@ export async function restartService(onPhase?: (phase: RestartPhase) => void): P
 
   onPhase?.("done");
   await sleep(1000);
-}
-
-export interface PageRequest {
-  limit: number;
-  offset: number;
-  q?: string;
-  category?: string;
-  sort?: string;
-  order?: "asc" | "desc";
-}
-
-export interface Page<T> {
-  items: T[];
-  total: number;
-  limit: number;
-  offset: number;
 }
 
 async function listPage<T>(path: string, req: PageRequest): Promise<Page<T>> {

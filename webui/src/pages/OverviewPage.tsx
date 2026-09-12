@@ -8,6 +8,7 @@ import type {
 } from "../lib/types";
 import { formatDateTime } from "../lib/format";
 import { isPipelineMocked } from "../lib/pipelineMock";
+import { isFullMock } from "../lib/mockMode";
 import { useI18n } from "../i18n";
 
 const STATUS_KEYS = ["pending", "running", "failed", "idle", "waiting"] as const;
@@ -249,7 +250,7 @@ export function OverviewPage({
         <p className="mt-1 text-rmb-gray">{o.subtitle}</p>
       </div>
 
-      {isPipelineMocked() && (
+      {isPipelineMocked() && !isFullMock() && (
         <div className="rounded-lg border border-rmb-accent/30 bg-rmb-accent/5 px-3 py-2 text-sm text-rmb-dark">
           {p.previewBanner}
         </div>

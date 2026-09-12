@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:mock": "VITE_MOCK=true vite",
     "dev:mock-setup": "VITE_MOCK_SETUP=true vite",
     "dev:mock-pipeline": "VITE_MOCK_PIPELINE=true vite",
     "dev:onboarding": "VITE_MOCK_SETUP=true VITE_MOCK_ONBOARDING=true vite",

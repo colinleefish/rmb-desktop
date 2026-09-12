@@ -2,22 +2,17 @@
 
 ## Current State
 
-Last commit: `feat/webui-ia-shell` (549adc1 + follow-up) — integrates **chore/pnpm** (3110269) + **F04 webui shell restructure** on top of main @ 706d07f (F10 merged). `make check` and `make webui-build`: green locally (2026-09-12). F04 `active`; verify via `make verify-feature F=F04` before merge.
-
-- **pnpm**: Makefile/CI use `pnpm install --frozen-lockfile`; `webui/pnpm-lock.yaml` replaces `package-lock.json`.
-- **F04**: Job-oriented shell (Overview · Sessions · Memories · Agents · Settings), Topbar recall bar, Agents hub (integrations + skills), memory category tabs, daemon heartbeat, corrections `target_uris` in API + UI. Contract: `.harness/contracts/F04.md`, design notes: `docs/design/webui-design.md`.
-- **Ship**: push `feat/webui-ia-shell` → PR → merge → bump VERSION (0.2.10) → `make release`.
+Branch `chore/webui-verify-gate` @ worktree `../rmb-desktop-chore-webui-verify`. **F11** (issue #60): `webui-verify` wired into `make check`. Baseline `make setup` + `make webui-build` then `make check`: green (2026-09-12). Contract: `.harness/contracts/F11.md`.
 
 ## In Progress
 
-- PR for F04 + pnpm awaiting CI (`pr-check`).
+- F11 verification + PR for #60.
 
 ## Next Steps
 
-1. Merge PR; release 0.2.10
-2. B04 phase-3 fix (`fix/B04-flaky-daemon-log-poll`)
-3. B05 deterministic regression + fix
-4. F05 settings strangler per `plan/webui-refactor.md`
+1. Merge F11 PR; close #60
+2. F04/F05 webui refactor track per `plan/webui-refactor.md`
+3. B04/B05 bug phases as scheduled
 
 ## Blockers
 

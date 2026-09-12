@@ -2,7 +2,7 @@
 
 This is **rmb-desktop**: a local-first memory product for AI coding agents. Go daemon (`rmbd`) + CLI (`rmb`) + menu-bar shell (`rmb-app`) + embedded React webui. It captures agent conversation turns, distills them into structured memories (scenes → atoms → memories pyramid), and serves hybrid recall (FTS + vectors) across sessions. Read `README.md` for the product story, `plan/` for active plans.
 
-**Verification: `make check` must exit 0 before every commit.** (vet + build + test + recall-eval gate.)
+**Verification: `make check` must exit 0 before every commit.** (webui typecheck/lint/build via `webui-verify`, embed artifact check, vet + build + test + recall-eval gate.)
 
 ## Clock-in (before touching code)
 

@@ -253,6 +253,32 @@
           "repair": "Full pipeline red — run make check locally and fix the failing stage."
         }
       ]
+    },
+    {
+      "id": "F11",
+      "name": "webui-verify-gate",
+      "behavior": "make check compiles and lints webui/src via Makefile webui-verify (pnpm lint + pnpm build) before go vet/build/test; webui-embed-check still requires the go:embed artifact so stale embed cannot mask a green Go pipeline alone",
+      "verification": "Breaking TS in webui/src fails make check; make verify-feature F=F11",
+      "state": "passing",
+      "issue": 60,
+      "layers": [
+        {
+          "label": "L1 static",
+          "cmd": "cd webui && pnpm exec tsc -b && pnpm exec oxlint src",
+          "repair": "Type or lint error in webui sources — run tsc -b and oxlint src in webui/ and fix findings."
+        },
+        {
+          "label": "L2 runtime",
+          "cmd": "make webui-verify",
+          "repair": "webui-verify failed (lint or vite build) — run make webui-verify and fix the reported error."
+        },
+        {
+          "label": "L3 system",
+          "cmd": "make check",
+          "repair": "Full pipeline red — run make check locally; webui-verify is the first webui stage in the predicate."
+        }
+      ],
+      "evidence": "commit 1695245, verified 2026-09-12"
     }
   ]
 }

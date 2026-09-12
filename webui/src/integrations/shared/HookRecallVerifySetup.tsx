@@ -68,8 +68,8 @@ export function HookRecallVerifySetup({
     hookArtifact.displayMode === "replace" ? FileReplaceReview : ConfigDiffReview;
 
   return (
-    <div className="relative ml-2 pl-10">
-      {error && <p className="mb-6 text-sm text-red-600">{error}</p>}
+    <div>
+      {error && <p className="mb-6 text-sm text-rmb-danger">{error}</p>}
 
       <SetupGuideStep step={1}>
         <div className="space-y-4">
@@ -116,7 +116,7 @@ export function HookRecallVerifySetup({
           </div>
           <Link
             to={`/sessions?source=${sessionSource}`}
-            className="inline-flex items-center gap-1.5 rounded-md border border-rmb-gray/20 bg-white px-3 py-2 text-sm font-medium text-rmb-dark hover:border-rmb-accent/40 hover:text-rmb-accent"
+            className="inline-flex items-center gap-1.5 rounded-md border border-rmb-line-strong bg-white px-3 py-2 text-sm font-medium text-rmb-dark hover:border-rmb-accent/40 hover:text-rmb-accent"
           >
             {t.agents.openSessions}
             <ExternalLink className="size-3.5" />

@@ -1,54 +1,57 @@
-import { useEffect, useState } from "react";
-import { Navigate, useParams } from "react-router-dom";
+import { useEffect, useState, type ReactNode } from "react";
+import { Navigate, useLocation, useParams, useSearchParams } from "react-router-dom";
+import { CorrectionTargetURIs } from "../components/CorrectionTargetURIs";
 import { MemoryCorrections } from "../components/MemoryCorrections";
+import { PageTabs } from "../components/PageTabs";
+import { memoryTitle, MemoryListRow } from "../components/MemoryListRow";
 import { RecallStatsLabel } from "../components/RecallStatsLabel";
 import { Modal } from "../components/Modal";
 import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
-import { pageMemories } from "../lib/api";
+import { EmptyState, ErrorNote, ListSkeleton } from "../components/EmptyState";
+import { listCorrections, pageMemories } from "../lib/api";
+import { useOverviewCounts } from "../lib/overviewCounts";
 import {
-  DEFAULT_MEMORY_CATEGORY,
+  MEMORY_CATEGORIES,
   isMemoryCategory,
   type MemoryCategory,
 } from "../lib/memoryCategories";
-import { formatDateTime } from "../lib/format";
-import type { MemoryRow } from "../lib/types";
+import { formatDateTime, formatDateTimeMonoClass } from "../lib/format";
+import type { CorrectionRow, MemoryRow } from "../lib/types";
 import { useI18n } from "../i18n";
+import { MemoryMarkdown } from "../components/MemoryMarkdown";
+import { getMemoriesSectionMeta } from "../lib/shellRoutes";
 
-function memoryTitle(memory: MemoryRow): string {
+/** Meta line shared by the modal and the profile article: version · updated · recalls. */
+function MemoryMeta({ memory }: { memory: MemoryRow }) {
+  const { t } = useI18n();
   return (
-    memory.slug?.replace(/[-_]+/g, " ") ??
-    memory.category.charAt(0).toUpperCase() + memory.category.slice(1)
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-rmb-muted">
+      <span className="inline-flex items-center shrink-0">v{memory.version}</span>
+      <span className={`inline-flex items-center ${formatDateTimeMonoClass}`}>
+        {formatDateTime(memory.updated_at)}
+      </span>
+      <RecallStatsLabel
+        stats={memory.recall_stats}
+        unit={t.memories.recalls}
+        uniform
+        className="inline-flex shrink-0 items-center"
+      />
+    </div>
   );
 }
 
-function SortableTh({
-  label,
-  k,
-  sort,
-  order,
-  onSort,
-}: {
-  label: string;
-  k: string;
-  sort: string;
-  order: "asc" | "desc";
-  onSort: (k: string) => void;
-}) {
-  const active = sort === k;
+function MemoryBody({ memory, emptyLabel }: { memory: MemoryRow; emptyLabel: string }) {
   return (
-    <th className="px-4 py-3 font-medium">
-      <button
-        type="button"
-        onClick={() => onSort(k)}
-        className={`inline-flex items-center gap-1 transition hover:text-rmb-dark ${
-          active ? "text-rmb-dark" : ""
-        }`}
-        title={active ? (order === "asc" ? "sorted ascending" : "sorted descending") : "click to sort"}
-      >
-        {label}
-        {active && <span aria-hidden>{order === "asc" ? "↑" : "↓"}</span>}
-      </button>
-    </th>
+    <>
+      {memory.abstract && <p className="text-sm text-rmb-dark">{memory.abstract}</p>}
+      {memory.body ? (
+        <pre className="mt-4 whitespace-pre-wrap font-sans text-sm leading-relaxed text-rmb-muted">
+          {memory.body}
+        </pre>
+      ) : (
+        <p className="mt-4 text-sm text-rmb-faint">{emptyLabel}</p>
+      )}
+    </>
   );
 }
 
@@ -62,76 +65,68 @@ function MemoryDetailModal({
   if (!memory) return null;
 
   return (
-    <Modal
-      open={!!memory}
-      onClose={onClose}
-      title={memoryTitle(memory)}
-      subtitle={memory.uri}
-    >
-      {memory.abstract && (
-        <p className="text-sm text-rmb-dark">{memory.abstract}</p>
-      )}
-      {memory.body ? (
-        <pre className="mt-4 whitespace-pre-wrap font-sans text-sm leading-relaxed text-rmb-gray">
-          {memory.body}
-        </pre>
-      ) : (
-        <p className="mt-4 text-sm text-rmb-gray">—</p>
-      )}
-      <p className="mt-6 text-xs text-rmb-gray">
-        v{memory.version} · {formatDateTime(memory.updated_at)}
-        {" · "}
-        <RecallStatsLabel stats={memory.recall_stats} />
-      </p>
+    <Modal open={!!memory} onClose={onClose} title={memoryTitle(memory)} subtitle={memory.uri}>
+      <MemoryBody memory={memory} emptyLabel="—" />
+      <div className="mt-6">
+        <MemoryMeta memory={memory} />
+      </div>
       <MemoryCorrections memoryURI={memory.uri} />
     </Modal>
+  );
+}
+
+function ProfileMemoryBody({ memory, emptyLabel }: { memory: MemoryRow; emptyLabel: string }) {
+  return (
+    <>
+      {memory.abstract ? (
+        <div className="rounded-lg border border-rmb-line bg-rmb-fill/70 px-5 py-4">
+          <p className="text-[15px] leading-relaxed text-rmb-dark">{memory.abstract}</p>
+        </div>
+      ) : null}
+      {memory.body ? (
+        <div className={memory.abstract ? "mt-8" : undefined}>
+          <MemoryMarkdown content={memory.body} />
+        </div>
+      ) : (
+        <p className={`text-sm text-rmb-faint ${memory.abstract ? "mt-6" : ""}`}>{emptyLabel}</p>
+      )}
+    </>
   );
 }
 
 function ProfileMemoryView({ memory }: { memory: MemoryRow }) {
   const { t } = useI18n();
   return (
-    <article className="rounded-xl border border-rmb-gray/20 bg-white p-6">
-      {memory.abstract && (
-        <p className="text-sm text-rmb-gray">{memory.abstract}</p>
-      )}
-      {memory.body ? (
-        <pre className="mt-4 whitespace-pre-wrap font-sans text-sm leading-relaxed text-rmb-dark">
-          {memory.body}
-        </pre>
-      ) : (
-        <p className="mt-4 text-sm text-rmb-gray">{t.memories.emptyProfile}</p>
-      )}
-      <p className="mt-6 text-xs text-rmb-gray">
-        v{memory.version} · {formatDateTime(memory.updated_at)}
-        {" · "}
-        <RecallStatsLabel stats={memory.recall_stats} />
-      </p>
+    <article className="w-full max-w-5xl">
+      <ProfileMemoryBody memory={memory} emptyLabel={t.memories.emptyProfile} />
+      <footer className="mt-8 border-t border-rmb-line pt-4">
+        <MemoryMeta memory={memory} />
+      </footer>
       <MemoryCorrections memoryURI={memory.uri} />
     </article>
   );
 }
 
+type SortKey = "updated" | "search" | "version";
+
 function MemoryListView({
   category,
-  title,
-  subtitle,
+  showCategory,
 }: {
-  category: MemoryCategory;
-  title: string;
-  subtitle: string;
+  category?: MemoryCategory;
+  showCategory?: boolean;
 }) {
   const { t } = useI18n();
+  const [searchParams] = useSearchParams();
+  const query = searchParams.get("q") ?? "";
   const [rows, setRows] = useState<MemoryRow[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
   const [limit, setLimit] = useState(DEFAULT_PAGE_SIZE);
-  const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<MemoryRow | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [sort, setSort] = useState("updated");
-  const [order, setOrder] = useState<"asc" | "desc">("desc");
+  const [sort, setSort] = useState<SortKey>("updated");
 
   useEffect(() => {
     setLoading(true);
@@ -141,7 +136,7 @@ function MemoryListView({
       category,
       q: query || undefined,
       sort,
-      order,
+      order: "desc",
     })
       .then((page) => {
         setRows(page.items);
@@ -149,140 +144,83 @@ function MemoryListView({
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [category, query, limit, offset, sort, order]);
+  }, [category, query, limit, offset, sort]);
 
   useEffect(() => {
     setOffset(0);
     setSelected(null);
   }, [query, category, sort]);
 
-  function handleSort(k: string) {
-    if (sort === k) {
-      setOrder(order === "asc" ? "desc" : "asc");
-    } else {
-      setSort(k);
-      setOrder("desc");
-    }
-  }
+  if (loading && !rows.length) return <ListSkeleton rows={6} />;
+  if (error) return <ErrorNote>{error}</ErrorNote>;
 
-  if (loading && !rows.length) {
-    return <p className="text-rmb-gray">{t.memories.loading}</p>;
-  }
-  if (error) return <p className="text-red-600">{error}</p>;
+  const categoryLabel = (cat: string) =>
+    isMemoryCategory(cat) ? t.memories.categories[cat].nav : cat;
+
+  const sortOptions: { value: SortKey; label: string }[] = [
+    { value: "updated", label: t.memories.sortUpdated },
+    { value: "search", label: t.memories.sortRecalled },
+    { value: "version", label: t.memories.sortVersion },
+  ];
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold text-rmb-dark">{title}</h1>
-        <p className="mt-1 text-rmb-gray">{subtitle}</p>
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-4 text-xs text-rmb-muted">
+        <span>
+          {total} {t.memories.countLabel}
+          {query ? (
+            <>
+              {" · "}
+              <span className="font-mono text-rmb-dark">“{query}”</span>
+            </>
+          ) : null}
+        </span>
+        <label className="flex items-center gap-2">
+          <span>{t.common.sortBy}</span>
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as SortKey)}
+            className="h-7 rounded-md border border-rmb-line-strong bg-white px-1.5 text-xs text-rmb-dark"
+          >
+            {sortOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
-      <input
-        type="search"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder={t.memories.search}
-        className="w-full max-w-md rounded-md border border-rmb-gray/20 px-3 py-2 text-sm text-rmb-dark"
-      />
-
-      <div className="overflow-x-auto rounded-xl border border-rmb-gray/20 bg-white">
-        {rows.length === 0 ? (
-          <p className="px-4 py-8 text-center text-rmb-gray">{t.memories.emptyCategory}</p>
-        ) : (
-          <table className="w-full table-fixed text-left text-sm">
-            <colgroup>
-              <col className="w-[22%]" />
-              <col />
-              <col className="w-16" />
-              <col className="w-16" />
-              <col className="w-16" />
-              <col className="w-16" />
-              <col className="w-36" />
-            </colgroup>
-            <thead className="border-b border-rmb-gray/15 bg-rmb-light text-rmb-gray">
-              <tr>
-                <th className="px-4 py-3 font-medium">{t.memories.colTitle}</th>
-                <th className="px-4 py-3 font-medium">{t.memories.colAbstract}</th>
-                <SortableTh label={t.memories.colVersion} k="version" sort={sort} order={order} onSort={handleSort} />
-                <SortableTh label={t.memories.colSearch} k="search" sort={sort} order={order} onSort={handleSort} />
-                <SortableTh label={t.memories.colCat} k="cat" sort={sort} order={order} onSort={handleSort} />
-                <SortableTh label={t.memories.colMeta} k="meta" sort={sort} order={order} onSort={handleSort} />
-                <SortableTh label={t.memories.colUpdated} k="updated" sort={sort} order={order} onSort={handleSort} />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((memory) => (
-                <tr
-                  key={memory.id}
-                  className="h-[4.5rem] cursor-pointer border-b border-rmb-gray/10 transition last:border-0 hover:bg-rmb-light/60"
-                  onClick={() => setSelected(memory)}
-                >
-                  <td className="px-4 align-middle">
-                    <div className="min-w-0">
-                      <span
-                        className="block truncate font-medium text-rmb-dark"
-                        title={memoryTitle(memory)}
-                      >
-                        {memoryTitle(memory)}
-                      </span>
-                      <span
-                        className="mt-0.5 block truncate font-mono text-xs text-rmb-gray/50"
-                        title={memory.uri}
-                      >
-                        {memory.uri}
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-4 align-middle">
-                    <div className="flex h-10 items-center">
-                      <p
-                        className="line-clamp-2 text-sm leading-5 text-rmb-gray"
-                        title={memory.abstract ?? undefined}
-                      >
-                        {memory.abstract ?? "—"}
-                      </p>
-                    </div>
-                  </td>
-                  <td className="px-4 align-middle tabular-nums text-rmb-gray">
-                    v{memory.version}
-                  </td>
-                  <td
-                    className="px-4 align-middle tabular-nums text-rmb-gray"
-                    title={`${t.memories.recallSearch} (rmb search)`}
-                  >
-                    {memory.recall_stats?.search_count ?? 0}
-                  </td>
-                  <td
-                    className="px-4 align-middle tabular-nums text-rmb-gray"
-                    title={`${t.memories.recallCat} (rmb cat)`}
-                  >
-                    {memory.recall_stats?.cat_count ?? 0}
-                  </td>
-                  <td
-                    className="px-4 align-middle tabular-nums text-rmb-gray"
-                    title={`${t.memories.recallMeta} (rmb meta)`}
-                  >
-                    {memory.recall_stats?.meta_count ?? 0}
-                  </td>
-                  <td className="px-4 align-middle text-xs text-rmb-gray">
-                    {formatDateTime(memory.updated_at)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-        <Pagination
-          total={total}
-          limit={limit}
-          offset={offset}
-          onPageChange={setOffset}
-          onLimitChange={(next) => {
-            setLimit(next);
-            setOffset(0);
-          }}
+      {rows.length === 0 ? (
+        <EmptyState
+          title={query ? t.memories.emptyCategory : t.memories.empty}
+          action={query ? undefined : { to: "/settings/models", label: t.settings.tabs.models }}
         />
-      </div>
+      ) : (
+        <div className="overflow-hidden rounded-md border border-rmb-line">
+          <div className="divide-y divide-rmb-line">
+            {rows.map((memory) => (
+              <MemoryListRow
+                key={memory.id}
+                memory={memory}
+                showCategory={showCategory}
+                categoryLabel={showCategory ? categoryLabel : undefined}
+                onSelect={() => setSelected(memory)}
+              />
+            ))}
+          </div>
+          <Pagination
+            total={total}
+            limit={limit}
+            offset={offset}
+            onPageChange={setOffset}
+            onLimitChange={(next) => {
+              setLimit(next);
+              setOffset(0);
+            }}
+          />
+        </div>
+      )}
 
       <MemoryDetailModal memory={selected} onClose={() => setSelected(null)} />
     </div>
@@ -309,51 +247,127 @@ function ProfileMemoryPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) {
-    return <p className="text-rmb-gray">{t.memories.loading}</p>;
-  }
-  if (error) return <p className="text-red-600">{error}</p>;
+  if (loading) return <ListSkeleton rows={4} />;
+  if (error) return <ErrorNote>{error}</ErrorNote>;
+
+  return memory ? (
+    <ProfileMemoryView memory={memory} />
+  ) : (
+    <EmptyState title={t.memories.emptyProfile} />
+  );
+}
+
+function CorrectionsList() {
+  const { t } = useI18n();
+  const [rows, setRows] = useState<CorrectionRow[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    listCorrections()
+      .then(setRows)
+      .catch((err: Error) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <ListSkeleton rows={3} />;
+  if (error) return <ErrorNote>{error}</ErrorNote>;
+  if (!rows.length) return <EmptyState title={t.memories.corrections.empty} />;
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold text-rmb-dark">
-          {t.memories.categories.profile.title}
-        </h1>
-        <p className="mt-1 text-rmb-gray">{t.memories.categories.profile.subtitle}</p>
-      </div>
-      {memory ? (
-        <ProfileMemoryView memory={memory} />
-      ) : (
-        <p className="rounded-xl border border-rmb-gray/20 bg-white px-4 py-8 text-center text-rmb-gray">
-          {t.memories.emptyProfile}
-        </p>
-      )}
+    <div className="divide-y divide-rmb-line rounded-md border border-rmb-line">
+      {rows.map((row) => (
+        <div
+          key={row.uri}
+          className="grid min-h-14 grid-cols-[minmax(0,1fr)_11.5rem] items-center gap-4 px-3 py-2"
+        >
+          <div className="min-w-0">
+            <p className="text-sm text-rmb-dark">{row.statement}</p>
+            <div className="mt-0.5">
+              <CorrectionTargetURIs uris={row.target_uris} />
+            </div>
+          </div>
+          <span className={`text-right text-xs text-rmb-faint ${formatDateTimeMonoClass}`}>
+            {formatDateTime(row.created_at)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MemoriesTabHeader({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <header className="space-y-1">
+      <h2 className="text-lg font-semibold tracking-tight text-rmb-dark">{title}</h2>
+      <p className="max-w-3xl text-sm text-rmb-muted">{subtitle}</p>
+    </header>
+  );
+}
+
+function MemoriesChrome({ children }: { children: ReactNode }) {
+  const { t } = useI18n();
+  const location = useLocation();
+  const counts = useOverviewCounts();
+  const correctionCount = counts?.corrections;
+  const tabMeta = getMemoriesSectionMeta(location.pathname, t);
+
+  const q = location.search;
+  const tabs = [
+    { to: { pathname: "/memories", search: q }, label: t.memories.tabAll, end: true },
+    ...MEMORY_CATEGORIES.map((category) => ({
+      to: { pathname: `/memories/${category}`, search: q },
+      label: t.memories.categories[category].nav,
+    })),
+    {
+      to: { pathname: "/memories/corrections", search: q },
+      label: t.nav.corrections,
+      badge: correctionCount,
+    },
+  ];
+
+  return (
+    <div className="space-y-5">
+      <PageTabs tabs={tabs} />
+      {tabMeta ? <MemoriesTabHeader title={tabMeta.title} subtitle={tabMeta.subtitle} /> : null}
+      {children}
     </div>
   );
 }
 
 export function MemoriesPage() {
   const { category: categoryParam } = useParams<{ category?: string }>();
-  const { t } = useI18n();
 
   if (!categoryParam) {
-    return <Navigate to={`/memories/${DEFAULT_MEMORY_CATEGORY}`} replace />;
+    return (
+      <MemoriesChrome>
+        <MemoryListView showCategory />
+      </MemoriesChrome>
+    );
+  }
+  if (categoryParam === "corrections") {
+    return (
+      <MemoriesChrome>
+        <CorrectionsList />
+      </MemoriesChrome>
+    );
   }
   if (!isMemoryCategory(categoryParam)) {
-    return <Navigate to={`/memories/${DEFAULT_MEMORY_CATEGORY}`} replace />;
+    return <Navigate to="/memories" replace />;
   }
 
   if (categoryParam === "profile") {
-    return <ProfileMemoryPage />;
+    return (
+      <MemoriesChrome>
+        <ProfileMemoryPage />
+      </MemoriesChrome>
+    );
   }
 
-  const meta = t.memories.categories[categoryParam];
   return (
-    <MemoryListView
-      category={categoryParam}
-      title={meta.title}
-      subtitle={meta.subtitle}
-    />
+    <MemoriesChrome>
+      <MemoryListView category={categoryParam} />
+    </MemoriesChrome>
   );
 }

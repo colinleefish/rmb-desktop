@@ -12,7 +12,7 @@ export function SkillFileViewer({
   const isMarkdown = path.endsWith(".md");
 
   return (
-    <div className="max-h-[min(70vh,640px)] overflow-auto rounded-xl border border-rmb-gray/20 bg-rmb-light/30 p-4">
+    <div className="max-h-[min(70vh,640px)] overflow-auto rounded-md border border-rmb-line bg-rmb-fill p-4">
       <div className="mb-3 font-mono text-xs text-rmb-gray">{path}</div>
       {isMarkdown ? (
         <pre className="whitespace-pre-wrap text-sm leading-relaxed text-rmb-dark">{content}</pre>

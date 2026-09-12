@@ -1,15 +1,22 @@
 import { Outlet } from "react-router-dom";
+import { OverviewCountsProvider } from "../lib/overviewCounts";
 import { Sidebar } from "./Sidebar";
+import { Topbar } from "./Topbar";
 
 export function Layout() {
   return (
-    <div className="flex h-screen overflow-hidden bg-rmb-light">
+    <OverviewCountsProvider>
+    <div className="flex h-screen overflow-hidden bg-white text-rmb-dark">
       <Sidebar />
-      <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-white">
-        <div className="w-full px-6 py-8 lg:px-8">
-          <Outlet />
-        </div>
-      </main>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white">
+        <Topbar />
+        <main className="min-h-0 flex-1 overflow-y-auto">
+          <div className="mx-auto w-full max-w-7xl px-8 py-6">
+            <Outlet />
+          </div>
+        </main>
+      </div>
     </div>
+    </OverviewCountsProvider>
   );
 }

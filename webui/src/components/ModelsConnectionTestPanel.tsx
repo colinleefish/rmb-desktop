@@ -90,9 +90,9 @@ export function ModelsConnectionTestPanel({
   }
 
   return (
-    <div className="space-y-4 border-t border-rmb-gray/15 pt-6">
+    <div className="space-y-4 border-t border-rmb-line pt-6">
       {showResults && (
-        <div className="space-y-2 rounded-lg border border-rmb-gray/15 bg-rmb-light/40 p-4">
+        <div className="space-y-2 rounded-md border border-rmb-line bg-rmb-fill p-4">
           <p className="text-sm font-medium text-rmb-dark">
             {t.settings.models.testResults}
           </p>
@@ -101,13 +101,13 @@ export function ModelsConnectionTestPanel({
         </div>
       )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-rmb-danger">{error}</p>}
 
       <button
         type="button"
         onClick={() => void handleTest()}
         disabled={testing}
-        className="rounded-md border border-rmb-gray/25 bg-white px-4 py-2 text-sm font-medium text-rmb-dark hover:bg-rmb-light disabled:opacity-50"
+        className="rounded-md border border-rmb-line-strong bg-white px-4 py-2 text-sm font-medium text-rmb-dark hover:bg-rmb-fill disabled:opacity-50"
       >
         {testing ? (
           <span className="inline-flex items-center gap-2">
@@ -150,15 +150,15 @@ function TestResultRow({
   return (
     <div className="flex items-center gap-2 text-sm">
       {result.ok ? (
-        <CheckCircle2 className="size-4 shrink-0 text-emerald-600" aria-hidden />
+        <CheckCircle2 className="size-4 shrink-0 text-rmb-accent" aria-hidden />
       ) : (
-        <XCircle className="size-4 shrink-0 text-red-600" aria-hidden />
+        <XCircle className="size-4 shrink-0 text-rmb-danger" aria-hidden />
       )}
       <span className="font-medium text-rmb-dark">{label}</span>
       {result.ok ? (
-        <span className="text-emerald-700">— {t.settings.models.testOk}</span>
+        <span className="text-rmb-accent">— {t.settings.models.testOk}</span>
       ) : (
-        <span className="text-red-600">
+        <span className="text-rmb-danger">
           — {result.error ?? t.settings.models.testFailed}
         </span>
       )}

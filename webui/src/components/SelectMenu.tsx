@@ -59,7 +59,7 @@ export function SelectMenu<T extends string | number>({
         onClick={() => !disabled && setOpen((prev) => !prev)}
         disabled={disabled}
         className={[
-          "rmb-language-select flex w-full items-center justify-between gap-3 rounded border border-[#dadce0] bg-white px-3 py-[7px] text-left text-rmb-dark shadow-sm transition focus:border-rmb-accent focus:outline-none focus:ring-1 focus:ring-rmb-accent/40",
+          "rmb-language-select flex w-full items-center justify-between gap-3 rounded border border-rmb-line-strong bg-white px-3 h-8 text-left text-rmb-dark transition focus:border-rmb-accent focus:outline-none focus:ring-1 focus:ring-rmb-accent/40",
           disabled
             ? "cursor-not-allowed opacity-50"
             : "hover:border-[#bdc1c6]",
@@ -79,7 +79,7 @@ export function SelectMenu<T extends string | number>({
         <ul
           role="listbox"
           aria-labelledby={labelId ?? id}
-          className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 overflow-hidden rounded-md border border-[#dadce0] bg-white py-1 shadow-lg"
+          className="absolute left-0 right-0 top-[calc(100%+4px)] z-50 overflow-hidden rounded-md border border-rmb-line-strong bg-white py-1 shadow-rmb-modal"
         >
           {options.map((option) => {
             const selected = option.value === value;
@@ -92,7 +92,7 @@ export function SelectMenu<T extends string | number>({
                     "flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm transition",
                     selected
                       ? "bg-rmb-accent/10 text-rmb-dark"
-                      : "text-rmb-dark hover:bg-rmb-light/80",
+                      : "text-rmb-dark hover:bg-rmb-fill",
                   ].join(" ")}
                 >
                   <span>{option.label}</span>

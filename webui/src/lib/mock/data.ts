@@ -606,6 +606,31 @@ export interface MockData {
   version: { version: string; commit: string };
 }
 
+/** One turn = one user+assistant exchange (matches hook ingest + browse API). */
+function turnsFromTalk(sessionId: string, talk: string[], createdMs: number): TurnRow[] {
+  const out: TurnRow[] = [];
+  for (let i = 0; i < talk.length; i += 2) {
+    const messages: { role: "user" | "assistant"; content: string }[] = [
+      { role: "user", content: talk[i]! },
+    ];
+    const assistant = talk[i + 1];
+    if (assistant !== undefined) {
+      messages.push({ role: "assistant", content: assistant });
+    }
+    const turnIndex = out.length;
+    const ts = createdMs + turnIndex * 7 * 60_000;
+    out.push({
+      id: `t-${sessionId}-${turnIndex + 1}`,
+      turn_index: turnIndex,
+      uri: `rmb://turns/t-${sessionId}-${turnIndex + 1}`,
+      messages_jsonl: messages.map((m) => JSON.stringify(m)).join("\n"),
+      created_at: iso(ts),
+      updated_at: iso(ts),
+    });
+  }
+  return out;
+}
+
 function buildData(): MockData {
   prngState = PRNG_SEED;
   resetCorrectionSeq();
@@ -622,17 +647,7 @@ function buildData(): MockData {
     const lastTurn = ago(topic.daysAgo);
     const created = ago(topic.daysAgo + 0.4);
 
-    const sessionTurns: TurnRow[] = topic.talk.map((content, i) => ({
-      id: `t-${id}-${i + 1}`,
-      turn_index: i + 1,
-      uri: `rmb://turns/t-${id}-${i + 1}`,
-      messages_jsonl: JSON.stringify({
-        role: i % 2 === 0 ? "user" : "assistant",
-        content,
-      }),
-      created_at: iso(created + i * 7 * 60_000),
-      updated_at: iso(created + i * 7 * 60_000),
-    }));
+    const sessionTurns = turnsFromTalk(id, topic.talk, created);
     turns.set(key, sessionTurns);
 
     const sessionAtoms = atomsFor(topic, id);
@@ -673,14 +688,44 @@ function buildData(): MockData {
   });
 
   // ----- memories -----------------------------------------------------------
+  const profileAbstract =
+    '李广慧 (Li Guanghui / Colin, GitHub colinleefish, macOS user liguanghui), DevOps/SRE tech lead at HungryStudio (BlockBlast) in Beijing UTC+8; primary SRE & super admin (role 888) for Starlink/StarOrigin; SolutionHub is Starlink\'s frontend Vue SPA he works on (not personal); pgpour is NOT his (owner: 段文彬 duanwenbin); NOT 郭佳锋. Authored rmb/rmb-desktop, PBP, tutu, mypast. MacBook Pro 13" 2026 M5 Pro 48GB (colin-mbp13-2026); Nikon Z30 photographer; A-share 首板/二波 trader.';
+  const profileBody = `# Identity
+- Name: **李广慧** (Li Guanghui; legal name GUANGHUI LI), goes by **Colin** / **colinleefish**. He is **not** 郭佳锋 — Guo Jiafeng is Starlink's product manager (third party).
+- macOS/system username \`liguanghui\`, home directory \`/Users/liguanghui\`.
+- Work email \`liguanghui@hungrystudio.com\`; personal email \`colinleefish@gmail.com\` (also Google/AWS account email).
+- GitHub: \`colinleefish\`; owns domains \`colinleefish.com\` and \`re-mem-ber.me\` (rmb hosted at rmb.colinleefish.com); sometimes uses handle \`colin-devops\`.
+- HungryStudio workcode / SSO sub: **001232**; staff/DingTalk ID **1646383526189462**; DingTalk user ID 5716095.
+- Based in **Beijing, China**, timezone **UTC+8**; mainland-China network needs a local proxy for GitHub (e.g. 127.0.0.1:1081) and cannot reach Google Drive or pypi directly.
+
+# Work & Role
+- **DevOps/SRE technical lead at HungryStudio** (北京彩块科技有限公司; HR docs also reference 北京迦游网络科技有限公司), the BlockBlast game company; ~18 months tenure; department 产品研发中心-研发一部-架构组; leads the AI platform integration/architecture group; acts as tech lead/mentor (not a formal manager), runs DevOps interviews, probation plans, and onboarding.
+- **Primary SRE and super admin (role 888)** for the **Starlink (星链)** and **StarOrigin (星源)** platforms; supports game-service infrastructure for BlockCrush, BlockBlast, JDMJ, MJWD, and Nebula; leading the UCloud → Aliyun cloud migration.
+- Deep PostgreSQL skills (CDC, replication slots, schema diffs, large-scale migrations); application-layer debugging (Gunicorn, Rust GQL, SQLAlchemy); expert in the Starlink AB-test data model (solutions, ways, tags, mini bundles, Starmap pipeline).
+- Administers JumpServer (jump.hs99.vip), Aliyun ACK clusters, Kong, Sentry (sentry.hs99.vip), Harbor, Windmill, Airflow, Cloudflare zones, the SVN server (svn.youxi123.com), and a self-hosted Inspur Proxmox VE cluster.
+- **SolutionHub**: the frontend Vue SPA project of Starlink (not a personal project); user develops on it — Vue + Vite, packaged in Docker with nginx, \`Cache-Control: no-cache\` on static files; internal admin-config SPA with light traffic.
+- **pgpour**: the user is **not** the owner or maintainer — the authentic owner and sole developer is **段文彬 (duanwenbin)**. The user only operates pgpour-based CDC/data-sync stacks (starlink-dev-all-in-one, Kafka pipelines).
+
+# Personal Projects
+- **rmb / rmb-desktop / rmbd** and **mypast (mem9)**: author, developer, and maintainer of his personal AI-agent long-term memory system (Go, Postgres/pgvector, Next.js; T0–T3 pyramid architecture); repos \`colinleefish/rmb\` and \`colinleefish/rmb-desktop\`; distributes the RMB Desktop app.
+- **PBP**: developer of an A-share market data pipeline (multi-source sync into PostgreSQL); **tutu**: developer of the Zsh prompt theme he uses.
+- Apple Developer ID: GUANGHUI LI / N4YPJBRBN4 (personal, non-organization account); has prior subtitle-translation experience.
+
+# Devices & Environment
+- Primary machine: **MacBook Pro 13" (2026), Apple M5 Pro, 48 GB RAM, macOS 26.x**, named **colin-mbp13-2026**.
+- Other Macs: \`colin-mbp15-2018\` and \`colin-hs-mbp2023\` (work MBP); dotfiles/configs synced via per-device git branches.
+- Workspaces: \`/Users/liguanghui/hungrystudio/\` (dated \`YYYY/MM/DD.task-name\` task folders, runbooks) and \`~/hs.projects\` (starlink at \`~/hs.projects/starlink/\`, hs-devops under \`~/hs.projects/hs-devops/\`).
+- Daily stack: zsh + Oh My Zsh (tutu theme), iTerm2, Cursor + Claude Code (MCP configs in \`~/.cursor/mcp.json\`, \`~/.claude.json\`), OrbStack for Docker/K8s; MesloLGS NF terminal font.
+- SSH keys: \`~/.ssh/lgh_hungrystudio_ed25519\` (work/Aliyun), \`colinleefish_ed25519\` (personal); SOPS age key at \`~/.config/sops/age/keys.txt\`.
+- iPhone (13 mini / 17 on record); owns a used **Nikon Z30** (its clock resets when the battery is removed).
+
+# Cloud & Accounts
+- Aliyun: work account **caikuai-cn** (RAM user liguanghui / effcy_dev, account 1405334670349921, cn-beijing — runs its monthly cost attribution) and personal account \`colinleefish@aliyun.com\`; Aliyun CLI profile \`liguanghui-admin\`.
+
+(body capped at 4096 chars by distill-time limit)`;
+
   const memories: MemoryRow[] = [
-    ...[
-      ["colin-identity", 3, "Colin (李广慧) — Beijing-based DevOps/SRE lead", "Goes by Colin; GitHub colinleefish; runs the AI platform integration/architecture group at HungryStudio."],
-      ["work-role", 2, "Tech lead of the architecture group, product R&D center", "Leads Starlink/StarOrigin SRE as super admin (role 888); runs DevOps interviews, probation plans, and onboarding; mentors rather than formally manages."],
-      ["devices-setup", 2, "Primary machine: colin-mbp13-2026 (M5 Pro, 48GB)", "Daily stack: zsh + Oh My Zsh (tutu theme), iTerm2, Cursor + Claude Code, OrbStack for Docker/K8s; work MBP is colin-hs-mbp2023."],
-      ["contact-channels", 1, "Work email liguanghui@hungrystudio.com; personal colinleefish@gmail.com", "Workcode/SSO sub 001232; DingTalk staff id 1646383526189462; mainland-China network needs the local proxy for GitHub."],
-      ["apple-dev-id", 1, "Apple Developer ID: GUANGHUI LI / N4YPJBRBN4", "Personal (non-org) account; used to sign rmb-desktop release builds."],
-    ].map(([slug, version, abstract, body]) => memory("profile", slug as string, version as number, abstract as string, body as string)),
+    profileMemory(3, profileAbstract, profileBody),
     ...[
       ["merge-modern-go-pr69", 1, "modern-go refactor merged via PR #69 (merge commit 3ab60a5)", "One-commit sweep across 69 files: errors.Is, range-int loops, sync.WaitGroup.Go. Merged with a merge commit per the parallel-work plan; local make check was the gate of record (pr-check workflow not yet landed)."],
       ["b04-flaky-diagnosis", 1, "B04: TestSpawnedDaemonStdioIsLogFdNotPipe flakes under suite load", "Fixed 5s file-poll deadline loses to ~30 parallel packages; causality proven by injecting an 8s child-write delay (deterministic FAIL at 5.0s). Fix = tolerant detection, fd assertion untouched."],
@@ -748,7 +793,7 @@ function buildData(): MockData {
   const corrections: CorrectionRow[] = [
     correction(
       "Not 郭佳锋 — he is Starlink's product manager (third party); Colin is the DevOps/SRE lead.",
-      ["rmb://memories/profile/colin-identity"],
+      ["rmb://profile"],
     ),
     correction(
       "Proxy port is 1081 (not 7890) for GitHub access from the mainland network.",
@@ -768,7 +813,7 @@ function buildData(): MockData {
     ),
     correction(
       "Workcode is 001232; the older 001229 id is stale.",
-      ["rmb://memories/profile/contact-channels"],
+      ["rmb://profile"],
     ),
     correction(
       "Harbor retention keeps the last 10 tagged per repo (not 5) and exempts release tags.",
@@ -825,6 +870,39 @@ function buildData(): MockData {
 }
 
 // ----- memory/skill/correction builders -------------------------------------
+
+function profileMemory(version: number, abstract: string, body: string): MemoryRow {
+  const uri = "rmb://profile";
+  const created = ago(between(20, 55));
+  const searched = rand() < 0.55;
+  return {
+    id: "m-profile",
+    uri,
+    category: "profile",
+    slug: null,
+    version,
+    abstract,
+    body,
+    source_scene_uris: [
+      `rmb://scenes/sc-s-${String(between(1, 36)).padStart(3, "0")}-1`,
+    ],
+    source_correction_uris: [],
+    created_at: iso(created),
+    updated_at: iso(ago(between(0, 18))),
+    recall_stats: searched
+      ? {
+          uri,
+          search_count: between(1, 60),
+          cat_count: between(0, 15),
+          meta_count: between(0, 10),
+          last_searched_at: iso(ago(between(0, 12))),
+          last_cated_at: iso(ago(between(0, 20))),
+          last_metaed_at: iso(ago(between(0, 25))),
+          updated_at: iso(ago(between(0, 5))),
+        }
+      : null,
+  };
+}
 
 function memory(
   category: string,

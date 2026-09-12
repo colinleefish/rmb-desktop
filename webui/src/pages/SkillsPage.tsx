@@ -1,33 +1,16 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Wand2 } from "lucide-react";
+import { Search } from "lucide-react";
 import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { RecallStatsLabel } from "../components/RecallStatsLabel";
+import { EmptyState, ErrorNote, ListSkeleton } from "../components/EmptyState";
+import { StatusPill } from "../components/StatusPill";
 import { pageSkills } from "../lib/api";
-import { formatDateTime } from "../lib/format";
+import { formatDateTime, formatDateTimeMonoClass } from "../lib/format";
 import type { SkillRow } from "../lib/types";
 import { useI18n } from "../i18n";
 
-const TAG_CLASS: Record<string, string> = {
-  work: "border-emerald-600/30 bg-emerald-500/10 text-emerald-700",
-  personal: "border-violet-600/30 bg-violet-500/10 text-violet-700",
-};
-
-function SkillTag({ tag }: { tag: string }) {
-  const key = tag.toLowerCase();
-  return (
-    <span
-      className={[
-        "rounded border px-1.5 py-0.5 text-[10px] font-medium",
-        TAG_CLASS[key] ?? "border-rmb-gray/25 bg-rmb-light text-rmb-gray",
-      ].join(" ")}
-    >
-      {tag}
-    </span>
-  );
-}
-
-export function SkillsPage() {
+export function SkillsPage({ embedded = false }: { embedded?: boolean }) {
   const { t } = useI18n();
   const [rows, setRows] = useState<SkillRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -48,99 +31,88 @@ export function SkillsPage() {
       .finally(() => setLoading(false));
   }, [limit, offset, query]);
 
-  if (loading && !rows.length) {
-    return <p className="text-rmb-gray">{t.skills.loading}</p>;
-  }
-  if (error) return <p className="text-red-600">{error}</p>;
+  if (loading && !rows.length) return <ListSkeleton rows={5} />;
+  if (error) return <ErrorNote>{error}</ErrorNote>;
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold text-rmb-dark">{t.skills.title}</h1>
-        <p className="text-rmb-gray">{t.skills.subtitle}</p>
+    <div className="space-y-3">
+      {!embedded ? (
+        <div>
+          <h1 className="text-lg font-semibold text-rmb-dark">{t.skills.title}</h1>
+          <p className="text-sm text-rmb-muted">{t.skills.subtitle}</p>
+        </div>
+      ) : null}
+
+      <div className="flex items-center justify-between gap-4">
+        <div className="relative w-72">
+          <Search
+            className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-rmb-faint"
+            strokeWidth={1.75}
+          />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => {
+              setOffset(0);
+              setQuery(e.target.value);
+            }}
+            placeholder={t.skills.searchPlaceholder}
+            className="h-8 w-full rounded-md border border-rmb-line-strong bg-white pl-8 pr-3 text-sm text-rmb-dark outline-none transition-colors placeholder:text-rmb-faint focus:border-rmb-accent"
+          />
+        </div>
+        <span className="text-xs text-rmb-muted">
+          {total} {t.skills.title.toLowerCase()}
+        </span>
       </div>
 
-      <div className="flex gap-2">
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => {
-            setOffset(0);
-            setQuery(e.target.value);
-          }}
-          placeholder={t.skills.searchPlaceholder}
-          className="w-full max-w-md rounded-lg border border-rmb-gray/20 bg-white px-3 py-2 text-sm text-rmb-dark"
-        />
-      </div>
-
-      <div className="overflow-x-auto rounded-xl border border-rmb-gray/20 bg-white">
-        {rows.length === 0 ? (
-          <p className="px-4 py-8 text-center text-rmb-gray">{t.skills.empty}</p>
-        ) : (
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-rmb-gray/15 text-rmb-gray">
-              <tr>
-                <th className="px-4 py-3 font-medium">{t.skills.colSkill}</th>
-                <th className="px-4 py-3 font-medium">{t.skills.colRevision}</th>
-                <th className="px-4 py-3 font-medium">{t.skills.colRecall}</th>
-                <th className="px-4 py-3 font-medium">{t.skills.colUpdated}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr
-                  key={row.slug}
-                  className="group border-b border-rmb-gray/10 last:border-0 hover:bg-rmb-light/40"
-                >
-                  <td className="px-4 py-3">
-                    <Link
-                      to={`/skills/${encodeURIComponent(row.slug)}`}
-                      className="flex min-w-0 items-start gap-3"
-                    >
-                      <span
-                        className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-violet-500/10 text-violet-600"
-                        aria-hidden
-                      >
-                        <Wand2 className="size-4" />
-                      </span>
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-semibold text-rmb-dark">{row.name}</span>
-                          {(row.tags ?? []).map((tag) => (
-                            <SkillTag key={tag} tag={tag} />
-                          ))}
-                        </div>
-                        <div className="font-mono text-xs text-rmb-gray">{row.uri}</div>
-                        <p className="mt-1 line-clamp-2 text-sm text-rmb-gray">{row.description}</p>
-                      </div>
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 align-top">
-                    <div className="font-mono text-xs text-rmb-dark">v{row.version}</div>
-                    <div className="text-[11px] text-rmb-gray">
-                      {row.version > 1 ? `${row.version} revisions` : "original"}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 align-top">
-                    <RecallStatsLabel stats={row.recall_stats} />
-                  </td>
-                  <td className="px-4 py-3 align-top text-rmb-gray">
-                    {formatDateTime(row.updated_at)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      <Pagination
-        total={total}
-        offset={offset}
-        limit={limit}
-        onPageChange={setOffset}
-        onLimitChange={setLimit}
-      />
+      {rows.length === 0 ? (
+        <EmptyState title={t.skills.empty} />
+      ) : (
+        <div className="rounded-md border border-rmb-line">
+          <div className="divide-y divide-rmb-line">
+            {rows.map((row) => (
+              <Link
+                key={row.slug}
+                to={`/agents/skills/${encodeURIComponent(row.slug)}`}
+                className="grid min-h-14 grid-cols-[minmax(0,1fr)_3rem_5rem_11.5rem] items-center gap-4 px-3 py-2 transition-colors hover:bg-rmb-fill"
+              >
+                <div className="min-w-0">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <span className="truncate text-sm font-medium text-rmb-dark">{row.name}</span>
+                    {(row.tags ?? []).map((tag) => (
+                      <StatusPill key={tag} tone="neutral">
+                        {tag}
+                      </StatusPill>
+                    ))}
+                    <span className="hidden truncate font-mono text-[11px] text-rmb-faint lg:inline">
+                      {row.uri}
+                    </span>
+                  </div>
+                  <p className="truncate text-xs text-rmb-muted" title={row.description}>
+                    {row.description}
+                  </p>
+                </div>
+                <span className="text-right font-mono text-xs text-rmb-muted">v{row.version}</span>
+                <RecallStatsLabel
+                  stats={row.recall_stats}
+                  unit={t.memories.recalls}
+                  className="justify-end"
+                />
+                <span className={`text-right text-xs text-rmb-faint ${formatDateTimeMonoClass}`}>
+                  {formatDateTime(row.updated_at)}
+                </span>
+              </Link>
+            ))}
+          </div>
+          <Pagination
+            total={total}
+            offset={offset}
+            limit={limit}
+            onPageChange={setOffset}
+            onLimitChange={setLimit}
+          />
+        </div>
+      )}
     </div>
   );
 }

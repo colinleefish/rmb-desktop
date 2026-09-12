@@ -1,182 +1,97 @@
 import { NavLink, useLocation } from "react-router-dom";
 import type { ComponentType } from "react";
 import {
+  Bot,
+  ChevronLeft,
+  ChevronRight,
   LayoutDashboard,
   MessagesSquare,
-  Plug,
   Settings,
   Sparkles,
-  Wand2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { getOverview } from "../lib/api";
-import {
-  MEMORY_CATEGORIES,
-  type MemoryCategory,
-} from "../lib/memoryCategories";
-import type { MemoryCategoryOverview, OverviewCounts } from "../lib/types";
+import { probeDaemon } from "../lib/api";
+import { isFullMock } from "../lib/mockMode";
+import { useOverviewCounts } from "../lib/overviewCounts";
+import { useSidebarCollapsed } from "../lib/sidebarCollapsed";
+import type { OverviewCounts } from "../lib/types";
 import { useI18n } from "../i18n";
-
-type NavChild = {
-  to: string;
-  label: string;
-  category?: MemoryCategory;
-};
 
 type NavItem = {
   to: string;
   label: string;
-  icon: ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string; strokeWidth?: number }>;
   countKey?: keyof OverviewCounts;
   end?: boolean;
-  disabled?: boolean;
   activePrefix?: string;
-  children?: NavChild[];
+  extraPrefixes?: string[];
 };
 
-const navLinkClass = (isActive: boolean) =>
-  [
-    "flex items-center gap-2 rounded-md px-2 py-2 text-sm transition",
+function navLinkClass(isActive: boolean, collapsed: boolean) {
+  return [
+    "flex h-8 items-center rounded-md text-sm transition-colors",
+    collapsed ? "justify-center px-0" : "gap-2.5 px-2.5",
     isActive
-      ? "bg-rmb-accent text-white [&_svg]:stroke-white"
-      : "text-rmb-gray hover:bg-rmb-light [&_svg]:stroke-rmb-gray",
+      ? "bg-rmb-fill font-medium text-rmb-dark [&_svg]:stroke-rmb-accent"
+      : "text-rmb-muted hover:bg-rmb-fill hover:text-rmb-dark [&_svg]:stroke-rmb-faint",
   ].join(" ");
-
-function memoryCategoryBadge(
-  category: MemoryCategory,
-  stats: MemoryCategoryOverview | null,
-): string | undefined {
-  if (!stats) return undefined;
-  if (category === "profile") {
-    return stats.profile_version > 0 ? `v${stats.profile_version}` : undefined;
-  }
-  const count = stats[category];
-  return String(count);
 }
 
-function SidebarNavChildren({
-  items,
-  memoryByCategory,
-}: {
-  items: NavChild[];
-  memoryByCategory: MemoryCategoryOverview | null;
-}) {
-  const location = useLocation();
+function pathActive(pathname: string, item: NavItem, navActive: boolean): boolean {
+  if (item.end) return navActive;
+  if (navActive) return true;
+  if (item.activePrefix && pathname.startsWith(item.activePrefix)) return true;
+  return Boolean(item.extraPrefixes?.some((p) => pathname.startsWith(p)));
+}
 
-  return (
-    <ul className="ml-5 mt-0.5 space-y-0.5 border-l border-rmb-gray/15 pl-2">
-      {items.map((child) => {
-        const isActive = location.pathname === child.to;
-        const badge = child.category
-          ? memoryCategoryBadge(child.category, memoryByCategory)
-          : undefined;
-        return (
-          <li key={child.to}>
-            <NavLink
-              to={child.to}
-              className={[
-                "flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition",
-                isActive
-                  ? "bg-rmb-accent/10 font-medium text-rmb-accent"
-                  : "text-rmb-gray hover:bg-rmb-light hover:text-rmb-dark",
-              ].join(" ")}
-            >
-              <span className="flex-1">{child.label}</span>
-              {badge !== undefined && (
-                <span
-                  className={[
-                    "rounded px-1.5 py-0.5 text-[10px] tabular-nums",
-                    isActive
-                      ? "bg-rmb-accent/15 text-rmb-accent"
-                      : "bg-rmb-light text-rmb-gray",
-                  ].join(" ")}
-                >
-                  {badge}
-                </span>
-              )}
-            </NavLink>
-          </li>
-        );
-      })}
-    </ul>
-  );
+function navTooltip(label: string, count: number | null, collapsed: boolean): string | undefined {
+  if (!collapsed) return undefined;
+  if (count != null) return `${label} (${count})`;
+  return label;
 }
 
 function SidebarNavItem({
   item,
   counts,
-  memoryByCategory,
-  soonLabel,
+  collapsed,
 }: {
   item: NavItem;
   counts: OverviewCounts | null;
-  memoryByCategory: MemoryCategoryOverview | null;
-  soonLabel: string;
+  collapsed: boolean;
 }) {
   const Icon = item.icon;
   const location = useLocation();
-
-  if (item.disabled) {
-    return (
-      <span className="flex items-center gap-2 rounded-md px-2 py-2 text-sm text-rmb-gray/60 opacity-60">
-        <Icon className="size-4 shrink-0 stroke-rmb-gray/60" />
-        <span className="flex-1">{item.label}</span>
-        <span className="text-[10px] uppercase">{soonLabel}</span>
-      </span>
-    );
-  }
-
-  if (item.children?.length) {
-    const sectionActive = item.children.some((child) => location.pathname === child.to);
-
-    return (
-      <div>
-        <div
-          className={[
-            "flex items-center gap-2 rounded-md px-2 py-2 text-sm",
-            sectionActive ? "font-medium text-rmb-dark" : "text-rmb-gray",
-          ].join(" ")}
-        >
-          <Icon
-            className={[
-              "size-4 shrink-0",
-              sectionActive ? "stroke-rmb-accent" : "stroke-rmb-gray",
-            ].join(" ")}
-          />
-          <span className="flex-1">{item.label}</span>
-        </div>
-        <SidebarNavChildren items={item.children} memoryByCategory={memoryByCategory} />
-      </div>
-    );
-  }
+  const count =
+    item.countKey && counts != null ? counts[item.countKey] : null;
+  const tooltip = navTooltip(item.label, count, collapsed);
 
   return (
     <NavLink
       to={item.to}
       end={item.end}
+      title={tooltip}
       className={({ isActive }) =>
-        navLinkClass(isActive || (item.activePrefix ? location.pathname.startsWith(item.activePrefix) : false))
+        navLinkClass(pathActive(location.pathname, item, isActive), collapsed)
       }
     >
       {({ isActive }) => {
-        const highlighted =
-          isActive || (item.activePrefix ? location.pathname.startsWith(item.activePrefix) : false);
+        const highlighted = pathActive(location.pathname, item, isActive);
         return (
-        <>
-          <Icon className="size-4 shrink-0" />
-          <span className="flex-1">{item.label}</span>
-          {item.countKey && counts && (
-            <span
-              className={
-                highlighted
-                  ? "rounded bg-rmb-dark/30 px-1.5 py-0.5 text-[10px] tabular-nums text-white"
-                  : "rounded bg-rmb-light px-1.5 py-0.5 text-[10px] tabular-nums text-rmb-gray"
-              }
-            >
-              {counts[item.countKey]}
-            </span>
-          )}
-        </>
+          <>
+            <Icon className="size-4 shrink-0" strokeWidth={1.75} />
+            {!collapsed ? (
+              <>
+                <span className="flex-1">{item.label}</span>
+                {count != null ? (
+                  <span
+                    className={`text-[11px] ${highlighted ? "text-rmb-muted" : "text-rmb-faint"}`}
+                  >
+                    {count}
+                  </span>
+                ) : null}
+              </>
+            ) : null}
+          </>
         );
       }}
     </NavLink>
@@ -186,121 +101,151 @@ function SidebarNavItem({
 export function Sidebar() {
   const { t } = useI18n();
   const location = useLocation();
-  const [counts, setCounts] = useState<OverviewCounts | null>(null);
-  const [memoryByCategory, setMemoryByCategory] = useState<MemoryCategoryOverview | null>(null);
+  const counts = useOverviewCounts();
+  const { collapsed, toggle } = useSidebarCollapsed();
+  const [daemonUp, setDaemonUp] = useState<boolean | null>(null);
 
   useEffect(() => {
-    getOverview()
-      .then((o) => {
-        setCounts(o.counts);
-        setMemoryByCategory(o.memory_by_category);
-      })
-      .catch(() => {});
+    let cancelled = false;
+    const tick = () => {
+      probeDaemon()
+        .then((ok) => {
+          if (!cancelled) setDaemonUp(ok);
+        })
+        .catch(() => {
+          if (!cancelled) setDaemonUp(false);
+        });
+    };
+    tick();
+    const id = window.setInterval(tick, 5000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
   }, []);
 
-  const groups: { label: string; items: NavItem[] }[] = [
+  const items: NavItem[] = [
+    { to: "/", label: t.nav.overview, icon: LayoutDashboard, end: true },
     {
-      label: t.nav.home,
-      items: [
-        { to: "/", label: t.nav.overview, icon: LayoutDashboard, end: true },
-      ],
+      to: "/sessions",
+      label: t.nav.sessions,
+      icon: MessagesSquare,
+      countKey: "sessions",
     },
     {
-      label: t.nav.perSession,
-      items: [
-        {
-          to: "/sessions",
-          label: t.nav.sessions,
-          icon: MessagesSquare,
-          countKey: "sessions",
-        },
-      ],
+      to: "/memories",
+      label: t.nav.memories,
+      icon: Sparkles,
+      countKey: "memories",
+      activePrefix: "/memories",
     },
     {
-      label: t.nav.acrossSessions,
-      items: [
-        {
-          to: "/memories/profile",
-          label: t.nav.memories,
-          icon: Sparkles,
-          children: MEMORY_CATEGORIES.map((category) => ({
-            to: `/memories/${category}`,
-            label: t.memories.categories[category].nav,
-            category,
-          })),
-        },
-        {
-          to: "/skills",
-          label: t.nav.skills,
-          icon: Wand2,
-          countKey: "skills",
-        },
-      ],
-    },
-    {
-      label: t.nav.integrationGroup,
-      items: [
-        {
-          to: "/integrations/cursor",
-          label: t.nav.agentIntegrations,
-          icon: Plug,
-          activePrefix: "/integrations",
-        },
-      ],
+      to: "/agents",
+      label: t.nav.agents,
+      icon: Bot,
+      activePrefix: "/agents",
+      extraPrefixes: ["/integrations", "/skills"],
     },
   ];
 
+  const daemonLabel = !daemonUp
+    ? t.nav.daemonDown
+    : isFullMock()
+      ? t.nav.daemonMock
+      : t.nav.daemonLocal;
+
+  const toggleLabel = collapsed ? t.nav.expandSidebar : t.nav.collapseSidebar;
+  const ToggleIcon = collapsed ? ChevronRight : ChevronLeft;
+
   return (
-    <aside className="flex h-full w-60 shrink-0 flex-col border-r border-rmb-gray/20 bg-white">
-      <div className="flex items-center gap-3 border-b border-rmb-gray/15 px-4 py-4">
+    <div
+      className={[
+        "relative flex h-full shrink-0 flex-col transition-[width] duration-200 ease-in-out",
+        collapsed ? "w-14" : "w-56",
+      ].join(" ")}
+    >
+      <aside className="flex h-full flex-col overflow-hidden border-r border-rmb-line bg-white">
+      <div
+        className={[
+          "flex h-14 shrink-0 items-center",
+          collapsed ? "justify-center px-1" : "gap-2 px-3",
+        ].join(" ")}
+      >
         <img
           src={`${import.meta.env.BASE_URL}logo.svg`}
           alt=""
-          className="size-9 shrink-0 rounded-lg"
-          width={36}
-          height={36}
+          className={[
+            "shrink-0 rounded-md",
+            collapsed ? "size-6" : "size-7",
+          ].join(" ")}
+          width={collapsed ? 24 : 28}
+          height={collapsed ? 24 : 28}
         />
-        <div className="leading-tight">
-          <div className="text-sm font-semibold text-rmb-dark">{t.appName}</div>
-          {t.appSubtitle ? (
-            <div className="text-xs text-rmb-gray">{t.appSubtitle}</div>
+        {!collapsed ? (
+          <div className="min-w-0 flex-1 leading-tight">
+            <div className="truncate text-sm font-semibold text-rmb-dark">{t.appName}</div>
+            {t.appSubtitle ? (
+              <div className="truncate text-xs text-rmb-muted">{t.appSubtitle}</div>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+
+      <nav className={["flex-1 overflow-y-auto overflow-x-hidden pt-2", collapsed ? "px-1.5" : "px-3"].join(" ")}>
+        <ul className="space-y-0.5">
+          {items.map((item) => (
+            <li key={item.to}>
+              <SidebarNavItem item={item} counts={counts} collapsed={collapsed} />
+            </li>
+          ))}
+        </ul>
+      </nav>
+
+      <div className={["space-y-1 pb-3", collapsed ? "px-1.5" : "px-3"].join(" ")}>
+        <NavLink
+          to="/settings/general"
+          title={collapsed ? t.nav.settings : undefined}
+          className={({ isActive }) =>
+            navLinkClass(
+              isActive || location.pathname.startsWith("/settings"),
+              collapsed,
+            )
+          }
+        >
+          <Settings className="size-4 shrink-0" strokeWidth={1.75} />
+          {!collapsed ? <span>{t.nav.settings}</span> : null}
+        </NavLink>
+        <div
+          className={[
+            "flex items-center text-xs text-rmb-muted",
+            collapsed ? "h-8 justify-center px-0" : "h-8 gap-2.5 px-2.5",
+          ].join(" ")}
+          title={collapsed ? daemonLabel : undefined}
+        >
+          <span
+            className={[
+              "size-1.5 shrink-0 rounded-full",
+              daemonUp === null ? "bg-rmb-faint" : daemonUp ? "bg-rmb-accent" : "bg-rmb-danger",
+            ].join(" ")}
+            aria-hidden
+          />
+          {!collapsed ? <span className="truncate">{daemonLabel}</span> : null}
+          {collapsed ? (
+            <span className="sr-only">{daemonLabel}</span>
           ) : null}
         </div>
       </div>
-
-      <nav className="flex-1 overflow-y-auto px-2 py-3">
-        {groups.map((group) => (
-          <div key={group.label} className="mb-4">
-            <div className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-rmb-gray/60">
-              {group.label}
-            </div>
-            <ul className="space-y-0.5">
-              {group.items.map((item) => (
-                <li key={item.to}>
-                  <SidebarNavItem
-                    item={item}
-                    counts={counts}
-                    memoryByCategory={memoryByCategory}
-                    soonLabel={t.nav.soon}
-                  />
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </nav>
-
-      <div className="border-t border-rmb-gray/15 p-3">
-        <NavLink
-          to="/settings/general"
-          className={({ isActive }) =>
-            navLinkClass(isActive || location.pathname.startsWith("/settings"))
-          }
-        >
-          <Settings className="size-4 shrink-0" />
-          {t.nav.settings}
-        </NavLink>
-      </div>
-    </aside>
+      </aside>
+      <button
+        type="button"
+        onClick={toggle}
+        aria-expanded={!collapsed}
+        aria-label={toggleLabel}
+        title={toggleLabel}
+        className="absolute right-0 top-1/2 z-10 flex size-6 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full border border-rmb-line bg-white text-rmb-muted shadow-sm transition-colors hover:bg-rmb-fill hover:text-rmb-dark"
+      >
+        <ToggleIcon className="size-3.5" strokeWidth={1.75} aria-hidden />
+      </button>
+    </div>
   );
 }

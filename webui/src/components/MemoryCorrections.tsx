@@ -6,7 +6,7 @@ import {
   retractCorrection,
 } from "../lib/api";
 import type { CorrectionRow } from "../lib/types";
-import { formatDateTime } from "../lib/format";
+import { formatDateTime, formatDateTimeMonoClass } from "../lib/format";
 import { useI18n } from "../i18n";
 
 export function MemoryCorrections({ memoryURI }: { memoryURI: string }) {
@@ -58,37 +58,37 @@ export function MemoryCorrections({ memoryURI }: { memoryURI: string }) {
   };
 
   return (
-    <div className="space-y-4 border-t border-rmb-gray/15 pt-4">
+    <div className="mt-6 space-y-4 border-t border-rmb-line pt-5">
       <div>
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-rmb-gray">
-          {t.memories.corrections.title} ({rows.length})
+        <h3 className="text-sm font-semibold text-rmb-dark">
+          {t.memories.corrections.title}{" "}
+          <span className="font-normal text-rmb-faint">{rows.length}</span>
         </h3>
         {loading ? (
-          <p className="mt-2 text-sm text-rmb-gray">{t.memories.loading}</p>
+          <p className="mt-2 text-sm text-rmb-muted">{t.memories.loading}</p>
         ) : error ? (
-          <p className="mt-2 text-sm text-red-600">{error}</p>
+          <p className="mt-2 text-sm text-rmb-danger">{error}</p>
         ) : rows.length === 0 ? (
-          <p className="mt-2 text-sm text-rmb-gray">{t.memories.corrections.empty}</p>
+          <p className="mt-2 text-sm text-rmb-muted">{t.memories.corrections.empty}</p>
         ) : (
-          <div className="mt-2 space-y-2">
+          <div className="mt-2 divide-y divide-rmb-line rounded-md border border-rmb-line">
             {rows.map((row) => (
-              <div
-                key={row.uri}
-                className="rounded-lg border border-rmb-gray/15 bg-rmb-light/40 p-3"
-              >
-                <div className="flex items-start justify-between gap-3">
+              <div key={row.uri} className="flex items-start justify-between gap-3 px-3 py-2.5">
+                <div className="min-w-0">
                   <p className="whitespace-pre-wrap text-sm text-rmb-dark">{row.statement}</p>
-                  <button
-                    type="button"
-                    onClick={() => handleRetract(row.uri)}
-                    disabled={retractingURI === row.uri}
-                    className="shrink-0 rounded p-1 text-rmb-gray transition hover:bg-white hover:text-red-600 disabled:opacity-50"
-                    aria-label={t.memories.corrections.retract}
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
+                  <p className={`mt-1 text-xs text-rmb-faint ${formatDateTimeMonoClass}`}>
+                    {formatDateTime(row.created_at)}
+                  </p>
                 </div>
-                <p className="mt-2 text-xs text-rmb-gray">{formatDateTime(row.created_at)}</p>
+                <button
+                  type="button"
+                  onClick={() => handleRetract(row.uri)}
+                  disabled={retractingURI === row.uri}
+                  className="shrink-0 rounded-md p-1 text-rmb-faint transition-colors hover:bg-rmb-fill hover:text-rmb-danger disabled:opacity-50"
+                  aria-label={t.memories.corrections.retract}
+                >
+                  <Trash2 className="size-4" />
+                </button>
               </div>
             ))}
           </div>
@@ -96,23 +96,21 @@ export function MemoryCorrections({ memoryURI }: { memoryURI: string }) {
       </div>
 
       <div>
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-rmb-gray">
-          {t.memories.corrections.addTitle}
-        </h3>
+        <h3 className="text-sm font-semibold text-rmb-dark">{t.memories.corrections.addTitle}</h3>
         <textarea
           value={statement}
           onChange={(e) => setStatement(e.target.value)}
           placeholder={t.memories.corrections.placeholder}
           rows={3}
-          className="mt-2 w-full resize-y rounded-md border border-rmb-gray/20 px-3 py-2 text-sm text-rmb-dark outline-none focus:border-rmb-accent"
+          className="mt-2 w-full resize-y rounded-md border border-rmb-line-strong px-3 py-2 text-sm text-rmb-dark outline-none transition-colors placeholder:text-rmb-faint focus:border-rmb-accent"
         />
-        {submitError && <p className="mt-2 text-sm text-red-600">{submitError}</p>}
+        {submitError && <p className="mt-2 text-sm text-rmb-danger">{submitError}</p>}
         <div className="mt-2 flex justify-end">
           <button
             type="button"
             onClick={handleAdd}
             disabled={submitting || statement.trim() === ""}
-            className="rounded-md bg-rmb-accent px-3 py-1.5 text-sm font-medium text-white transition hover:bg-rmb-accent/90 disabled:opacity-50"
+            className="h-8 rounded-md bg-rmb-accent px-3 text-sm font-medium text-white transition-colors hover:bg-rmb-accent/90 active:scale-[0.98] disabled:opacity-50"
           >
             {submitting ? t.memories.corrections.adding : t.memories.corrections.add}
           </button>

@@ -4,6 +4,8 @@ import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { getConfig, getVersion, putConfig, restartService, type RestartPhase } from "../lib/api";
 import type { ConfigUpdateRequest, ConfigView } from "../lib/types";
 import { useI18n } from "../i18n";
+import { tabClass } from "../lib/tabClass";
+import { ErrorNote, ListSkeleton } from "../components/EmptyState";
 import { LanguageSelect } from "../components/LanguageSelect";
 import { SelectMenu } from "../components/SelectMenu";
 import { ConfiguredApiKeyField } from "../components/ConfiguredApiKeyField";
@@ -172,50 +174,41 @@ export function SettingsPage() {
   }
 
   if (!config || !pipeline) {
-    return <p className="text-rmb-gray">{t.common.loading}</p>;
+    return <ListSkeleton rows={5} />;
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">{t.settings.title}</h1>
-        <p className="mt-1 text-rmb-gray">{t.settings.subtitle}</p>
-      </div>
-
-      <div className="flex gap-2 border-b border-rmb-gray/20">
+    <div className="space-y-5">
+      <div className="flex gap-1 border-b border-rmb-line">
         {tabs.map((item) => (
           <button
             key={item.id}
             type="button"
             onClick={() => selectTab(item.id)}
-            className={`border-b-2 px-3 py-2 text-sm font-medium transition ${
-              tab === item.id
-                ? "border-rmb-accent text-rmb-dark"
-                : "border-transparent text-rmb-gray hover:text-rmb-dark"
-            }`}
+            className={tabClass(tab === item.id)}
           >
             {item.label}
           </button>
         ))}
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-rmb-gray/35 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-md border border-rmb-line bg-white">
         <div className="p-6">
         {tab === "general" && config && pipeline && (
-          <div className="space-y-4 max-w-xl">
+          <div className="max-w-xl space-y-5">
             <Field label={t.settings.general.addr} value={addr} onChange={setAddr} />
             <ReadOnly label={t.settings.general.dbPath} value={config.db_path} />
             <ReadOnly label={t.settings.general.configPath} value={config.config_path} />
             <div>
-              <div className="text-sm font-medium text-rmb-gray">{t.settings.general.distillation}</div>
-              <p className="mt-1 text-sm text-rmb-gray">
+              <div className="text-xs font-medium text-rmb-muted">{t.settings.general.distillation}</div>
+              <p className="mt-1 text-sm text-rmb-dark">
                 {config.distillation_enabled
                   ? t.settings.general.distillationOn
                   : t.settings.general.distillationOff}
               </p>
             </div>
-            <div className="border-t border-rmb-gray/15 pt-4">
-              <label id="settings-launch-at-login-label" className="block text-sm font-medium text-rmb-gray">
+            <div className="border-t border-rmb-line pt-5">
+              <label id="settings-launch-at-login-label" className="block text-xs font-medium text-rmb-muted">
                 {t.settings.general.launchAtLogin}
               </label>
               <div className="mt-1 max-w-xs">
@@ -230,10 +223,10 @@ export function SettingsPage() {
                   ]}
                 />
               </div>
-              <p className="mt-1.5 text-xs text-rmb-gray">{t.settings.general.launchAtLoginHint}</p>
+              <p className="mt-1.5 text-xs text-rmb-faint">{t.settings.general.launchAtLoginHint}</p>
             </div>
-            <div className="border-t border-rmb-gray/15 pt-4">
-              <label id="settings-language-label" className="block text-sm font-medium text-rmb-gray">
+            <div className="border-t border-rmb-line pt-5">
+              <label id="settings-language-label" className="block text-xs font-medium text-rmb-muted">
                 {t.settings.language.label}
               </label>
               <div className="mt-1 max-w-xs">
@@ -250,7 +243,7 @@ export function SettingsPage() {
 
         {tab === "models" && config && (
           <div className="max-w-xl space-y-8">
-            <p className="text-sm text-rmb-gray">{t.settings.models.intro}</p>
+            <p className="text-sm text-rmb-muted">{t.settings.models.intro}</p>
             <section className="space-y-4">
               <h3 className="text-sm font-semibold text-rmb-dark">{t.settings.models.llm}</h3>
               <Field
@@ -271,9 +264,9 @@ export function SettingsPage() {
               />
             </section>
 
-            <section className="space-y-4 border-t border-rmb-gray/15 pt-8">
+            <section className="space-y-4 border-t border-rmb-line pt-8">
               <h3 className="text-sm font-semibold text-rmb-dark">{t.settings.models.embed}</h3>
-              <p className="text-xs text-rmb-gray">{t.settings.embed.reembedNotice}</p>
+              <p className="text-xs text-rmb-faint">{t.settings.embed.reembedNotice}</p>
               <Field
                 label={t.settings.embed.apiBase}
                 value={embedBase}
@@ -284,7 +277,7 @@ export function SettingsPage() {
               <div>
                 <label
                   id="settings-embed-dimensions-label"
-                  className="block text-sm font-medium text-rmb-gray"
+                  className="block text-xs font-medium text-rmb-muted"
                 >
                   {t.settings.embed.dimensions}
                 </label>
@@ -322,7 +315,7 @@ export function SettingsPage() {
 
         {tab === "advanced" && pipeline && (
           <div className="max-w-xl space-y-4">
-            <p className="text-sm text-rmb-gray">{t.settings.advanced.pipelineIntro}</p>
+            <p className="text-sm text-rmb-muted">{t.settings.advanced.pipelineIntro}</p>
             <PipelineSecondsField label={t.settings.pipeline.l1Poll} field="l1_poll_interval" pipeline={pipeline} setPipeline={setPipeline} />
             <PipelineSecondsField label={t.settings.pipeline.l2Poll} field="l2_poll_interval" pipeline={pipeline} setPipeline={setPipeline} />
             <PipelineSecondsField label={t.settings.pipeline.l3Poll} field="l3_poll_interval" pipeline={pipeline} setPipeline={setPipeline} />
@@ -346,7 +339,7 @@ export function SettingsPage() {
             <button
               type="button"
               onClick={() => setPipeline({ ...DEFAULT_PIPELINE })}
-              className="rounded-md border border-rmb-gray/20 bg-white px-3 py-1.5 text-sm font-medium text-rmb-dark hover:bg-rmb-light"
+              className="h-8 rounded-md border border-rmb-line-strong bg-white px-3 text-sm font-medium text-rmb-dark transition-colors hover:bg-rmb-fill"
             >
               {t.settings.advanced.reset}
             </button>
@@ -355,30 +348,30 @@ export function SettingsPage() {
 
         </div>
 
-        <div className="flex flex-wrap items-center gap-4 border-t border-rmb-gray/15 bg-rmb-light/30 px-6 py-4">
+        <div className="flex flex-wrap items-center gap-4 border-t border-rmb-line bg-rmb-fill/70 px-6 py-3">
             <button
               type="button"
               onClick={() => void handleSave()}
               disabled={saving}
-              className="rounded-md bg-rmb-accent px-4 py-2 text-sm font-medium text-white hover:bg-rmb-accent/90 disabled:opacity-50"
+              className="h-8 rounded-md bg-rmb-accent px-4 text-sm font-medium text-white transition-colors hover:bg-rmb-accent/90 active:scale-[0.98] disabled:opacity-50"
             >
               {saving ? t.settings.saving : t.settings.save}
             </button>
             {saveStatus === "saved" && (
-              <p className="text-sm text-emerald-600">{t.settings.saved}</p>
+              <p className="text-sm text-rmb-accent">{t.settings.saved}</p>
             )}
             {saveStatus === "saved_reembed" && (
-              <p className="text-sm text-emerald-600">{t.settings.savedReembed}</p>
+              <p className="text-sm text-rmb-accent">{t.settings.savedReembed}</p>
             )}
             {saveStatus === "restarted" && (
-              <p className="text-sm text-emerald-600">{t.settings.restartComplete}</p>
+              <p className="text-sm text-rmb-accent">{t.settings.restartComplete}</p>
             )}
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {error && <ErrorNote>{error}</ErrorNote>}
           </div>
       </div>
 
       {buildInfo && (
-        <p className="text-xs text-rmb-gray/60">
+        <p className="text-xs text-rmb-faint">
           v{buildInfo.version} · {buildInfo.commit}
         </p>
       )}
@@ -392,13 +385,13 @@ export function SettingsPage() {
           <RestartProgress phase={restartPhase} labels={t.settings} />
         ) : (
           <>
-            <p className="text-sm text-rmb-gray">{t.settings.restartBody}</p>
+            <p className="text-sm text-rmb-muted">{t.settings.restartBody}</p>
             <div className="mt-6 flex justify-end gap-3">
               <button
                 type="button"
                 onClick={() => setShowRestartPrompt(false)}
                 disabled={restarting}
-                className="rounded-md border border-rmb-gray/20 bg-white px-4 py-2 text-sm font-medium text-rmb-dark hover:bg-rmb-light disabled:opacity-50"
+                className="h-8 rounded-md border border-rmb-line-strong bg-white px-4 text-sm font-medium text-rmb-dark transition-colors hover:bg-rmb-fill disabled:opacity-50"
               >
                 {t.settings.restartLater}
               </button>
@@ -406,7 +399,7 @@ export function SettingsPage() {
                 type="button"
                 onClick={() => void handleRestartNow()}
                 disabled={restarting}
-                className="rounded-md bg-rmb-accent px-4 py-2 text-sm font-medium text-white hover:bg-rmb-accent/90 disabled:opacity-50"
+                className="h-8 rounded-md bg-rmb-accent px-4 text-sm font-medium text-white transition-colors hover:bg-rmb-accent/90 disabled:opacity-50"
               >
                 {t.settings.restartNow}
               </button>
@@ -420,13 +413,13 @@ export function SettingsPage() {
         onClose={() => setShowEmbedConfirm(false)}
         title={t.settings.embed.reembedConfirmTitle}
       >
-        <p className="text-sm text-rmb-gray">{t.settings.embed.reembedConfirmBody}</p>
+        <p className="text-sm text-rmb-muted">{t.settings.embed.reembedConfirmBody}</p>
         <div className="mt-6 flex justify-end gap-3">
           <button
             type="button"
             onClick={() => setShowEmbedConfirm(false)}
             disabled={saving}
-            className="rounded-md border border-rmb-gray/20 bg-white px-4 py-2 text-sm font-medium text-rmb-dark hover:bg-rmb-light disabled:opacity-50"
+            className="h-8 rounded-md border border-rmb-line-strong bg-white px-4 text-sm font-medium text-rmb-dark transition-colors hover:bg-rmb-fill disabled:opacity-50"
           >
             {t.settings.embed.reembedConfirmCancel}
           </button>
@@ -434,7 +427,7 @@ export function SettingsPage() {
             type="button"
             onClick={() => void performSave()}
             disabled={saving}
-            className="rounded-md bg-rmb-accent px-4 py-2 text-sm font-medium text-white hover:bg-rmb-accent/90 disabled:opacity-50"
+            className="h-8 rounded-md bg-rmb-accent px-4 text-sm font-medium text-white transition-colors hover:bg-rmb-accent/90 disabled:opacity-50"
           >
             {saving ? t.settings.saving : t.settings.embed.reembedConfirmAction}
           </button>
@@ -473,7 +466,7 @@ function RestartProgress({
         return (
           <div key={step.id} className="flex items-center gap-3 text-sm">
             {done ? (
-              <CircleCheck className="size-5 shrink-0 text-emerald-600" aria-hidden />
+              <CircleCheck className="size-5 shrink-0 text-rmb-accent" aria-hidden />
             ) : active ? (
               <Loader2 className="size-5 shrink-0 animate-spin text-rmb-accent" aria-hidden />
             ) : (
@@ -521,7 +514,7 @@ function Field({
 }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-rmb-gray">{label}</label>
+      <label className="block text-xs font-medium text-rmb-muted">{label}</label>
       <input
         type={type}
         min={min}
@@ -529,7 +522,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className={`mt-1 rounded-md border border-rmb-gray/20 px-3 py-2 text-sm placeholder:text-rmb-gray/45 ${
+        className={`mt-1 h-8 rounded-md border border-rmb-line-strong px-3 text-sm text-rmb-dark outline-none transition-colors placeholder:text-rmb-faint focus:border-rmb-accent ${
           compact ? "w-28" : "w-full"
         } ${
           type === "number"
@@ -544,8 +537,8 @@ function Field({
 function ReadOnly({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="text-sm font-medium text-rmb-gray">{label}</div>
-      <p className="mt-1 break-all font-mono text-xs text-rmb-gray">{value}</p>
+      <div className="text-xs font-medium text-rmb-muted">{label}</div>
+      <p className="mt-1 break-all font-mono text-xs text-rmb-dark">{value}</p>
     </div>
   );
 }

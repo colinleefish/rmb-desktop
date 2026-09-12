@@ -118,6 +118,10 @@ async function healthOk(): Promise<boolean> {
   }
 }
 
+export function probeDaemon(): Promise<boolean> {
+  return healthOk();
+}
+
 async function waitForHealthDown(timeoutMs = 5000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -184,8 +188,9 @@ export function getSkill(slug: string) {
   );
 }
 
-export function listCorrections(target: string) {
-  const params = new URLSearchParams({ limit: "200", offset: "0", target });
+export function listCorrections(target?: string) {
+  const params = new URLSearchParams({ limit: "200", offset: "0" });
+  if (target) params.set("target", target);
   return apiGet<{ items: import("./types").CorrectionRow[] }>(
     `/corrections?${params.toString()}`,
   ).then((page) => page.items ?? []);

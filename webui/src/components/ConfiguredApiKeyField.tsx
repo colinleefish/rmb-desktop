@@ -46,7 +46,7 @@ export function ConfiguredApiKeyField({
         placeholder={configured ? replacePlaceholder : emptyPlaceholder}
         aria-label={label}
         autoComplete="off"
-        className="mt-1 w-full rounded-md border border-rmb-gray/20 px-3 py-2 font-mono text-sm placeholder:font-sans placeholder:text-rmb-gray/45"
+        className="mt-1 w-full rounded-md border border-rmb-line-strong h-8 px-3 font-mono text-sm outline-none transition-colors focus:border-rmb-accent placeholder:font-sans placeholder:text-rmb-faint"
       />
     </div>
   );

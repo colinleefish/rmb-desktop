@@ -76,16 +76,16 @@
     {
       "id": "F04",
       "name": "webui-shell-restructure",
-      "behavior": "Sidebar organized by user jobs; redirect shims (RedirectSettingsIntegrations, /pipeline) deleted; unused lib/*Mock.ts deleted",
-      "verification": "webui builds; no RedirectSettingsIntegrations in src; make check exits 0",
-      "state": "planned",
+      "behavior": "Job-oriented shell: flat Overview/Sessions/Memories/Agents/Settings; memory category tabs; Skills under Agents; daemon heartbeat; global recall bar. F10 mocks kept.",
+      "verification": "webui builds; Sidebar has /agents and no acrossSessions; Topbar exists; make check exits 0",
+      "state": "active",
       "evidence": "",
       "issue": 0,
       "layers": [
         {
           "label": "L1 static",
-          "cmd": "! grep -r 'RedirectSettingsIntegrations' webui/src && ! ls webui/src/lib/*Mock.ts >/dev/null 2>&1",
-          "repair": "Delete the redirect shim and unused mock files — see plan/webui-refactor.md §3 week 2."
+          "cmd": "grep -q 'to: \"/agents\"' webui/src/components/Sidebar.tsx && ! grep -q 'acrossSessions' webui/src/components/Sidebar.tsx && test -f webui/src/components/Topbar.tsx && test -f webui/src/lib/shellRoutes.ts && ! test -f webui/src/pages/RedirectSettingsIntegrations.tsx && grep -q 'RedirectSettingsIntegrations' webui/src/App.tsx",
+          "repair": "Job-oriented shell: flat Sidebar, Topbar + shellRoutes meta, settings/integrations redirect inline in App.tsx (no RedirectSettingsIntegrations page). F10 *Mock.ts files stay — gate does not require deleting them."
         },
         {
           "label": "L2 runtime",

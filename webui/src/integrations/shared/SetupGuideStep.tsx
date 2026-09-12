@@ -1,5 +1,8 @@
 import type { ReactNode } from "react";
 
+/** One sequential section of a setup guide (hook → recall → verify). Quiet
+ * tabular-num badge, no bespoke circle/connector shape — matches the
+ * hairline-section rhythm used by Settings' grouped fields. */
 export function SetupGuideStep({
   step,
   isLast = false,
@@ -10,19 +13,13 @@ export function SetupGuideStep({
   children: ReactNode;
 }) {
   return (
-    <section className={`relative ${isLast ? "" : "pb-10"}`}>
+    <section className={isLast ? "" : "mb-6 border-b border-rmb-line pb-6"}>
       <span
-        className="absolute -left-10 top-0 z-[1] flex size-7 items-center justify-center rounded-full border border-rmb-gray/25 bg-white text-xs font-semibold text-rmb-dark shadow-sm"
+        className="mb-3 inline-flex size-5 items-center justify-center rounded bg-rmb-fill text-[11px] font-semibold tabular-nums text-rmb-muted"
         aria-hidden
       >
         {step}
       </span>
-      {!isLast && (
-        <div
-          className="absolute -left-[27px] top-7 bottom-0 w-px bg-rmb-gray/30"
-          aria-hidden
-        />
-      )}
       {children}
     </section>
   );

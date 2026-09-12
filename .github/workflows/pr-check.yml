@@ -30,11 +30,15 @@ jobs:
           # tar-extraction race — disable it and cache the build dir explicitly below.
           cache: false
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.0
+
       - uses: actions/setup-node@v4
         with:
           node-version: 24.16.0 # pinned by .tool-versions
-          cache: npm
-          cache-dependency-path: webui/package-lock.json
+          cache: pnpm
+          cache-dependency-path: webui/pnpm-lock.yaml
 
       - name: Go build cache (CGO/sqlite is the expensive part)
         uses: actions/cache@v4
@@ -44,7 +48,7 @@ jobs:
 
       # The embedded webui (internal/http/static/web/index.html) is gitignored —
       # make check's webui-embed-check needs it, so build it exactly like locally.
-      - name: Bootstrap (go mod download + webui npm ci)
+      - name: Bootstrap (go mod download + webui pnpm install)
         run: make setup
 
       - name: Build embedded webui

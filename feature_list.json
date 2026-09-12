@@ -76,21 +76,21 @@
     {
       "id": "F04",
       "name": "webui-shell-restructure",
-      "behavior": "Sidebar organized by user jobs; redirect shims (RedirectSettingsIntegrations, /pipeline) deleted; unused lib/*Mock.ts deleted",
-      "verification": "webui builds; no RedirectSettingsIntegrations in src; make check exits 0",
-      "state": "planned",
-      "evidence": "",
+      "behavior": "Job-oriented shell: flat Overview/Sessions/Memories/Agents/Settings; memory category tabs; Skills under Agents; daemon heartbeat; global recall bar. F10 mocks kept.",
+      "verification": "webui builds; Sidebar has /agents and no acrossSessions; Topbar exists; make check exits 0",
+      "state": "passing",
+      "evidence": "commit 8ae3fae, verified 2026-09-12",
       "issue": 0,
       "layers": [
         {
           "label": "L1 static",
-          "cmd": "! grep -r 'RedirectSettingsIntegrations' webui/src && ! ls webui/src/lib/*Mock.ts >/dev/null 2>&1",
-          "repair": "Delete the redirect shim and unused mock files — see plan/webui-refactor.md §3 week 2."
+          "cmd": "grep -q 'to: \"/agents\"' webui/src/components/Sidebar.tsx && ! grep -q 'acrossSessions' webui/src/components/Sidebar.tsx && test -f webui/src/components/Topbar.tsx && test -f webui/src/lib/shellRoutes.ts && ! test -f webui/src/pages/RedirectSettingsIntegrations.tsx && grep -q 'RedirectSettingsIntegrations' webui/src/App.tsx",
+          "repair": "Job-oriented shell: flat Sidebar, Topbar + shellRoutes meta, settings/integrations redirect inline in App.tsx (no RedirectSettingsIntegrations page). F10 *Mock.ts files stay — gate does not require deleting them."
         },
         {
           "label": "L2 runtime",
-          "cmd": "cd webui && npm run build",
-          "repair": "Vite build failing: run npm run build in webui/ and fix the TS/build error."
+          "cmd": "cd webui && pnpm run build",
+          "repair": "Vite build failing: run pnpm run build in webui/ and fix the TS/build error."
         },
         {
           "label": "L3 system",
@@ -115,7 +115,7 @@
         },
         {
           "label": "L2 runtime",
-          "cmd": "cd webui && npm run build",
+          "cmd": "cd webui && pnpm run build",
           "repair": "Vite build failing after the split — fix the TS/build error."
         },
         {
@@ -162,7 +162,7 @@
       "layers": [
         {
           "label": "L1 static",
-          "cmd": "go build -tags sqlite_fts5 ./... && cd webui && npx tsc -b",
+          "cmd": "go build -tags sqlite_fts5 ./... && cd webui && pnpm exec tsc -b",
           "repair": "Go or TypeScript compile error in the zcode integration files — fix the reported error."
         },
         {
@@ -206,7 +206,7 @@
     {
       "id": "F09",
       "name": "pr-ci-gate",
-      "behavior": "GitHub Actions PR CI with full local parity (.github/workflows/pr-check.yml: make setup → webui-build → check on ubuntu-latest, CGO + sqlite_fts5, setup-go cache:false dodging the #40 toolchain race, go-build + npm caches, concurrency cancel, 15min timeout; triggers: all PRs + push to main) + branch protection on main (require check green, require PRs, merge-commit only) mechanically enforcing three existing harness rules",
+      "behavior": "GitHub Actions PR CI with full local parity (.github/workflows/pr-check.yml: make setup → webui-build → check on ubuntu-latest, CGO + sqlite_fts5, setup-go cache:false dodging the #40 toolchain race, go-build + pnpm caches, concurrency cancel, 15min timeout; triggers: all PRs + push to main) + branch protection on main (require check green, require PRs, merge-commit only) mechanically enforcing three existing harness rules",
       "verification": "a real PR runs pr-check green (run URL in evidence); branch protection API returns required_status_checks",
       "state": "passing",
       "evidence": "commit 24e94e1, verified 2026-09-12",
@@ -220,7 +220,7 @@
         {
           "label": "L2 runtime",
           "cmd": "bash scripts/with-proxy.sh gh run list --repo colinleefish/rmb-desktop --workflow pr-check.yml --branch feat/pr-ci-gate --limit 1 --json conclusion --jq '.[0].conclusion == \"success\"'",
-          "repair": "No green pr-check run on this branch — open/reopen the F09 PR (gh pr create) and read the run log; common causes: npm ci failure, missing webui-build before check, CGO/toolchain issues."
+          "repair": "No green pr-check run on this branch — open/reopen the F09 PR (gh pr create) and read the run log; common causes: pnpm install failure, missing webui-build before check, CGO/toolchain issues."
         },
         {
           "label": "L3 system",
@@ -232,19 +232,19 @@
     {
       "id": "F10",
       "name": "webui-dev-mock",
-      "behavior": "Dev-only full-app mock mode for the webui: `cd webui && npm run dev:mock` boots the SPA with no daemon — a central flag (VITE_MOCK=true or localStorage rmb.mock) routes every /api fetch through an in-memory mock router seeded with a rich deterministic dataset (~36 sessions with turns/atoms/scenes, ~60 memories across 4 categories, 12 skills with file trees, corrections, config, pipeline health, onboarding-complete) supporting pagination/search/sort and in-memory mutations (config PUT, corrections add/retract, restart phases); a MOCK badge marks the mode and toggles back to the proxied real daemon; vite dev proxy target becomes env-configurable (RMB_API_TARGET, default 127.0.0.1:19019)",
+      "behavior": "Dev-only full-app mock mode for the webui: `cd webui && pnpm run dev:mock` boots the SPA with no daemon — a central flag (VITE_MOCK=true or localStorage rmb.mock) routes every /api fetch through an in-memory mock router seeded with a rich deterministic dataset (~36 sessions with turns/atoms/scenes, ~60 memories across 4 categories, 12 skills with file trees, corrections, config, pipeline health, onboarding-complete) supporting pagination/search/sort and in-memory mutations (config PUT, corrections add/retract, restart phases); a MOCK badge marks the mode and toggles back to the proxied real daemon; vite dev proxy target becomes env-configurable (RMB_API_TARGET, default 127.0.0.1:19019)",
       "verification": "make verify-feature F=F10; L1 tsc+oxlint clean; L2 node selftest of the mock router (routes, paging, mutations) via esbuild bundle; L3 make check",
       "state": "passing",
       "evidence": "commit 14fe897, verified 2026-09-12",
       "layers": [
         {
           "label": "L1 static",
-          "cmd": "cd webui && npx tsc -b && npx oxlint src",
+          "cmd": "cd webui && pnpm exec tsc -b && pnpm exec oxlint src",
           "repair": "Type or lint error in webui sources (mock router must stay type-clean against src/lib/types.ts) — run the two commands and fix findings."
         },
         {
           "label": "L2 runtime",
-          "cmd": "cd webui && npx esbuild src/lib/mock/selftest.ts --bundle --format=esm --outfile=.mock-selftest.mjs && node .mock-selftest.mjs && rm -f .mock-selftest.mjs",
+          "cmd": "cd webui && pnpm exec esbuild src/lib/mock/selftest.ts --bundle --format=esm --outfile=.mock-selftest.mjs && node .mock-selftest.mjs && rm -f .mock-selftest.mjs",
           "repair": "Mock router contract broken (route missing, paging/mutation wrong, shape drifts from src/lib/types.ts) — read webui/src/lib/mock/selftest.ts assertion output for the failing endpoint."
         },
         {

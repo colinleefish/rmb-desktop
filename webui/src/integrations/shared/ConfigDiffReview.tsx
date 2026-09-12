@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Check, Copy, FileCode2, Rows2, SplitSquareHorizontal } from "lucide-react";
 import type { SetupArtifact } from "../../lib/agentSetupTypes";
 import { useI18n } from "../../i18n";
+import { StatusPill } from "../../components/StatusPill";
 
 type DiffLine = {
   text: string;
@@ -34,11 +35,11 @@ function computeDiff(current: string, proposed: string): DiffLine[] {
 function lineClass(kind: DiffLine["kind"]) {
   switch (kind) {
     case "add":
-      return "bg-emerald-50/80 text-emerald-900";
+      return "bg-rmb-accent/10 text-rmb-dark";
     case "remove":
-      return "bg-red-50/80 text-red-900 line-through decoration-red-300/60";
+      return "bg-rmb-danger-soft text-rmb-danger/90 line-through decoration-rmb-danger/30";
     case "change":
-      return "bg-amber-50/80 text-amber-900";
+      return "bg-rmb-warn-soft text-rmb-dark";
     default:
       return "text-rmb-dark/90";
   }
@@ -46,11 +47,11 @@ function lineClass(kind: DiffLine["kind"]) {
 
 function UnifiedDiff({ lines }: { lines: DiffLine[] }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-rmb-gray/15 bg-[#fafafa]">
+    <div className="overflow-hidden rounded-md border border-rmb-line bg-rmb-fill">
       <pre className="m-0 max-h-[28rem] overflow-auto p-3 font-mono text-[12px] leading-5">
         {lines.map((line, i) => (
           <div key={i} className={`whitespace-pre-wrap break-all px-1 ${lineClass(line.kind)}`}>
-            <span className="mr-2 inline-block w-4 select-none text-rmb-gray/40">
+            <span className="mr-2 inline-block w-4 select-none text-rmb-faint">
               {line.kind === "add" ? "+" : line.kind === "remove" ? "−" : " "}
             </span>
             {line.text || "\u00a0"}
@@ -78,8 +79,8 @@ function SideBySideDiff({
 
   return (
     <div className="grid min-h-[20rem] gap-3 lg:grid-cols-2">
-      <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-rmb-gray/15 bg-[#fafafa]">
-        <div className="border-b border-rmb-gray/10 bg-white px-3 py-2 text-xs font-medium text-rmb-gray">
+      <div className="flex min-h-0 flex-col overflow-hidden rounded-md border border-rmb-line bg-rmb-fill">
+        <div className="border-b border-rmb-line bg-white px-3 py-2 text-xs font-medium text-rmb-muted">
           {currentLabel}
         </div>
         <pre className="m-0 flex-1 overflow-auto p-3 font-mono text-[12px] leading-5">
@@ -93,7 +94,7 @@ function SideBySideDiff({
                 key={i}
                 className={[
                   "whitespace-pre-wrap break-all px-0.5",
-                  changed || removed ? "bg-red-50/70 text-red-900" : "text-rmb-dark/90",
+                  changed || removed ? "bg-rmb-danger-soft text-rmb-danger/90" : "text-rmb-dark/90",
                 ].join(" ")}
               >
                 {line ?? ""}
@@ -102,8 +103,8 @@ function SideBySideDiff({
           })}
         </pre>
       </div>
-      <div className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-rmb-gray/15 bg-[#fafafa]">
-        <div className="border-b border-rmb-gray/10 bg-white px-3 py-2 text-xs font-medium text-rmb-gray">
+      <div className="flex min-h-0 flex-col overflow-hidden rounded-md border border-rmb-line bg-rmb-fill">
+        <div className="border-b border-rmb-line bg-white px-3 py-2 text-xs font-medium text-rmb-muted">
           {proposedLabel}
         </div>
         <pre className="m-0 flex-1 overflow-auto p-3 font-mono text-[12px] leading-5">
@@ -117,7 +118,7 @@ function SideBySideDiff({
                 key={i}
                 className={[
                   "whitespace-pre-wrap break-all px-0.5",
-                  changed || added ? "bg-emerald-50/80 text-emerald-900" : "text-rmb-dark/90",
+                  changed || added ? "bg-rmb-accent/10 text-rmb-dark" : "text-rmb-dark/90",
                 ].join(" ")}
               >
                 {line ?? ""}
@@ -165,28 +166,30 @@ export function ConfigDiffReview({
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-rmb-gray/35 bg-white shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-rmb-gray/10 px-5 py-4">
+    <div className="overflow-hidden rounded-md border border-rmb-line bg-white">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-rmb-line px-5 py-4">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <FileCode2 className="size-4 shrink-0 stroke-rmb-accent" />
             <h3 className="text-sm font-semibold text-rmb-dark">{title ?? artifact.title}</h3>
             {applied && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-emerald-200">
-                <Check className="size-3" />
+              <StatusPill tone="ok">
+                <Check className="mr-0.5 size-3" />
                 {t.agents.applied}
-              </span>
+              </StatusPill>
             )}
           </div>
-          <p className="mt-1 font-mono text-xs text-rmb-gray">{artifact.path}</p>
+          <p className="mt-1 font-mono text-xs text-rmb-muted">{artifact.path}</p>
         </div>
-        <div className="flex items-center gap-1 rounded-lg border border-rmb-gray/15 bg-rmb-light/50 p-0.5">
+        <div className="flex items-center gap-0.5 rounded-md border border-rmb-line bg-rmb-fill p-0.5">
           <button
             type="button"
             onClick={() => setView("split")}
             className={[
-              "inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs transition",
-              view === "split" ? "bg-white text-rmb-dark shadow-sm" : "text-rmb-gray hover:text-rmb-dark",
+              "inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs transition-colors",
+              view === "split"
+                ? "bg-white font-medium text-rmb-dark"
+                : "text-rmb-muted hover:text-rmb-dark",
             ].join(" ")}
           >
             <SplitSquareHorizontal className="size-3.5" />
@@ -196,8 +199,10 @@ export function ConfigDiffReview({
             type="button"
             onClick={() => setView("unified")}
             className={[
-              "inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs transition",
-              view === "unified" ? "bg-white text-rmb-dark shadow-sm" : "text-rmb-gray hover:text-rmb-dark",
+              "inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs transition-colors",
+              view === "unified"
+                ? "bg-white font-medium text-rmb-dark"
+                : "text-rmb-muted hover:text-rmb-dark",
             ].join(" ")}
           >
             <Rows2 className="size-3.5" />
@@ -207,9 +212,9 @@ export function ConfigDiffReview({
       </div>
 
       {artifact.warnings.length > 0 && (
-        <div className="space-y-1 border-b border-amber-100 bg-amber-50/60 px-5 py-3">
+        <div className="space-y-1 border-b border-rmb-line bg-rmb-warn-soft px-5 py-3">
           {artifact.warnings.map((w) => (
-            <p key={w} className="text-xs text-amber-900">
+            <p key={w} className="text-xs text-rmb-warn">
               {w}
             </p>
           ))}
@@ -218,12 +223,12 @@ export function ConfigDiffReview({
 
       <div className="px-5 py-4">
         {!applied && (added > 0 || removed > 0) && (
-          <p className="mb-3 text-xs text-rmb-gray">
-            <span className="text-emerald-700">+{added}</span>
+          <p className="mb-3 text-xs text-rmb-muted">
+            <span className="text-rmb-accent">+{added}</span>
             {removed > 0 && (
               <>
                 {" "}
-                <span className="text-red-600">−{removed}</span>
+                <span className="text-rmb-danger">−{removed}</span>
               </>
             )}{" "}
             {t.agents.linesChanged}
@@ -248,14 +253,14 @@ export function ConfigDiffReview({
         )}
       </div>
 
-      <div className="flex flex-wrap items-center justify-start gap-2 border-t border-rmb-gray/15 bg-rmb-light/30 px-5 py-3">
+      <div className="flex flex-wrap items-center justify-start gap-2 border-t border-rmb-line bg-rmb-fill px-5 py-3">
         {artifact.applyMode === "copy_only" ? (
           <button
             type="button"
             onClick={handleCopy}
-            className="inline-flex items-center gap-1.5 rounded-md border border-rmb-gray/20 bg-white px-3 py-1.5 text-sm font-medium text-rmb-dark hover:bg-rmb-light"
+            className="inline-flex items-center gap-1.5 rounded-md border border-rmb-line-strong bg-white px-3 py-1.5 text-sm font-medium text-rmb-dark hover:bg-rmb-fill"
           >
-            {copied ? <Check className="size-4 text-emerald-600" /> : <Copy className="size-4" />}
+            {copied ? <Check className="size-4 text-rmb-accent" /> : <Copy className="size-4" />}
             {copied ? t.agents.copied : t.agents.copyProposed}
           </button>
         ) : (

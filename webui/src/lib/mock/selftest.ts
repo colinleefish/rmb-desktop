@@ -4,6 +4,13 @@
  * coverage, paging/filtering and the mutable endpoints stay consistent
  * with the shapes in lib/types.ts. Exits non-zero on the first failure.
  */
+import {
+  formatDateTime,
+  formatTimeOfDay,
+  localCalendarDayKey,
+  parseTurnMessages,
+  sessionDateGroupLabel,
+} from "../format";
 import { handleMockApi, mockHealthOk } from "./server";
 import { buildMockData } from "./data";
 
@@ -67,8 +74,14 @@ assert(detail.json.turns.length === doneSession!.turn_count, "detail turns match
 assert(detail.json.atoms.length === doneSession!.atom_count, "detail atoms match atom_count");
 assert(detail.json.scenes.length === doneSession!.scene_count, "detail scenes match scene_count");
 assert(detail.json.pipeline_state !== null, "detail carries a pipeline state");
-const parsedTurn = JSON.parse(detail.json.turns[0].messages_jsonl);
-assert(typeof parsedTurn.role === "string" && typeof parsedTurn.content === "string", "turn messages_jsonl parses to {role, content}");
+assert(detail.json.turns[0].turn_index === 0, "first turn turn_index is 0-based (matches browse API)");
+const firstTurnMessages = parseTurnMessages(detail.json.turns[0].messages_jsonl);
+assert(firstTurnMessages.length >= 2, "first turn is one exchange (user + assistant)");
+assert(
+  (firstTurnMessages[0]?.role ?? "").toLowerCase() === "user" &&
+    firstTurnMessages.some((m) => (m.role ?? "").toLowerCase() === "assistant"),
+  "turn messages_jsonl holds user then assistant",
+);
 assert(get("/api/v1/browse/sessions/nope:missing").status === 404, "unknown session is 404");
 
 // -- memories ---------------------------------------------------------------------
@@ -139,5 +152,17 @@ assert(get("/api/v1/onboarding/status").json.completed === true, "onboarding sta
 const llmTest = call("POST", "/api/v1/config/test/llm", { api_base: "x" });
 assert(llmTest.json.ok === true && typeof llmTest.json.latency_ms === "number", "llm connection test ok");
 assert(call("GET", "/api/v1/does-not-exist").status === 404, "unknown route is 404");
+
+// -- datetime formatting (local TZ; pattern + calendar bucketing) ---------------------------
+assert(formatDateTime(null) === "—", "formatDateTime null");
+assert(formatDateTime("") === "—", "formatDateTime empty");
+const fixedLocal = new Date(2024, 5, 15, 9, 8, 7);
+assert(formatDateTime(fixedLocal.toISOString()) === "2024-06-15 09:08:07", "formatDateTime local fixed");
+assert(formatTimeOfDay(fixedLocal.toISOString()) === "09:08:07", "formatTimeOfDay local fixed");
+assert(localCalendarDayKey(fixedLocal.toISOString()) === "2024-06-15", "localCalendarDayKey local day");
+assert(
+  sessionDateGroupLabel(new Date().toISOString(), "TODAY", "YEST", "en-US") === "TODAY",
+  "sessionDateGroupLabel marks local today",
+);
 
 console.log(`\n${passed} assertions passed`);

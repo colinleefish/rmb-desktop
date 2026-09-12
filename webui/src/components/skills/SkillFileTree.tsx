@@ -21,7 +21,7 @@ function TreeNode({
         onClick={() => !isDir && onSelect(node.path)}
         className={[
           "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm",
-          isDir ? "cursor-default text-rmb-gray" : "text-rmb-dark hover:bg-rmb-light",
+          isDir ? "cursor-default text-rmb-gray" : "text-rmb-dark hover:bg-rmb-fill",
           isSelected ? "bg-rmb-accent/10 font-medium text-rmb-accent" : "",
         ].join(" ")}
         style={{ paddingLeft: `${depth * 12 + 8}px` }}

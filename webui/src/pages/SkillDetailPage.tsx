@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
+import { EmptyState, ErrorNote, ListSkeleton } from "../components/EmptyState";
+import { PageHeader } from "../components/PageHeader";
+import { StatusPill } from "../components/StatusPill";
 import { SkillFileTree } from "../components/skills/SkillFileTree";
 import { SkillFileViewer } from "../components/skills/SkillFileViewer";
 import { getSkill } from "../lib/api";
-import { formatDateTime } from "../lib/format";
+import { formatDateTime, formatDateTimeMonoClass } from "../lib/format";
 import type { SkillDetail } from "../lib/types";
 import { useI18n } from "../i18n";
 
@@ -49,42 +52,40 @@ export function SkillDetailPage() {
   }
 
   if (error) {
-    return <p className="text-red-600">{t.skills.loadError}: {error}</p>;
+    return (
+      <ErrorNote>
+        {t.skills.loadError}: {error}
+      </ErrorNote>
+    );
   }
 
-  if (loading || !detail) {
-    return <p className="text-rmb-gray">{t.skills.loadingDetail}</p>;
-  }
+  if (loading || !detail) return <ListSkeleton rows={4} />;
 
   const content = selectedFile ? (detail.files[selectedFile] ?? "") : "";
 
   return (
     <div className="space-y-6">
-      <div>
-        <Link to="/skills" className="text-sm text-rmb-accent hover:underline">
-          ← {t.skills.backToList}
-        </Link>
-      </div>
+      <PageHeader
+        back={{ to: "/agents/skills", label: t.skills.backToList }}
+        title={detail.skill.name}
+        description={detail.skill.description}
+        meta={
+          <>
+            {(detail.skill.tags ?? []).map((tag) => (
+              <StatusPill key={tag} tone="neutral">
+                {tag}
+              </StatusPill>
+            ))}
+            <span>v{detail.skill.version}</span>
+            <span className={formatDateTimeMonoClass}>{formatDateTime(detail.skill.updated_at)}</span>
+            <span className="font-mono text-rmb-faint">{detail.skill.uri}</span>
+          </>
+        }
+      />
 
-      <div className="space-y-2 border-b border-rmb-gray/15 pb-4">
-        <h1 className="text-2xl font-semibold tracking-tight text-rmb-dark">
-          {detail.skill.name}
-        </h1>
-        <p className="max-w-3xl text-sm text-rmb-gray">{detail.skill.description}</p>
-        <div className="flex flex-wrap gap-4 text-xs text-rmb-gray">
-          <span>v{detail.skill.version}</span>
-          <span>{formatDateTime(detail.skill.updated_at)}</span>
-          <span className="font-mono">{detail.skill.uri}</span>
-        </div>
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
-        <div className="rounded-xl border border-rmb-gray/20 bg-white p-2">
-          <SkillFileTree
-            tree={detail.tree}
-            selected={selectedFile}
-            onSelect={setFile}
-          />
+      <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
+        <div className="rounded-md border border-rmb-line p-2">
+          <SkillFileTree tree={detail.tree} selected={selectedFile} onSelect={setFile} />
         </div>
         <SkillFileViewer path={selectedFile} content={content} />
       </div>
@@ -93,11 +94,11 @@ export function SkillDetailPage() {
 }
 
 function NavigateToSkills() {
+  const { t } = useI18n();
   return (
-    <p className="text-rmb-gray">
-      <Link to="/skills" className="text-rmb-accent hover:underline">
-        Back to skills
-      </Link>
-    </p>
+    <EmptyState
+      title={t.skills.empty}
+      action={{ to: "/agents/skills", label: t.skills.backToList }}
+    />
   );
 }

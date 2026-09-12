@@ -5,6 +5,17 @@
   --color-rmb-gray: #393e46;
   --color-rmb-accent: #00adb5;
   --color-rmb-light: #eeeeee;
+  /* Neutrals added by the 2026-09 visual pass (docs/design/webui-design.md §3). */
+  --color-rmb-muted: #646b76;
+  --color-rmb-faint: #9096a0;
+  --color-rmb-line: #e7e9ec;
+  --color-rmb-line-strong: #d3d7dc;
+  --color-rmb-fill: #f5f6f7;
+  --color-rmb-danger: #b42318;
+  --color-rmb-danger-soft: #fdecea;
+  --color-rmb-warn: #9a5b00;
+  --color-rmb-warn-soft: #fbf3db;
+  --shadow-rmb-modal: 0 12px 40px rgba(34, 40, 49, 0.14);
 }
 
 @layer base {
@@ -13,8 +24,9 @@
     font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     line-height: 1.5;
     font-weight: 400;
+    font-variant-numeric: tabular-nums;
     color: var(--color-rmb-dark);
-    background: var(--color-rmb-light);
+    background: #ffffff;
   }
 
   body {

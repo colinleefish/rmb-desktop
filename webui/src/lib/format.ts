@@ -8,18 +8,72 @@ export function truncate(text: string, max: number): string {
   return `${text.slice(0, max - 1)}…`;
 }
 
-/** Format an ISO timestamp in the browser's local timezone. */
+/** Tailwind classes for fixed-width datetime text (never truncate). */
+export const formatDateTimeMonoClass =
+  "font-mono tabular-nums whitespace-nowrap shrink-0";
+
+function pad2(n: number): string {
+  return n < 10 ? `0${n}` : String(n);
+}
+
+function parseIsoDate(iso: string): Date | null {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return date;
+}
+
+/** Calendar date in the browser's local timezone, `YYYY-MM-DD`. */
+export function localCalendarDayKey(iso: string): string {
+  const date = parseIsoDate(iso);
+  if (!date) return iso;
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+function startOfLocalDayMs(d: Date): number {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+
+/**
+ * Session list section title: localized today/yesterday, else locale date.
+ * Buckets by local calendar day (not UTC date from ISO string prefix).
+ */
+export function sessionDateGroupLabel(
+  iso: string,
+  todayLabel: string,
+  yesterdayLabel: string,
+  locale: string,
+): string {
+  const d = parseIsoDate(iso);
+  if (!d) return iso;
+  const day = startOfLocalDayMs(d);
+  const now = new Date();
+  if (day === startOfLocalDayMs(now)) return todayLabel;
+  const yest = new Date(now);
+  yest.setDate(now.getDate() - 1);
+  if (day === startOfLocalDayMs(yest)) return yesterdayLabel;
+  return d.toLocaleDateString(locale, { year: "numeric", month: "short", day: "numeric" });
+}
+
+/** Local time only, fixed `HH:MM:SS` (e.g. under a date group header). */
+export function formatTimeOfDay(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const date = parseIsoDate(iso);
+  if (!date) return iso;
+  return `${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
+}
+
+/** Format an ISO timestamp in the browser's local timezone as `YYYY-MM-DD HH:MM:SS`. */
 export function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return "—";
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  const date = parseIsoDate(iso);
+  if (!date) return iso;
+  const y = date.getFullYear();
+  const m = pad2(date.getMonth() + 1);
+  const day = pad2(date.getDate());
+  const h = pad2(date.getHours());
+  const min = pad2(date.getMinutes());
+  const sec = pad2(date.getSeconds());
+  return `${y}-${m}-${day} ${h}:${min}:${sec}`;
 }
 
 /** Normalize message content to displayable text. */
@@ -131,6 +185,7 @@ export function sessionSourceLabel(source: string | null | undefined): string {
       return "Cursor";
     case "cc":
     case "claude":
+    case "claude-code":
       return "Claude Code";
     case "codex":
       return "Codex";

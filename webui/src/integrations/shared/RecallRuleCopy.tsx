@@ -44,37 +44,37 @@ export function RecallRuleCopy({
 
   return (
     <>
-      <div className="overflow-hidden rounded-xl border border-rmb-gray/35 bg-white shadow-sm">
+      <div className="overflow-hidden rounded-md border border-rmb-line bg-white">
         {manualHint && (
-          <div className="space-y-1 border-b border-amber-100 bg-amber-50/60 px-5 py-3">
-            <p className="text-xs text-amber-900">{manualHint}</p>
+          <div className="space-y-1 border-b border-rmb-line bg-rmb-warn-soft px-5 py-3">
+            <p className="text-xs text-rmb-warn">{manualHint}</p>
           </div>
         )}
 
         {!manualHint && artifact.warnings.length > 0 && (
-          <div className="space-y-1 border-b border-amber-100 bg-amber-50/60 px-5 py-3">
+          <div className="space-y-1 border-b border-rmb-line bg-rmb-warn-soft px-5 py-3">
             {artifact.warnings.map((w) => (
-              <p key={w} className="text-xs text-amber-900">
+              <p key={w} className="text-xs text-rmb-warn">
                 {w}
               </p>
             ))}
           </div>
         )}
 
-        <div className="border-b border-rmb-gray/10 px-5 py-4">
+        <div className="border-b border-rmb-line px-5 py-4">
           {contentHint && (
             <p className="mb-3 text-sm text-rmb-gray">{contentHint}</p>
           )}
-          <pre className="m-0 overflow-auto rounded-lg border border-rmb-gray/15 bg-[#fafafa] p-3 font-mono text-[12px] leading-5 text-rmb-dark/90 whitespace-pre-wrap break-all">
+          <pre className="m-0 overflow-auto rounded-md border border-rmb-line bg-rmb-fill p-3 font-mono text-[12px] leading-5 text-rmb-dark/90 whitespace-pre-wrap break-all">
             {artifact.proposed}
           </pre>
           <div className="mt-3">
             <button
               type="button"
               onClick={() => void handleCopy()}
-              className="inline-flex items-center gap-1.5 rounded-md border border-rmb-gray/20 bg-white px-3 py-1.5 text-sm font-medium text-rmb-dark hover:bg-rmb-light"
+              className="inline-flex items-center gap-1.5 rounded-md border border-rmb-line-strong bg-white px-3 py-1.5 text-sm font-medium text-rmb-dark hover:bg-rmb-fill"
             >
-              {copied ? <Check className="size-4 text-emerald-600" /> : <Copy className="size-4" />}
+              {copied ? <Check className="size-4 text-rmb-accent" /> : <Copy className="size-4" />}
               {copied ? t.agents.copied : t.agents.copyProposed}
             </button>
           </div>
@@ -86,7 +86,7 @@ export function RecallRuleCopy({
             <button
               type="button"
               onClick={() => setLightboxOpen(true)}
-              className="group relative block w-full overflow-hidden rounded-lg border border-rmb-gray/20 bg-rmb-light/40 text-left transition hover:border-rmb-accent/40"
+              className="group relative block w-full overflow-hidden rounded-md border border-rmb-line bg-rmb-fill text-left transition hover:border-rmb-accent/40"
             >
               <img
                 src={guideImage.src}
@@ -94,7 +94,7 @@ export function RecallRuleCopy({
                 className="block w-full"
                 loading="lazy"
               />
-              <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-md bg-white/95 px-2 py-1 text-xs font-medium text-rmb-dark shadow-sm ring-1 ring-rmb-gray/15 opacity-0 transition group-hover:opacity-100">
+              <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-md bg-white/95 px-2 py-1 text-xs font-medium text-rmb-dark ring-1 ring-rmb-gray/15 opacity-0 transition group-hover:opacity-100">
                 <ZoomIn className="size-3.5" />
                 {t.agents.clickToEnlarge}
               </span>

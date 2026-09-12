@@ -21,8 +21,8 @@ export function AgentStatusIndicator({ agent }: { agent: AgentSetupState }) {
 
   const dotClass =
     status === "configured"
-      ? "bg-emerald-500 ring-1 ring-emerald-500/30"
-      : "bg-rmb-gray/35 ring-1 ring-rmb-gray/25";
+      ? "bg-rmb-accent"
+      : "bg-rmb-warn/70 ring-1 ring-rmb-warn/25";
 
   return (
     <span

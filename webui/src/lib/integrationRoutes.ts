@@ -4,15 +4,16 @@ import { isIntegrationAgentId } from "./agentRegistry";
 export function parseIntegrationPath(pathname: string): {
   agentId: IntegrationAgentId;
 } {
-  const rest = pathname.replace(/^\/integrations\/?/, "");
-  if (!rest) {
+  const rest = pathname.replace(/^\/(?:agents|integrations)\/?/, "");
+  const id = rest.split("/")[0] ?? "";
+  if (!id || id === "skills") {
     return { agentId: "cursor" };
   }
   return {
-    agentId: isIntegrationAgentId(rest) ? rest : "cursor",
+    agentId: isIntegrationAgentId(id) ? id : "cursor",
   };
 }
 
 export function integrationPath(agentId: IntegrationAgentId): string {
-  return `/integrations/${agentId}`;
+  return `/agents/${agentId}`;
 }

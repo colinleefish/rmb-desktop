@@ -19,9 +19,10 @@ var (
 )
 
 type Summary struct {
-	URI       string `json:"uri"`
-	Statement string `json:"statement"`
-	CreatedAt string `json:"created_at"`
+	URI         string   `json:"uri"`
+	Statement   string   `json:"statement"`
+	CreatedAt   string   `json:"created_at"`
+	TargetURIs  []string `json:"target_uris,omitempty"`
 }
 
 type Row struct {
@@ -82,9 +83,10 @@ func (s *Service) Create(ctx context.Context, in CreateInput) (Summary, error) {
 	}
 
 	return Summary{
-		URI:       correctionURI,
-		Statement: statement,
-		CreatedAt: now.Format(time.RFC3339),
+		URI:        correctionURI,
+		Statement:  statement,
+		CreatedAt:  now.Format(time.RFC3339),
+		TargetURIs: targets,
 	}, nil
 }
 
@@ -153,7 +155,7 @@ func (s *Service) List(ctx context.Context, target string, limit, offset int) ([
 			return nil, 0, fmt.Errorf("count corrections: %w", err)
 		}
 		rows, err = s.db.QueryContext(ctx, `
-			SELECT id, statement, created_at FROM corrections
+			SELECT id, target_uris, statement, created_at FROM corrections
 			WHERE retracted_at IS NULL
 			AND EXISTS (SELECT 1 FROM json_each(target_uris) WHERE value = ?)
 			ORDER BY created_at DESC
@@ -166,7 +168,7 @@ func (s *Service) List(ctx context.Context, target string, limit, offset int) ([
 			return nil, 0, fmt.Errorf("count corrections: %w", err)
 		}
 		rows, err = s.db.QueryContext(ctx, `
-			SELECT id, statement, created_at FROM corrections
+			SELECT id, target_uris, statement, created_at FROM corrections
 			WHERE retracted_at IS NULL
 			ORDER BY created_at DESC
 			LIMIT ? OFFSET ?`, limit, offset)
@@ -178,15 +180,20 @@ func (s *Service) List(ctx context.Context, target string, limit, offset int) ([
 
 	var items []Summary
 	for rows.Next() {
-		var id, statement string
+		var id, targetJSON, statement string
 		var createdMS int64
-		if err := rows.Scan(&id, &statement, &createdMS); err != nil {
+		if err := rows.Scan(&id, &targetJSON, &statement, &createdMS); err != nil {
+			return nil, 0, err
+		}
+		targets, err := db.UnmarshalStringArray(targetJSON)
+		if err != nil {
 			return nil, 0, err
 		}
 		items = append(items, Summary{
-			URI:       uri.BuildCorrection(id),
-			Statement: statement,
-			CreatedAt: time.UnixMilli(createdMS).UTC().Format(time.RFC3339),
+			URI:        uri.BuildCorrection(id),
+			Statement:  statement,
+			CreatedAt:  time.UnixMilli(createdMS).UTC().Format(time.RFC3339),
+			TargetURIs: targets,
 		})
 	}
 	return items, total, rows.Err()
@@ -224,9 +231,10 @@ func ForTargets(ctx context.Context, database *sql.DB, targetURIs []string) (map
 			return nil, err
 		}
 		sum := Summary{
-			URI:       uri.BuildCorrection(id),
-			Statement: statement,
-			CreatedAt: time.UnixMilli(createdMS).UTC().Format(time.RFC3339),
+			URI:        uri.BuildCorrection(id),
+			Statement:  statement,
+			CreatedAt:  time.UnixMilli(createdMS).UTC().Format(time.RFC3339),
+			TargetURIs: targets,
 		}
 		for _, t := range targets {
 			if _, ok := wanted[t]; ok {

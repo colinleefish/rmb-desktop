@@ -24,7 +24,7 @@ export function Pagination({
   if (total === 0) return null;
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rmb-gray/15 px-4 py-3 text-sm text-rmb-gray">
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rmb-line px-3 py-3 text-xs text-rmb-muted">
       <span>
         {t.pagination.showing} {from}–{to} {t.pagination.of} {total}
       </span>
@@ -36,7 +36,7 @@ export function Pagination({
             <select
               value={limit}
               onChange={(e) => onLimitChange(Number(e.target.value))}
-              className="rounded-md border border-rmb-gray/20 bg-white px-2 py-1 text-sm text-rmb-dark"
+              className="h-7 rounded-md border border-rmb-line-strong bg-white px-1.5 text-xs text-rmb-dark"
             >
               {PAGE_SIZE_OPTIONS.map((size) => (
                 <option key={size} value={size}>
@@ -52,18 +52,18 @@ export function Pagination({
             type="button"
             disabled={offset <= 0}
             onClick={() => onPageChange(Math.max(0, offset - limit))}
-            className="rounded-md border border-rmb-gray/20 px-3 py-1 text-rmb-dark transition hover:bg-rmb-light disabled:cursor-not-allowed disabled:opacity-40"
+            className="h-7 rounded-md border border-rmb-line-strong px-2.5 text-xs text-rmb-dark transition-colors hover:bg-rmb-fill disabled:cursor-not-allowed disabled:opacity-40"
           >
             {t.pagination.prev}
           </button>
-          <span className="min-w-16 text-center tabular-nums">
+          <span className="min-w-14 text-center">
             {page} / {pageCount}
           </span>
           <button
             type="button"
             disabled={offset + limit >= total}
             onClick={() => onPageChange(offset + limit)}
-            className="rounded-md border border-rmb-gray/20 px-3 py-1 text-rmb-dark transition hover:bg-rmb-light disabled:cursor-not-allowed disabled:opacity-40"
+            className="h-7 rounded-md border border-rmb-line-strong px-2.5 text-xs text-rmb-dark transition-colors hover:bg-rmb-fill disabled:cursor-not-allowed disabled:opacity-40"
           >
             {t.pagination.next}
           </button>

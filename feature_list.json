@@ -234,8 +234,8 @@
       "name": "webui-dev-mock",
       "behavior": "Dev-only full-app mock mode for the webui: `cd webui && npm run dev:mock` boots the SPA with no daemon — a central flag (VITE_MOCK=true or localStorage rmb.mock) routes every /api fetch through an in-memory mock router seeded with a rich deterministic dataset (~36 sessions with turns/atoms/scenes, ~60 memories across 4 categories, 12 skills with file trees, corrections, config, pipeline health, onboarding-complete) supporting pagination/search/sort and in-memory mutations (config PUT, corrections add/retract, restart phases); a MOCK badge marks the mode and toggles back to the proxied real daemon; vite dev proxy target becomes env-configurable (RMB_API_TARGET, default 127.0.0.1:19019)",
       "verification": "make verify-feature F=F10; L1 tsc+oxlint clean; L2 node selftest of the mock router (routes, paging, mutations) via esbuild bundle; L3 make check",
-      "state": "active",
-      "evidence": "",
+      "state": "passing",
+      "evidence": "commit 14fe897, verified 2026-09-12",
       "layers": [
         {
           "label": "L1 static",

@@ -2,8 +2,10 @@
 import { clearOnboardingState } from "./onboardingState";
 import { resetOnboardingComplete } from "./onboardingComplete";
 
+import { isFullMock } from "./mockMode";
+
 export function isOnboardingDemo(): boolean {
-  if (import.meta.env.VITE_MOCK_ONBOARDING === "true") return true;
+  if (isFullMock() || import.meta.env.VITE_MOCK_ONBOARDING === "true") return true;
   if (!import.meta.env.DEV) return false;
   try {
     return localStorage.getItem("rmb.mockOnboarding") === "1";

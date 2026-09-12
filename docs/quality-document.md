@@ -14,13 +14,13 @@
 | `internal/appshell` | B | B | B | A | C | tray + sidecar supervision; release-signed; B04 flake root-caused to the test's fixed 5s log-poll window (#70, 2026-09-06) — deterministic delay-injection regression (`RMB_TEST_DAEMON_WRITE_DELAY`, test-only) on `fix/B04-flaky-daemon-log-poll`; `*os.File` guard intact; tolerant detection pending phase 3, then re-grade Tests |
 | `internal/config` | C | B | C | B | C | **secrets still plaintext in config.yaml — P3.5 open (F06)** |
 | `cmd/*` | B | A | B | A | B | thin entrypoints |
-| `webui/` | D | C | C | B | C | **known-weak: 604-line SettingsPage, tier-based nav, mock dead weight — refactor planned (F03–F05, plan/webui-refactor.md)** |
+| `webui/` | C | C | B | B | C | dev loop documented in `webui/README.md`: `npm run dev:mock` (in-memory dataset, no daemon) / `npm run dev` (RMB_API_TARGET proxy); mock-router contract selftest 49 asserts (F10 L2); **still no component/e2e tests; 604-line SettingsPage, tier-based nav — refactor planned (F03–F05, plan/webui-refactor.md)** |
 | `internal/db` | A | B | B | A | B | goose SQL migrations embedded; upgrade-scenario tests (00008) |
 | harness (Makefile/scripts/.harness) | B | A | A | A | A | this refactor (#53–#58); audit 7/7 critical |
 | `internal/hook`, `internal/setup` (agent integrations) | A | B | B | A | B | cursor/cc/codex/opencode/pi/workbuddy/zcode; ZCode payload shape verified against the installed client bundle (#61 fix, 2026-08-29): Stop carries no user prompt → UserPromptSubmit capture hook + sidecar pairing; #62 session-key normalization mirrors the opencode precedent with total-function tests; hook tests modernized in PR #69 |
 
 ## Reading the table
 
-- **D in webui tests**: no component/e2e tests at all; any change relies on `npm run build` only.
+- **C in webui tests**: lib-level contract selftest only (mock router, F10 L2); still no component/e2e tests, so UI changes lean on manual smoke + `npm run build`.
 - **C in config observability**: no validation warnings surfaced to users on bad config.
 - Twice-in-a-row C/D on the same dimension ⇒ promote a fix feature in `feature_list.json`.

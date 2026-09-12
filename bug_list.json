@@ -105,8 +105,9 @@
       "issue": 70,
       "severity": "low",
       "module": "internal/appshell",
-      "state": "reported",
+      "state": "passing",
       "reported": "2026-09-06",
+      "branch": "fix/B04-flaky-daemon-log-poll",
       "layers": [
         {
           "label": "L1 static",
@@ -123,7 +124,13 @@
           "cmd": "make check",
           "repair": "Full pipeline red: run make check locally, fix the failing stage."
         }
-      ]
+      ],
+      "investigation": "docs/bugs/B04-investigation.md",
+      "regression": {
+        "file": "internal/appshell/updatelatch_test.go",
+        "cmd": "RMB_TEST_DAEMON_WRITE_DELAY=8s CGO_ENABLED=1 go test -tags sqlite_fts5 -count=1 ./internal/appshell -run TestSpawnedDaemonStdioIsLogFdNotPipe"
+      },
+      "evidence": "commit 3730212, verified 2026-09-12"
     },
     {
       "id": "B05",

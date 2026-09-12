@@ -12,9 +12,6 @@ export function getMemoriesSectionMeta(
   if (!categoryParam) {
     return { title: t.memories.tabAll, subtitle: t.memories.subtitle };
   }
-  if (categoryParam === "corrections") {
-    return { title: t.memories.corrections.title, subtitle: t.overview.stats.correctionsHint };
-  }
   if (isMemoryCategory(categoryParam)) {
     return {
       title: t.memories.categories[categoryParam].title,

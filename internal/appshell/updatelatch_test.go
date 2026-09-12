@@ -1,6 +1,7 @@
 package appshell
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -13,6 +14,49 @@ import (
 
 	"github.com/colinleefish/rmb-desktop/internal/platform"
 )
+
+// b04DelayedMarkScript returns the fake-daemon script for
+// TestSpawnedDaemonStdioIsLogFdNotPipe. Test-only env hook
+// RMB_TEST_DAEMON_WRITE_DELAY (time.ParseDuration, e.g. 8s; default unset = no
+// delay) inserts a sleep before the daemon's first write, deterministically
+// replaying the load-delayed child write that made B04 (issue #70) flaky: a
+// child whose mark becomes visible after the test's fixed 5s poll window. // B04
+func b04DelayedMarkScript(t *testing.T) string {
+	t.Helper()
+	script := "#!/bin/sh\necho daemon-mark\nsleep 60\n"
+	if raw := os.Getenv("RMB_TEST_DAEMON_WRITE_DELAY"); raw != "" {
+		d, err := time.ParseDuration(raw)
+		if err != nil || d < 0 {
+			t.Fatalf("RMB_TEST_DAEMON_WRITE_DELAY: invalid duration %q", raw)
+		}
+		if d > 0 {
+			script = fmt.Sprintf("#!/bin/sh\nsleep %s\necho daemon-mark\nsleep 60\n", d)
+		}
+	}
+	return script
+}
+
+// b04MarkPollDeadline is how long TestSpawnedDaemonStdioIsLogFdNotPipe waits for the
+// fake daemon's daemon-mark write. The incident (B04) used a fixed 5s window that
+// false-failed under load; delay injection (RMB_TEST_DAEMON_WRITE_DELAY) needs
+// base+2×delay, and the normal path adds load headroom without slowing the happy path.
+func b04MarkPollDeadline(t *testing.T) time.Time {
+	t.Helper()
+	const base = 5 * time.Second
+	var delay time.Duration
+	if raw := os.Getenv("RMB_TEST_DAEMON_WRITE_DELAY"); raw != "" {
+		d, err := time.ParseDuration(raw)
+		if err != nil || d < 0 {
+			t.Fatalf("RMB_TEST_DAEMON_WRITE_DELAY: invalid duration %q", raw)
+		}
+		delay = d
+	}
+	window := base + 2*delay
+	if delay == 0 {
+		window += 25 * time.Second
+	}
+	return time.Now().Add(window)
+}
 
 // TestUpdateStopThenRestartRespawnsDaemon is the regression test for the
 // 2026-08-16 v0.2.4 incident: installUpdate stopped the daemon via
@@ -99,7 +143,7 @@ func TestSpawnedDaemonStdioIsLogFdNotPipe(t *testing.T) {
 	t.Setenv("HOME", home)
 
 	script := filepath.Join(home, "fake-rmbd")
-	if err := os.WriteFile(script, []byte("#!/bin/sh\necho daemon-mark\nsleep 60\n"), 0o755); err != nil {
+	if err := os.WriteFile(script, []byte(b04DelayedMarkScript(t)), 0o755); err != nil {
 		t.Fatalf("write fake daemon: %v", err)
 	}
 	t.Setenv("RMBD_PATH", script)
@@ -127,7 +171,7 @@ func TestSpawnedDaemonStdioIsLogFdNotPipe(t *testing.T) {
 	if err != nil {
 		t.Fatalf("log path: %v", err)
 	}
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := b04MarkPollDeadline(t)
 	for time.Now().Before(deadline) {
 		data, err := os.ReadFile(path)
 		if err == nil && strings.Contains(string(data), "daemon-mark") {

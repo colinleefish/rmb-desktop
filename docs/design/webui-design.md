@@ -17,7 +17,6 @@ Brand accent `#00adb5` stays (memory: `rmb://preferences/color-palette`); canvas
 | `/sessions/:key` | J2 | session, turns, atoms, scenes, pipeline state | read turns | switch atoms / scenes | T1/T2/T3 pills first, before turns |
 | `/memories[/:cat]` | J3 | memories (title, abstract, version, recall stats, updated) | open a memory (modal) | tab, sort, page | 8-column table; three separate recall columns (search / cat / meta); version column |
 | `/memories/profile` | J3 | single profile memory | read / correct | — | fine |
-| `/memories/corrections` | J3 | corrections list | read | — | table chrome |
 | `/agents` | J1 | 7 agents × setup state (`detected`, hook / recall status, `lastHookAt`) | open a broken agent | open connected agent | status as plain gray text; every card looks the same regardless of state |
 | `/agents/:id` | J1 | setup checklist (hook, recall, verify) with diffs | apply a step | back to grid, pick another card | double frame (card in card), `/35` border + shadow |
 | `/agents/skills` | J1 (playbooks) | skills (name, tags, description, version, recall) | open a skill | search, page | violet icon box + emerald / violet tag colors off-palette; "N revisions" |
@@ -114,10 +113,10 @@ N turns · HH:MM`. Removed: table header, UID label, T1/T2/T3 LEDs (tooltip on t
 **Session detail** — `PageHeader` (back, key, abstract, meta: chip · status pill · turns · time) → one-line value
 funnel `turns → atoms → scenes` → tabs Turns / Atoms / Scenes. T1/T2/T3 pipeline state inside `Pipeline details`.
 
-**Memories** — Topbar stays section-level (`shell.memoriesTitle` / `shell.memoriesSubtitle`). Under `PageTabs`, tab heading uses `getMemoriesSectionMeta` (category title + `t.memories.categories.*.subtitle`, or All / corrections copy). Tabs (All · Profile · Events · Preferences · Entities · Corrections n); tab and row category pills use `t.memories.categories.*.nav` (localized in zh). Toolbar: count + sort
+**Memories** — Topbar stays section-level (`shell.memoriesTitle` / `shell.memoriesSubtitle`). Under `PageTabs`, tab heading uses `getMemoriesSectionMeta` (category title + `t.memories.categories.*.subtitle`, or All). Tabs (All · Profile · Events · Preferences · Entities); tab and row category pills use `t.memories.categories.*.nav` (localized in zh). Toolbar: count + sort
 (Updated / Most recalled / Version). Row = title + uri / abstract · category pill (All only) · recalls (sum, tooltip
-breaks down search / cat / meta) · updated. Modal: title, uri, abstract, body, meta row, corrections. Profile: plain
-article. Corrections: statement · targets · date rows.
+breaks down search / cat / meta) · updated. Modal: title, uri, abstract, body, meta row, corrections (add / retract). Profile: plain
+article. `/memories/corrections` redirects to `/memories` — corrections are not a memory category.
 
 **Agents** — Integration tab: 3-col card grid, status-first: `logo · name · StatusPill` then one line
 (`Last capture · time` or "no hook installed") then the single CTA (Details / Fix setup / Set up). Setup-incomplete

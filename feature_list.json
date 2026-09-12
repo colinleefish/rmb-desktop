@@ -279,6 +279,32 @@
         }
       ],
       "evidence": "commit 1695245, verified 2026-09-12"
+    },
+    {
+      "id": "F12",
+      "name": "drop-corrections-tab",
+      "behavior": "Memories chrome tabs are All/Profile/Events/Preferences/Entities only. Corrections are not a sibling memory category: add/retract stay on the target memory detail (list modal + profile page). /memories/corrections is an unknown category and redirects to /memories. Distill-time correction pin is unchanged.",
+      "verification": "make verify-feature F=F12",
+      "state": "planned",
+      "issue": 0,
+      "layers": [
+        {
+          "label": "L1 static",
+          "cmd": "! grep -q '/memories/corrections' webui/src/pages/MemoriesPage.tsx && ! test -f webui/src/components/CorrectionTargetURIs.tsx && ! grep -q 'categoryParam === \"corrections\"' webui/src/lib/shellRoutes.ts",
+          "repair": "Corrections tab or list route leaked back — remove it from MemoriesPage/shellRoutes and delete CorrectionTargetURIs.tsx. Add/retract belongs on MemoryCorrections."
+        },
+        {
+          "label": "L2 runtime",
+          "cmd": "make webui-verify",
+          "repair": "webui-verify failed (lint or vite build) — run make webui-verify and fix the reported error."
+        },
+        {
+          "label": "L3 system",
+          "cmd": "make check",
+          "repair": "Full pipeline red — run make check locally and fix the failing stage."
+        }
+      ],
+      "evidence": ""
     }
   ]
 }

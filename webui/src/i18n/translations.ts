@@ -13,7 +13,6 @@ export const translations = {
       acrossSessions: "Across sessions",
       acrossSessionsHint: "Long-term memory rolled up from many conversations.",
       memories: "Memories",
-      corrections: "Corrections",
       skills: "Skills",
       agents: "Agents",
       agentsOverview: "Overview",
@@ -164,7 +163,6 @@ export const translations = {
       recallCat: "rmb cat hits",
       recallMeta: "rmb meta hits",
       colUpdated: "Updated",
-      colTargets: "Targets",
       recalls: "recalls",
       sortUpdated: "Updated",
       sortRecalled: "Most recalled",
@@ -177,7 +175,6 @@ export const translations = {
         add: "Add correction",
         adding: "Adding…",
         retract: "Retract",
-        noTargetUri: "No linked memory URI",
       },
       categories: {
         profile: {
@@ -549,7 +546,6 @@ export const translations = {
       acrossSessions: "跨会话",
       acrossSessionsHint: "从多次对话中汇总的长时记忆。",
       memories: "记忆",
-      corrections: "修正",
       skills: "技能",
       agents: "智能体",
       agentsOverview: "概览",
@@ -700,7 +696,6 @@ export const translations = {
       recallCat: "rmb cat 命中",
       recallMeta: "rmb meta 命中",
       colUpdated: "更新于",
-      colTargets: "目标",
       recalls: "次召回",
       sortUpdated: "更新时间",
       sortRecalled: "召回最多",
@@ -713,7 +708,6 @@ export const translations = {
         add: "添加修正",
         adding: "添加中…",
         retract: "撤回",
-        noTargetUri: "无关联记忆 URI",
       },
       categories: {
         profile: {

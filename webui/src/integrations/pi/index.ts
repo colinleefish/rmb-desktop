@@ -1,6 +1,6 @@
 import type { IntegrationDefinition } from "../types";
 import { PiSetupPanel } from "./PiSetupPanel";
-import logo from "./assets/logo.png";
+import logo from "./assets/logo.svg";
 
 export { PiSetupPanel } from "./PiSetupPanel";
 

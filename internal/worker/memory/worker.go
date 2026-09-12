@@ -188,6 +188,7 @@ func (w *Worker) rollup(ctx context.Context) error {
 
 	transientPending := false
 	deferredBuckets := 0
+	batch := newRollupBatch()
 	var (
 		mu  sync.Mutex
 		wg  sync.WaitGroup
@@ -222,6 +223,25 @@ func (w *Worker) rollup(ctx context.Context) error {
 				return
 			}
 
+			if batch.alreadyWritten(bucket.URI) {
+				return
+			}
+
+			unlock := lockMemoryURI(bucket.URI)
+			defer unlock()
+
+			if batch.alreadyWritten(bucket.URI) {
+				return
+			}
+
+			if rollupTestHook != nil && rollupTestHook.BeforeBucketUnchangedQuery != nil {
+				rollupTestHook.BeforeBucketUnchangedQuery(bucket.URI)
+			}
+
+			if batch.alreadyWritten(bucket.URI) {
+				return
+			}
+
 			unchanged, err := w.bucketUnchanged(ctx, bucket, srcScenes, corrURIs)
 			if err != nil {
 				w.log.Warn("l3 provenance check failed", "uri", bucket.URI, "err", err)
@@ -233,7 +253,9 @@ func (w *Worker) rollup(ctx context.Context) error {
 			if unchanged {
 				return
 			}
-
+			if batch.alreadyWritten(bucket.URI) {
+				return
+			}
 			pm, err := w.distillBucket(ctx, bucket, corrStatements)
 			if err != nil {
 				if llm.IsTransientError(err) {
@@ -247,7 +269,7 @@ func (w *Worker) rollup(ctx context.Context) error {
 				return
 			}
 
-			if err := w.persistMemory(ctx, bucket, pm, srcScenes, corrURIs); err != nil {
+			if err := w.persistMemory(ctx, batch, bucket, pm, srcScenes, corrURIs); err != nil {
 				if llm.IsTransientError(err) {
 					mu.Lock()
 					transientPending = true
@@ -425,6 +447,9 @@ func (w *Worker) bucketUnchanged(ctx context.Context, bucket Bucket, srcScenes, 
 	if err != nil {
 		return false, err
 	}
+	if rollupTestHook != nil && rollupTestHook.AfterBucketUnchangedLoad != nil {
+		rollupTestHook.AfterBucketUnchangedLoad(bucket.URI)
+	}
 	if bucket.Category == model.AtomCategoryEvents {
 		return true, nil
 	}
@@ -472,7 +497,7 @@ func atomIDs(atoms []model.Atom) []string {
 	return out
 }
 
-func (w *Worker) persistMemory(ctx context.Context, bucket Bucket, pm ParsedMemory, sourceSceneURIs, sourceCorrectionURIs []string) error {
+func (w *Worker) persistMemory(ctx context.Context, batch *rollupBatch, bucket Bucket, pm ParsedMemory, sourceSceneURIs, sourceCorrectionURIs []string) error {
 	pm.Body = capBody(pm.Body)
 	tx, err := w.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -526,15 +551,28 @@ func (w *Worker) persistMemory(ctx context.Context, bucket Bucket, pm ParsedMemo
 		if err != nil {
 			w.log.Warn("l3 incumbent lookup failed; inserting as new subject", "uri", bucket.URI, "err", err)
 		} else if inc.uri != "" {
+			unlock := lockMemoryURI(inc.uri)
+			defer unlock()
+			if batch.alreadyWritten(inc.uri) {
+				return tx.Commit()
+			}
 			if err := w.mergeIntoIncumbent(ctx, tx, bucket, pm, inc, sceneJSON, corrJSON, atomHash, nowMS); err != nil {
 				return err
 			}
+			batch.markWritten(inc.uri)
 			w.log.Info("l3 merged new subject into incumbent", "uri", bucket.URI, "incumbent", inc.uri)
-			return tx.Commit()
+			if err := tx.Commit(); err != nil {
+				return err
+			}
+			if rollupTestHook != nil && rollupTestHook.AfterMergeIncumbentCommit != nil {
+				rollupTestHook.AfterMergeIncumbentCommit(inc.uri)
+			}
+			return nil
 		}
 		if err := insertMemory(ctx, tx, bucket, pm, sceneJSON, corrJSON, atomHash, 1, nowMS, 0); err != nil {
 			return err
 		}
+		batch.markWritten(bucket.URI)
 		return tx.Commit()
 	}
 	if err != nil {
@@ -565,6 +603,7 @@ func (w *Worker) persistMemory(ctx context.Context, bucket Bucket, pm ParsedMemo
 	if err := insertMemory(ctx, tx, bucket, pm, sceneJSON, corrJSON, atomHash, version+1, nowMS, 0); err != nil {
 		return err
 	}
+	batch.markWritten(bucket.URI)
 	return tx.Commit()
 }
 
@@ -676,6 +715,9 @@ func (w *Worker) mergeIntoIncumbent(ctx context.Context, tx *sql.Tx, bucket Buck
 	_, err := tx.ExecContext(ctx, `UPDATE memories SET superseded_at = ? WHERE id = ?`, nowMS, inc.id)
 	if err != nil {
 		return fmt.Errorf("supersede incumbent: %w", err)
+	}
+	if rollupTestHook != nil && rollupTestHook.BeforeMergeIncumbentCommit != nil {
+		rollupTestHook.BeforeMergeIncumbentCommit(inc.uri)
 	}
 	incBucket := Bucket{Category: bucket.Category, Slug: inc.uri, URI: inc.uri}
 	if slug, ok := strings.CutPrefix(inc.uri, "rmb://"+bucket.Category+"/"); ok {

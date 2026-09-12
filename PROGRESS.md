@@ -2,17 +2,18 @@
 
 ## Current State
 
-Branch `chore/webui-verify-gate` @ worktree `../rmb-desktop-chore-webui-verify`. **F11** (issue #60): `webui-verify` wired into `make check`. Baseline `make setup` + `make webui-build` then `make check`: green (2026-09-12). Contract: `.harness/contracts/F11.md`.
+**main** after merging #78 (F11), #77 (B03); **#79** (B05) rebasing on main for conflict resolve. VERSION target: `0.2.11-dev.1`.
 
 ## In Progress
 
-- F11 verification + PR for #60.
+- PR #79 merge (B05 / #72)
+- PR #80 (bug-track hygiene + #17)
 
 ## Next Steps
 
-1. Merge F11 PR; close #60
-2. F04/F05 webui refactor track per `plan/webui-refactor.md`
-3. B04/B05 bug phases as scheduled
+1. Merge #79, #80; bump `Makefile` VERSION → `0.2.11-dev.1`
+2. B04 (#70), #16 logos, close #17/#40/#60/#15/#72 on merge
+3. F05 settings strangler per `plan/webui-refactor.md`
 
 ## Blockers
 

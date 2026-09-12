@@ -49,7 +49,7 @@ Deterministic hook (`rollupTestHook`, `BypassURILock`) forces variant merge comm
 
 ## Fix direction (not a patch)
 
-- Suggested approach: per-memory-URI mutex from materiality through persist; skip further work on a URI once another bucket in the same rollup batch has already written it (variant merge marks incumbent URI).
+- Suggested approach: per-memory-URI mutex from materiality through persist; `rollupBatch` marks URIs written in the same rollup (including incumbent targets after cosine merge); re-check `alreadyWritten` after test interleaving hooks.
 - Files to touch: `worker.go`, small `rollup_sync.go` helper, `b05_regression_test.go`, test hooks in `rollup_testhook.go`.
 - Risks / edge cases: deadlock if hooks hold locks in tests — B05 test bypasses URI locks intentionally; production always locks.
 - Constraints: no change to embedder threshold or atom-id fingerprint semantics in this bug.

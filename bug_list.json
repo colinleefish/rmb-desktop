@@ -137,7 +137,7 @@
           "repair": "Full pipeline red: run make check locally, fix the failing stage."
         }
       ],
-      "evidence": "commit d83070f, verified 2026-09-12"
+      "evidence": "commit 1362519, verified 2026-09-12"
     }
   ]
 }

@@ -285,7 +285,7 @@
       "name": "drop-corrections-tab",
       "behavior": "Memories chrome tabs are All/Profile/Events/Preferences/Entities only. Corrections are not a sibling memory category: add/retract stay on the target memory detail (list modal + profile page). /memories/corrections is an unknown category and redirects to /memories. Distill-time correction pin is unchanged.",
       "verification": "make verify-feature F=F12",
-      "state": "planned",
+      "state": "passing",
       "issue": 0,
       "layers": [
         {
@@ -304,7 +304,7 @@
           "repair": "Full pipeline red — run make check locally and fix the failing stage."
         }
       ],
-      "evidence": ""
+      "evidence": "commit f7e66a7, verified 2026-09-12"
     }
   ]
 }

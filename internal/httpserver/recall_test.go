@@ -73,10 +73,13 @@ func TestSearch_sinceUntil_filtering(t *testing.T) {
 	if uris := get(base); len(uris) != 2 {
 		t.Fatalf("unfiltered: want 2, got %v", uris)
 	}
+	// Relative date between old and new so the window never rots (a hardcoded
+	// "2026-08-02" expired on 2026-09-12 — one day past its validity window).
+	untilDate := time.UnixMilli(oldMS).UTC().Add(24 * time.Hour).Format("2006-01-02")
 	if uris := get(base + "&since=7d"); len(uris) != 1 || uris[0] != "rmb://entities/new" {
 		t.Fatalf("since=7d: got %v", uris)
 	}
-	if uris := get(base + "&until=2026-08-02"); len(uris) != 1 || uris[0] != "rmb://entities/old" {
+	if uris := get(base + "&until=" + untilDate); len(uris) != 1 || uris[0] != "rmb://entities/old" {
 		t.Fatalf("until: got %v", uris)
 	}
 	// Bad since value → 400.

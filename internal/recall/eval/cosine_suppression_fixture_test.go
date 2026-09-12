@@ -1,7 +1,6 @@
 package eval_test
 
 import (
-	"context"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -62,7 +61,7 @@ func TestCosineSuppression_fixtureNoFalsePositives(t *testing.T) {
 	svc := recall.NewService(database)
 	suppressions := 0
 	for _, q := range golden.Questions {
-		matches, err := svc.Search(context.Background(), nil, q.Query, 10, []string{"memory", "scene"}, recall.TimeWindow{})
+		matches, err := svc.Search(t.Context(), nil, q.Query, 10, []string{"memory", "scene"}, recall.TimeWindow{})
 		if err != nil {
 			t.Fatalf("query %s: %v", q.ID, err)
 		}
@@ -146,7 +145,7 @@ func TestCosineSuppression_fixtureTrueDuplicateFused(t *testing.T) {
 	query := strings.Join(tokens, " ")
 
 	svc := recall.NewService(database)
-	matches, err := svc.Search(context.Background(), nil, query, 10, []string{"memory", "scene"}, recall.TimeWindow{})
+	matches, err := svc.Search(t.Context(), nil, query, 10, []string{"memory", "scene"}, recall.TimeWindow{})
 	if err != nil {
 		t.Fatal(err)
 	}

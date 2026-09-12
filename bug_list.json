@@ -79,6 +79,32 @@
           "repair": "Full pipeline red: run make check locally, fix the failing stage."
         }
       ]
+    },
+    {
+      "id": "B04",
+      "title": "flaky: TestSpawnedDaemonStdioIsLogFdNotPipe 5s log poll times out under full-suite load",
+      "issue": 70,
+      "severity": "low",
+      "module": "internal/appshell",
+      "state": "reported",
+      "reported": "2026-09-06",
+      "layers": [
+        {
+          "label": "L1 static",
+          "cmd": "jq -e --arg id \"B04\" '(.bugs[] | select(.id == $id) | .issue) == 70 and (.bugs[] | select(.id == $id) | .regression.file | test(\"_test\\\\.go$\"))' bug_list.json",
+          "repair": "B04 entry lost its issue linkage or regression file — check bug_list.json against bug_list.schema.json."
+        },
+        {
+          "label": "L2 runtime",
+          "cmd": "c=$(jq -r '.bugs[] | select(.id == \"B04\") | .regression.cmd // empty' bug_list.json); test -n \"$c\" && bash -c \"$c\"",
+          "repair": "No regression yet — B04 needs a phase-2 investigation: prove the flake source (5s/50ms file-poll window in updatelatch_test.go:131-139) and add a deterministic repro under load; keep the *os.File type assertion untouched."
+        },
+        {
+          "label": "L3 system",
+          "cmd": "make check",
+          "repair": "Full pipeline red: run make check locally, fix the failing stage."
+        }
+      ]
     }
   ]
 }

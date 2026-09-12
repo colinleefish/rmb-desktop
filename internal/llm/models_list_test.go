@@ -1,7 +1,6 @@
 package llm
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -80,7 +79,7 @@ func TestListModels_largeJSONBody(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	ids, err := listModels(context.Background(), srv.URL, "test-key", 5*time.Second)
+	ids, err := listModels(t.Context(), srv.URL, "test-key", 5*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}

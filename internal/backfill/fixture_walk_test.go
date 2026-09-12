@@ -2,7 +2,6 @@ package backfill
 
 import (
 	"bytes"
-	"context"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -53,11 +52,11 @@ func TestProvenanceWalkableOnGoldenFixture(t *testing.T) {
 	// clobber). We don't assert a link count here: with hash embeddings the
 	// fixture is not guaranteed to have any above-threshold scene, so the walk
 	// below pins a recoverable link explicitly.
-	stats, err := BackfillProvenance(context.Background(), database, Options{})
+	stats, err := BackfillProvenance(t.Context(), database, Options{})
 	if err != nil {
 		t.Fatalf("backfill on golden fixture: %v", err)
 	}
-	if _, err := BackfillProvenance(context.Background(), database, Options{}); err != nil {
+	if _, err := BackfillProvenance(t.Context(), database, Options{}); err != nil {
 		t.Fatalf("backfill idempotent rerun: %v", err)
 	}
 	t.Logf("fixture backfill scanned=%d linked=%d scenes=%d", stats.MemoriesScanned, stats.MemoriesLinked, stats.ScenesLinked)
@@ -71,7 +70,7 @@ func TestProvenanceWalkableOnGoldenFixture(t *testing.T) {
 
 	svc := inspect.NewService(database)
 	var mBuf bytes.Buffer
-	if err := svc.Meta(context.Background(), mem.URI, &mBuf); err != nil {
+	if err := svc.Meta(t.Context(), mem.URI, &mBuf); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(mBuf.String(), "rmb://scenes/"+scene.ID) {
@@ -79,7 +78,7 @@ func TestProvenanceWalkableOnGoldenFixture(t *testing.T) {
 	}
 
 	var sBuf bytes.Buffer
-	if err := svc.Meta(context.Background(), "rmb://scenes/"+scene.ID, &sBuf); err != nil {
+	if err := svc.Meta(t.Context(), "rmb://scenes/"+scene.ID, &sBuf); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(sBuf.String(), `"session_id": "`+sessionID+`"`) ||
@@ -88,7 +87,7 @@ func TestProvenanceWalkableOnGoldenFixture(t *testing.T) {
 	}
 
 	var lsBuf bytes.Buffer
-	if err := svc.Ls(context.Background(), "rmb://sessions/"+sessionID+"/", &lsBuf); err != nil {
+	if err := svc.Ls(t.Context(), "rmb://sessions/"+sessionID+"/", &lsBuf); err != nil {
 		t.Fatalf("ls by session_id on fixture: %v", err)
 	}
 	for _, want := range []string{"fixture-turn-1", "fixture-turn-2", "fixture-atom-1", "fixture-atom-2"} {

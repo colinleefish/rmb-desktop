@@ -40,7 +40,7 @@ type Match struct {
 	Tier    string  `json:"tier"`
 	Rank    float64 `json:"rank"`
 	Snippet string  `json:"snippet"`
-	Version int     `json:"version,omitempty"`
+	Version int     `json:"version,omitzero"`
 }
 
 func (c *Client) Search(ctx context.Context, query string, k int, scopes []string, since, until string, noBoost bool) ([]Match, error) {

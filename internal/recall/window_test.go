@@ -1,7 +1,6 @@
 package recall_test
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -99,7 +98,7 @@ func TestSearch_FTS_memories_timeWindow(t *testing.T) {
 	svc := recall.NewService(database)
 
 	// Unfiltered: both hit.
-	m, err := svc.Search(context.Background(), nil, "kubectl deployment", 5, []string{"memory"}, recall.TimeWindow{})
+	m, err := svc.Search(t.Context(), nil, "kubectl deployment", 5, []string{"memory"}, recall.TimeWindow{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +107,7 @@ func TestSearch_FTS_memories_timeWindow(t *testing.T) {
 	}
 
 	// --since=7d: only the fresh row.
-	m, err = svc.Search(context.Background(), nil, "kubectl deployment", 5, []string{"memory"}, recall.TimeWindow{SinceMS: nowMS - 7*24*time.Hour.Milliseconds()})
+	m, err = svc.Search(t.Context(), nil, "kubectl deployment", 5, []string{"memory"}, recall.TimeWindow{SinceMS: nowMS - 7*24*time.Hour.Milliseconds()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +116,7 @@ func TestSearch_FTS_memories_timeWindow(t *testing.T) {
 	}
 
 	// --until in the past: only the stale row.
-	m, err = svc.Search(context.Background(), nil, "kubectl deployment", 5, []string{"memory"}, recall.TimeWindow{UntilMS: oldMS + 1000})
+	m, err = svc.Search(t.Context(), nil, "kubectl deployment", 5, []string{"memory"}, recall.TimeWindow{UntilMS: oldMS + 1000})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +125,7 @@ func TestSearch_FTS_memories_timeWindow(t *testing.T) {
 	}
 
 	// Boundary equality: since exactly at old timestamp includes the old row.
-	m, err = svc.Search(context.Background(), nil, "kubectl deployment", 5, []string{"memory"}, recall.TimeWindow{SinceMS: oldMS})
+	m, err = svc.Search(t.Context(), nil, "kubectl deployment", 5, []string{"memory"}, recall.TimeWindow{SinceMS: oldMS})
 	if err != nil {
 		t.Fatal(err)
 	}

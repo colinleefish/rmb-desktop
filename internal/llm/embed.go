@@ -55,7 +55,7 @@ func (c *EmbeddingClient) Dimensions() int { return c.dimensions }
 type embeddingRequest struct {
 	Model      string   `json:"model"`
 	Input      []string `json:"input"`
-	Dimensions int      `json:"dimensions,omitempty"`
+	Dimensions int      `json:"dimensions,omitzero"`
 }
 
 type embeddingResponse struct {

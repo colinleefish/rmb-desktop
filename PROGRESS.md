@@ -2,25 +2,26 @@
 
 ## Current State
 
-Last commit: 7454203 (main) | `make check`: passing | F01, F02, F07 passing.
+Last commit: 45b97a7 (main); B04 branch `fix/B04-flaky-daemon-log-poll` @ 341d409 | `make check`: passing (main + bug worktree) | F01, F02, F07 passing.
+
+- **refactor/modern-go merged via PR #69** (merge commit 3ab60a5, merge-commit style, no squash): one-commit sweep (6a5b757) of modern Go idioms — `errors.Is`, range-int loops, `sync.WaitGroup.Go` — across 69 files. Branch caught up to origin/main@35d85c7 with a clean auto-merge (zero conflicts; zcode logic + idioms both preserved), verified green locally; note the PR had **no CI runs** because the pr-check workflow only lands with PR #67 — local `make check` was the gate of record. Branch + worktree cleaned up (local + remote deleted).
+- **PR #67 (pr-ci-gate) green**: hermetic `fakeRMBHome` CI fixture committed (8f1ea69) and pushed; Linux CI run passed 2m10s. Awaiting merge.
+- **B04 triaged (2026-09-06)**: the transient make-check flake from the merge day recurred (3rd instance) and is now identified — `flaky: TestSpawnedDaemonStdioIsLogFdNotPipe` (issue #70, `internal/appshell`, sev-low). 5s/50ms file-poll window in `updatelatch_test.go:131-139` times out under suite load; the `*os.File` regression guard itself never fails.
+- **B04 diagnosed (2026-09-06, phase 2 complete)** — branch `fix/B04-flaky-daemon-log-poll` @ 341d409, pushed. Root cause: the test's completion signal is a fixed 5s wall-clock poll for the fake daemon's `daemon-mark` write; under extreme CPU oversubscription (~30 parallel test pkgs + FTS5) the child's write lands past 5s → false FAIL at the deadline-exhaustion line (incident: 5.05s). The guarded `*os.File` assertion never failed. Causality proven by injection: test-only `RMB_TEST_DAEMON_WRITE_DELAY` hook delays the child write 8s → deterministic FAIL at ~5.0s (2/2), idle probe datapoint 410ms spawn→mark (12× headroom, why 2× load can't repro). Artifacts: `docs/bugs/B04-investigation.md`, `// B04` hook in `updatelatch_test.go` (test infra only, default off), `bug_list.json` regression {file, cmd}. Gate `make bug-state B=B04 S=diagnosed` passed (regression required to fail on unfixed code). Probe file deleted pre-commit; no product code touched; no PR yet.
 
 ## In Progress
 
-**ZCode capture bugs #61 + #62** — 3-phase procedure in flight:
-
-1. ✅ Issues filed: [#61](https://github.com/colinleefish/rmb-desktop/issues/61) (assistant-only turns), [#62](https://github.com/colinleefish/rmb-desktop/issues/62) (`sess_`-prefixed session keys)
-2. ✅ Investigation complete: `docs/audit/2026-08-29-zcode-capture-bugs/INVESTIGATION.md` (root causes verified against the installed ZCode client bundle, not docs; deterministic repro; test matrix TC-1…TC-7; fixer handoff §5)
-3. ✅ Fixes complete — PRs submitted (two parallel sub-agents, two worktrees, integrated by coordinator session):
-   - **PR [#65](https://github.com/colinleefish/rmb-desktop/pull/65)** — #61: UserPromptSubmit capture hook + sidecar pairing (branch `fix/zcode-61-user-prompt-capture`)
-   - **PR [#66](https://github.com/colinleefish/rmb-desktop/pull/66)** — #62: `zcodeRMBSessionID` key normalizer, no-migration per owner decision (branch `fix/zcode-62-session-key-normalize`, stacked on #65 — merge #65 first)
-   - Coordinator caught + fixed a semantic merge conflict (sidecar lookup vs key normalization) and verified the integrated stack: `make check` + `clean-check` green on both branches
+- **B04 phase 3 (fix)**: `fix/B04-flaky-daemon-log-poll` is diagnosed, not fixed. Fix session: read `docs/bugs/B04-investigation.md`, fill a sprint contract, make the regression green (detection tolerant of a child write delayed ≥8s; keep the `*os.File` assertion untouched), then `make verify-bug B=B04` → PR.
+- Issue #70 summary comment still to post (checklist item left open by the phase-2 session per mission scope).
 
 ## Next Steps
 
-1. Review + merge #65, then #66; after both land: bump VERSION, rebuild + reinstall locally so the new hooks go live; remove fix worktrees/panes
-2. WebUI refactor per `plan/webui-refactor.md` (week of 2026-08-31): F03 UX audit first
-3. F06 secrets → Keychain/env + key rotation (P3.5)
-4. Weekly sweep per AGENTS.md Observability
+0. B04 phase 3: fix session on the existing `fix/B04-flaky-daemon-log-poll` worktree — tolerant detection, `make verify-bug B=B04`, PR (F09 pr-check), merge, close #70
+1. Merge PR #67 (pr-ci-gate) so future PRs get CI runs
+2. Bump VERSION, rebuild + reinstall locally so the new zcode hooks go live; remove remaining fix worktrees/panes
+3. WebUI refactor per `plan/webui-refactor.md` (week of 2026-08-31): F03 UX audit first
+4. F06 secrets → Keychain/env + key rotation (P3.5)
+5. Weekly sweep per AGENTS.md Observability
 
 ## Blockers
 

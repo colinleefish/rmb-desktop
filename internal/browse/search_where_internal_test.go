@@ -1,7 +1,6 @@
 package browse
 
 import (
-	"context"
 	"database/sql"
 	"testing"
 
@@ -40,7 +39,7 @@ func TestSessionScopedSearchStaysInSession(t *testing.T) {
 		('a1', 's1', 'entities', 1, 'alpha needle', '[]', ?, ?),
 		('a2', 's2', 'entities', 1, 'beta needle', '[]', ?, ?)`, now, now, now, now)
 
-	page, err := svc.listAtoms(context.Background(), ListParams{Limit: 10, Query: "needle"}, "s1")
+	page, err := svc.listAtoms(t.Context(), ListParams{Limit: 10, Query: "needle"}, "s1")
 	if err != nil {
 		t.Fatalf("listAtoms: %v", err)
 	}

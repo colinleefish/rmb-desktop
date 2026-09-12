@@ -57,7 +57,7 @@ func TestSearchAtomScope_FTS(t *testing.T) {
 	insertAtomFixture(t, database, "openresty request time DNS resolver 10.0.0.1 10.0.0.2 upstreams.conf")
 
 	svc := recall.NewService(database)
-	matches, err := svc.Search(context.Background(), nil, "openresty resolver", 5, []string{"atom"}, recall.TimeWindow{})
+	matches, err := svc.Search(t.Context(), nil, "openresty resolver", 5, []string{"atom"}, recall.TimeWindow{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +87,7 @@ func TestSearchAtomScope_Vector(t *testing.T) {
 	embed := recall.QueryEmbedder(func(_ context.Context, q string) ([]float32, error) {
 		return []float32{1, 0, 0, 0}, nil // matches the atom embedding exactly
 	})
-	matches, err := svc.Search(context.Background(), embed, "proxy", 5, []string{"atom"}, recall.TimeWindow{})
+	matches, err := svc.Search(t.Context(), embed, "proxy", 5, []string{"atom"}, recall.TimeWindow{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +107,7 @@ func TestSearchAtomScope_NotDefault(t *testing.T) {
 
 	svc := recall.NewService(database)
 	// Default scope (memory + skill) must NOT surface atoms.
-	matches, err := svc.Search(context.Background(), nil, "kubectl deployment", 5, nil, recall.TimeWindow{})
+	matches, err := svc.Search(t.Context(), nil, "kubectl deployment", 5, nil, recall.TimeWindow{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +131,7 @@ func TestSearchAtomScope_TimeWindow(t *testing.T) {
 	}
 
 	svc := recall.NewService(database)
-	matches, err := svc.Search(context.Background(), nil, atomContent, 5,
+	matches, err := svc.Search(t.Context(), nil, atomContent, 5,
 		[]string{"atom"}, recall.TimeWindow{SinceMS: time.Now().UTC().Add(-time.Hour).UnixMilli()})
 	if err != nil {
 		t.Fatal(err)
@@ -146,7 +146,7 @@ func TestSearchAtomScope_InvalidScopeRejected(t *testing.T) {
 	defer database.Close()
 
 	svc := recall.NewService(database)
-	if _, err := svc.Search(context.Background(), nil, "anything", 5, []string{"atom", "bogus"}, recall.TimeWindow{}); err == nil {
+	if _, err := svc.Search(t.Context(), nil, "anything", 5, []string{"atom", "bogus"}, recall.TimeWindow{}); err == nil {
 		t.Fatal("expected error for invalid scope")
 	}
 }

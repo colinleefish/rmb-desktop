@@ -15,9 +15,9 @@ import (
 
 type configTestSide struct {
 	OK          bool     `json:"ok"`
-	LatencyMs   int64    `json:"latency_ms,omitempty"`
+	LatencyMs   int64    `json:"latency_ms,omitzero"`
 	Error       string   `json:"error,omitempty"`
-	ModelsCount int      `json:"models_count,omitempty"`
+	ModelsCount int      `json:"models_count,omitzero"`
 	Models      []string `json:"models,omitempty"`
 }
 
@@ -52,10 +52,7 @@ func (s *Server) handlePostConfigTest(w http.ResponseWriter, r *http.Request) {
 
 	out := configTestResponse{}
 	var wg sync.WaitGroup
-	wg.Add(2)
-
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		llmCfg, err := s.mergeLLMTestBody(configTestLLMBody{
 			APIBase: req.LLM.APIBase,
 			APIKey:  req.LLM.APIKey,
@@ -67,10 +64,9 @@ func (s *Server) handlePostConfigTest(w http.ResponseWriter, r *http.Request) {
 		}
 		llmRes, err := llm.TestLLMConnection(ctx, llmCfg)
 		out.LLM = llmTestSide(llmRes, err)
-	}()
+	})
 
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		embedCfg, err := s.mergeEmbedTestBody(configTestEmbedBody{
 			APIBase:    req.Embed.APIBase,
 			APIKey:     req.Embed.APIKey,
@@ -88,7 +84,7 @@ func (s *Server) handlePostConfigTest(w http.ResponseWriter, r *http.Request) {
 			out.Embed.OK = true
 			out.Embed.LatencyMs = embedDur.Milliseconds()
 		}
-	}()
+	})
 
 	wg.Wait()
 	writeJSON(w, http.StatusOK, out)

@@ -1,7 +1,6 @@
 package backfill
 
 import (
-	"context"
 	"database/sql"
 	"path/filepath"
 	"testing"
@@ -72,7 +71,7 @@ func TestBackfillProvenance_linksMatchingScene(t *testing.T) {
 	database := openDB(t)
 	memURI, sceneURI := seedMemWithScene(t, database)
 
-	stats, err := BackfillProvenance(context.Background(), database, Options{})
+	stats, err := BackfillProvenance(t.Context(), database, Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +97,7 @@ func TestBackfillProvenance_idempotentAndDryRun(t *testing.T) {
 	memURI, _ := seedMemWithScene(t, database)
 
 	// Dry-run: reports but does not write.
-	dry, err := BackfillProvenance(context.Background(), database, Options{DryRun: true})
+	dry, err := BackfillProvenance(t.Context(), database, Options{DryRun: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,11 +113,11 @@ func TestBackfillProvenance_idempotentAndDryRun(t *testing.T) {
 	}
 
 	// Real pass.
-	if _, err := BackfillProvenance(context.Background(), database, Options{}); err != nil {
+	if _, err := BackfillProvenance(t.Context(), database, Options{}); err != nil {
 		t.Fatal(err)
 	}
 	// Idempotency: second pass finds zero empty-provenance memories.
-	stats, err := BackfillProvenance(context.Background(), database, Options{})
+	stats, err := BackfillProvenance(t.Context(), database, Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -152,7 +151,7 @@ func TestBackfillProvenance_skipsMemoryWithExistingProvenance(t *testing.T) {
 		blob([]float32{1, 0, 0, 0}), nowMS, nowMS); err != nil {
 		t.Fatal(err)
 	}
-	stats, err := BackfillProvenance(context.Background(), database, Options{})
+	stats, err := BackfillProvenance(t.Context(), database, Options{})
 	if err != nil {
 		t.Fatal(err)
 	}

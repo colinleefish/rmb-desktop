@@ -1,7 +1,6 @@
 package pipeline_test
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -36,7 +35,7 @@ func TestResetRunningOlderThan(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	n, err := pipeline.ResetRunningOlderThan(context.Background(), database, pipeline.StageL2, nowMS-int64(5*time.Minute/time.Millisecond))
+	n, err := pipeline.ResetRunningOlderThan(t.Context(), database, pipeline.StageL2, nowMS-int64(5*time.Minute/time.Millisecond))
 	if err != nil {
 		t.Fatal(err)
 	}

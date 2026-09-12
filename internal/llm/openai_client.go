@@ -46,7 +46,7 @@ type OpenAICompatibleClient struct {
 type chatCompletionRequest struct {
 	Model       string        `json:"model"`
 	Temperature float64       `json:"temperature"`
-	MaxTokens   int           `json:"max_tokens,omitempty"`
+	MaxTokens   int           `json:"max_tokens,omitzero"`
 	Messages    []chatMessage `json:"messages"`
 }
 

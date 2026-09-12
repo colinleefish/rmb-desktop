@@ -155,7 +155,7 @@ func (s *Service) catMemory(ctx context.Context, target string, w io.Writer) err
 	err := s.db.QueryRowContext(ctx, `
 		SELECT body FROM memories WHERE uri = ? AND superseded_at IS NULL`, target,
 	).Scan(&body)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("memory not found: %s", target)
 	}
 	if err != nil {

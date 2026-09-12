@@ -127,7 +127,7 @@ func TestDistillBucketSingleAtomEventGoesThroughLLMWithRelated(t *testing.T) {
 	distiller := &recordingDistiller{}
 	w := testWorker(database, distiller)
 
-	pm, err := w.distillBucket(context.Background(), bucket, nil)
+	pm, err := w.distillBucket(t.Context(), bucket, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +160,7 @@ func TestDistillBucketSingleAtomPreferenceKeepsFastPath(t *testing.T) {
 		URI:      "rmb://preferences/atlas",
 		Atoms:    []model.Atom{{Content: "The user uses Atlas for schema comparison."}},
 	}
-	pm, err := w.distillBucket(context.Background(), bucket, nil)
+	pm, err := w.distillBucket(t.Context(), bucket, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,7 +207,7 @@ func TestRollupGraduationBar(t *testing.T) {
 		"On 2026-07-16 the tag bug was fixed.")
 
 	w := testWorker(database, &recordingDistiller{})
-	if err := w.rollup(context.Background()); err != nil {
+	if err := w.rollup(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 
@@ -229,7 +229,7 @@ func TestRollupGraduationBar(t *testing.T) {
 	insertPendingSession(t, database, "s3")
 	insertAtom(t, database, "p2", "s3", model.AtomCategoryPreferences, "call-user-daddy",
 		"The user prefers to be called Daddy.")
-	if err := w.rollup(context.Background()); err != nil {
+	if err := w.rollup(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	if err := database.QueryRow(`SELECT COUNT(*) FROM memories WHERE uri = 'rmb://preferences/call-user-daddy' AND superseded_at IS NULL`).Scan(&prefCount); err != nil {
@@ -245,7 +245,7 @@ func TestRollupGraduationBar(t *testing.T) {
 		"The user prefers to be called Daddy in AI chats.")
 	insertScene(t, database, "sc1", "s4", []string{"p3"})
 	insertPendingSession(t, database, "s4")
-	if err := w.rollup(context.Background()); err != nil {
+	if err := w.rollup(t.Context()); err != nil {
 		t.Fatal(err)
 	}
 	var version int
@@ -283,7 +283,7 @@ func TestPersistEventBodyRetainsResolvesLink(t *testing.T) {
 	body := "On 2026-07-16 the one-tag-diff solutions were cleaned up.\n\n- **Decision:** Clean up bad one-tag-diff rows.\n- **Outcome:** Soft-deleted 29,800, 67 remain.\n- **Related:** resolves " + problemURI
 	pm := ParsedMemory{Abstract: "one-tag cleaned after tag bug", Body: body}
 
-	if err := w.persistMemory(context.Background(), bucket, pm, nil, nil); err != nil {
+	if err := w.persistMemory(t.Context(), bucket, pm, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -322,7 +322,7 @@ func TestGraduationDeferredExistingMemoryRewrites(t *testing.T) {
 		URI:      "rmb://entities/starlink",
 		Atoms:    []model.Atom{{ID: "a1", SessionID: "only-session", Category: model.AtomCategoryEntities, Content: "starlink entity fact"}},
 	}
-	deferred, err := w.graduationDeferred(context.Background(), bucket)
+	deferred, err := w.graduationDeferred(t.Context(), bucket)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -383,7 +383,7 @@ func TestDryRunL3(t *testing.T) {
 		t.Fatal(err)
 	}
 	distiller := &recordingDistiller{}
-	result, err := DryRunL3(context.Background(), database, distiller, cfg.Pipeline, nil, "s1")
+	result, err := DryRunL3(t.Context(), database, distiller, cfg.Pipeline, nil, "s1")
 	if err != nil {
 		t.Fatal(err)
 	}

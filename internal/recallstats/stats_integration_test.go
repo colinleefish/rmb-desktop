@@ -1,7 +1,6 @@
 package recallstats_test
 
 import (
-	"context"
 	"database/sql"
 	"path/filepath"
 	"testing"
@@ -15,7 +14,7 @@ func TestRecordSearchCatMeta(t *testing.T) {
 	defer database.Close()
 
 	svc := recallstats.NewService(database)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := svc.RecordSearch(ctx, []string{"rmb://entities/jenkins", "rmb://entities/jenkins"}); err != nil {
 		t.Fatal(err)

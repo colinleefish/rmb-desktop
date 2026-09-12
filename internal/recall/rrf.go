@@ -1,6 +1,9 @@
 package recall
 
-import "sort"
+import (
+	"cmp"
+	"slices"
+)
 
 // Ranked is a search hit with a fused score.
 type Ranked struct {
@@ -26,11 +29,11 @@ func FuseRRF(vectorHits, ftsHits []string, k int, vectorWeight, ftsWeight float6
 	for uri, score := range scores {
 		out = append(out, Ranked{URI: uri, Score: score})
 	}
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].Score == out[j].Score {
-			return out[i].URI < out[j].URI
+	slices.SortFunc(out, func(a, b Ranked) int {
+		if c := cmp.Compare(b.Score, a.Score); c != 0 {
+			return c
 		}
-		return out[i].Score > out[j].Score
+		return cmp.Compare(a.URI, b.URI)
 	})
 	if k > 0 && len(out) > k {
 		out = out[:k]

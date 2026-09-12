@@ -1,7 +1,6 @@
 package debug
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -61,7 +60,7 @@ func TestAttrToJSONNilError(t *testing.T) {
 func TestBufferHandlerEnabledDelegates(t *testing.T) {
 	buf := NewLogBuffer(1)
 	h := buf.Handler(slog.NewJSONHandler(discardWriter{}, &slog.HandlerOptions{Level: slog.LevelError}))
-	if h.Enabled(context.Background(), slog.LevelInfo) {
+	if h.Enabled(t.Context(), slog.LevelInfo) {
 		t.Fatal("expected info disabled when base level is error")
 	}
 }

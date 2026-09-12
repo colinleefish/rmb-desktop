@@ -1,7 +1,6 @@
 package recallstats
 
 import (
-	"context"
 	"database/sql"
 	"path/filepath"
 	"testing"
@@ -54,7 +53,7 @@ func TestHeatWeights_catMeta(t *testing.T) {
 	start := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
 	now, set := fakeClock(start)
 	svc.SetClock(now)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	if err := svc.RecordCat(ctx, "rmb://entities/jump-hs99-vip"); err != nil {
 		t.Fatal(err)
@@ -102,7 +101,7 @@ func TestSearchNeverUpdatesHeat_skillPollutionCase(t *testing.T) {
 	svc := NewService(database)
 	now, _ := fakeClock(time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC))
 	svc.SetClock(now)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	for i := 0; i < 20; i++ {
 		if err := svc.RecordQuery(ctx, "deploy prod", nil, 5, []string{
@@ -140,7 +139,7 @@ func TestSearchToCatJoin_tenMinuteWindow(t *testing.T) {
 	start := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
 	now, set := fakeClock(start)
 	svc.SetClock(now)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	target := "rmb://skills/jump-hs99-vip"
 	if err := svc.RecordQuery(ctx, "bastion ssh", []string{"memory", "skill"}, 5, []string{
@@ -185,7 +184,7 @@ func TestDoctorMetrics_zeroCatRateAndConcentration(t *testing.T) {
 	start := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
 	now, set := fakeClock(start)
 	svc.SetClock(now)
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// 4 searches; 2 get cats (within window), 2 do not → zero-cat rate 0.5.
 	for i, converted := range []bool{true, false, true, false} {

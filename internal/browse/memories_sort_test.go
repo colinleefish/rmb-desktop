@@ -1,7 +1,6 @@
 package browse_test
 
 import (
-	"context"
 	"testing"
 
 	"github.com/colinleefish/rmb-desktop/internal/browse"
@@ -57,7 +56,7 @@ func TestListMemoriesSortByRecallStats(t *testing.T) {
 		{"meta", "desc", []string{"a", "b", "c", "d"}},   // 9,3,1,0
 	}
 	for _, tc := range cases {
-		page, err := svc.ListMemories(context.Background(), browse.ListParams{
+		page, err := svc.ListMemories(t.Context(), browse.ListParams{
 			Limit: 10, Sort: tc.sort, Order: tc.order,
 		})
 		if err != nil {
@@ -70,7 +69,7 @@ func TestListMemoriesSortByRecallStats(t *testing.T) {
 	}
 
 	// Category filter must still work alongside the join.
-	page, err := svc.ListMemories(context.Background(), browse.ListParams{
+	page, err := svc.ListMemories(t.Context(), browse.ListParams{
 		Limit: 10, Category: "entities", Sort: "search", Order: "desc",
 	})
 	if err != nil {
@@ -81,7 +80,7 @@ func TestListMemoriesSortByRecallStats(t *testing.T) {
 	}
 
 	// Query filter (matches uri/abstract/body/slug) must work alongside join.
-	page, err = svc.ListMemories(context.Background(), browse.ListParams{
+	page, err = svc.ListMemories(t.Context(), browse.ListParams{
 		Limit: 10, Query: "body a", Sort: "search", Order: "desc",
 	})
 	if err != nil {

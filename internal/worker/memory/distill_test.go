@@ -1,7 +1,6 @@
 package memory
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -18,7 +17,7 @@ func TestDistillBucketSingleAtomSkipsLLM(t *testing.T) {
 		Atoms:    []model.Atom{atom},
 	}
 
-	pm, err := w.distillBucket(context.Background(), bucket, nil)
+	pm, err := w.distillBucket(t.Context(), bucket, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,7 +40,7 @@ func TestDistillBucketSingleAtomTruncatesAbstract(t *testing.T) {
 		Atoms:    []model.Atom{atom},
 	}
 
-	pm, err := w.distillBucket(context.Background(), bucket, nil)
+	pm, err := w.distillBucket(t.Context(), bucket, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +60,7 @@ func TestDistillBucketSingleAtomEmptyContent(t *testing.T) {
 		URI:      "rmb://entities/empty",
 		Atoms:    []model.Atom{{Content: "   "}},
 	}
-	if _, err := w.distillBucket(context.Background(), bucket, nil); err == nil {
+	if _, err := w.distillBucket(t.Context(), bucket, nil); err == nil {
 		t.Fatal("expected error for empty single-atom content")
 	}
 }

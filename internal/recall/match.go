@@ -9,7 +9,7 @@ type Match struct {
 	// Version is the memory version count (trust signal: high churn means
 	// heavily rewritten — verify via linked scene). Populated for the memory
 	// tier only.
-	Version int `json:"version,omitempty"`
+	Version int `json:"version,omitzero"`
 	// SourceScenes are the memory's evidence scenes (drill-down targets).
 	// Populated for the memory tier only; used for link-based suppression of
 	// duplicated scene hits.

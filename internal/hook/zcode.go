@@ -4,17 +4,36 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
+	"time"
+
+	"github.com/google/uuid"
 )
 
-// zcodePayload covers the ZCode Stop hook payload shape. ZCode's hook stdin
-// contract mirrors Claude Code's field names (session_id, transcript_path,
-// cwd, permission_mode, hook_event_name, stop_hook_active,
-// last_assistant_message), since ZCode inherited the same hook protocol.
+// zcodeSessionNamespace maps non-reducible ZCode session ids to deterministic
+// rmb UUIDs (uuid5), mirroring opencodeSessionNamespace in opencode.go.
+var zcodeSessionNamespace = uuid.MustParse("9f3c7b2a-5d41-4e68-a7c9-2b4d6e8f1a3c")
+
+// ZCode hook contract (verified against ZCode's CLI bundle, glm/zcode.cjs —
+// createClaudeCompatibleHookStdin / formatClaudeTranscript):
 //
-// ZCode cleans up the transcript_path temp directory once the hook finishes,
-// so it must be read synchronously while hook-submit runs (which is the
-// case here: the Stop hook blocks until this process exits).
+//   - Stop payload: {session_id, hook_event_name, permission_mode,
+//     transcript_path, last_assistant_message, stop_hook_active, cwd, mode,
+//     responseText, responsePreview, stopHookActive, toolCallCount, turnId,
+//     traceId, timestamp, agentName, agent_type}. It carries NO user prompt.
+//   - The Stop transcript_path points at a temp file
+//     ($TMPDIR/zcode-claude-hook-*/transcript.jsonl) holding exactly ONE line
+//     — the assistant message, in a Claude-ish shape without a row "type":
+//     {"message":{"content":[{"text":...,"type":"text"}],"role":"assistant"}}
+//     The temp dir is deleted once the hook finishes.
+//
+// So the user prompt cannot come from the Stop payload or its transcript.
+// ZCode's UserPromptSubmit hook does receive {prompt, session_id, ...}; we
+// register a second capture hook on that event (see internal/setup/zcode.go
+// and rmb hook-capture) which persists the prompt to a sidecar file keyed by
+// session id. ParseZCodePayload pairs the captured prompt with the assistant
+// message and consumes the sidecar.
 type zcodePayload struct {
 	SessionID            string `json:"session_id"`
 	TranscriptPath       string `json:"transcript_path"`
@@ -26,6 +45,15 @@ type zcodePayload struct {
 }
 
 // IsZCodePayload reports whether raw JSON looks ZCode-originated.
+// Note: the transcript_path lives under the system temp dir, not ~/.zcode, so
+// detection leans on the Claude-alias fields ZCode always includes.
+//
+// TC-4 decision (investigation §4): a payload carrying only the camelCase
+// aliases (responseText, no snake-case last_assistant_message) is NOT
+// accepted. ZCode always sends both spellings (§1.2 Fact C), so camel-only
+// would mean a client contract change; gating on the snake alias keeps
+// detection strict — a contract change surfaces as a loud "not a zcode
+// payload" skip instead of a silent misparse.
 func IsZCodePayload(raw []byte) bool {
 	if len(strings.TrimSpace(string(raw))) == 0 {
 		return false
@@ -33,12 +61,6 @@ func IsZCodePayload(raw []byte) bool {
 	var p zcodePayload
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return false
-	}
-	if tp := strings.TrimSpace(p.TranscriptPath); tp != "" {
-		home, _ := os.UserHomeDir()
-		if home != "" && strings.HasPrefix(tp, home+"/.zcode/") {
-			return true
-		}
 	}
 	if strings.TrimSpace(p.LastAssistantMessage) != "" {
 		return true
@@ -53,15 +75,18 @@ func IsZCodePayload(raw []byte) bool {
 }
 
 // ParseZCodePayload extracts session key and messages from a ZCode Stop hook.
+// The user prompt comes from the sidecar written by the UserPromptSubmit
+// capture hook; when absent (capture hook not applied yet, or rmb restarted
+// mid-turn) the turn degrades to assistant-only.
 func ParseZCodePayload(raw []byte) (sessionKey string, messages []uploadMessage, reason string, err error) {
 	var p zcodePayload
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return "", nil, "", fmt.Errorf("decode zcode payload: %w", err)
 	}
 
-	sessionKey = strings.ToLower(strings.TrimSpace(p.SessionID))
-	if sessionKey == "" {
-		return "", nil, "", fmt.Errorf("zcode payload missing session_id")
+	sessionKey, err = zcodeRMBSessionID(p.SessionID)
+	if err != nil {
+		return "", nil, "", err
 	}
 
 	assistant := strings.TrimSpace(p.LastAssistantMessage)
@@ -69,10 +94,11 @@ func ParseZCodePayload(raw []byte) (sessionKey string, messages []uploadMessage,
 		return "", nil, "", fmt.Errorf("zcode payload: last_assistant_message is empty")
 	}
 
-	// ZCode's hook transcript is Claude-Code-compatible JSONL when present;
-	// reuse the same tolerant parser and degrade to assistant-only on any
-	// shape mismatch (unmarshal errors are swallowed by claudeFindLastUserPrompt).
-	userText := claudeFindLastUserPrompt(p.TranscriptPath)
+	// Sidecar lookup is keyed on the raw payload id (zcodeSidecarKey), NOT on
+	// the stored sessionKey: both hooks receive the same raw session_id, while
+	// sessionKey is owned by key normalization (issue #62). Decoupling keeps
+	// capture→pairing correct regardless of how keys are derived.
+	userText := takeCapturedZCodePrompt(zcodeSidecarKey(p.SessionID))
 
 	out := make([]uploadMessage, 0, 2)
 	if userText != "" {
@@ -81,7 +107,145 @@ func ParseZCodePayload(raw []byte) (sessionKey string, messages []uploadMessage,
 	out = append(out, uploadMessage{Role: "assistant", Content: assistant})
 
 	if userText == "" {
-		return sessionKey, out, "last_assistant_message only (no user found)", nil
+		return sessionKey, out, "last_assistant_message only (no captured prompt)", nil
 	}
-	return sessionKey, out, "user from transcript + assistant from payload", nil
+	return sessionKey, out, "user from prompt capture + assistant from payload", nil
+}
+
+// zcodePromptPayload covers the UserPromptSubmit hook stdin: it carries the
+// raw prompt plus the session id the prompt belongs to.
+type zcodePromptPayload struct {
+	SessionID     string `json:"session_id"`
+	Prompt        string `json:"prompt"`
+	HookEventName string `json:"hook_event_name"`
+}
+
+// zcodePromptDir is where UserPromptSubmit captures are parked until the
+// matching Stop hook consumes them.
+func zcodePromptDir() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".rmb", "cache", "agent-prompts", "zcode")
+}
+
+func zcodePromptPath(sessionKey string) string {
+	return filepath.Join(zcodePromptDir(), sessionKey+".json")
+}
+
+// zcodeSidecarKey normalizes a payload session id into a sidecar file key.
+// Same derivation as ParseZCodePayload's session key (lowercased, trimmed —
+// issue #62 owns any further normalization), plus a guard: the key must form
+// a single safe path segment so a hostile session_id cannot escape the
+// sidecar dir. Returns "" when unusable.
+func zcodeSidecarKey(sessionID string) string {
+	key := strings.ToLower(strings.TrimSpace(sessionID))
+	if key == "" || strings.ContainsAny(key, `/\`) {
+		return ""
+	}
+	return key
+}
+
+// CaptureZCodePrompt persists a UserPromptSubmit prompt for later pairing by
+// ParseZCodePayload. It never fails the hook: ZCode treats non-zero exits as
+// run failures, and a missed capture only degrades to assistant-only capture.
+func CaptureZCodePrompt(raw []byte) error {
+	var p zcodePromptPayload
+	if err := json.Unmarshal(raw, &p); err != nil {
+		return nil //nolint:nilerr // undecorable stdin: skip silently
+	}
+	sessionKey := zcodeSidecarKey(p.SessionID)
+	prompt := strings.TrimSpace(p.Prompt)
+	if sessionKey == "" || prompt == "" {
+		return nil
+	}
+
+	dir := zcodePromptDir()
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return nil
+	}
+
+	doc := struct {
+		Prompt     string `json:"prompt"`
+		CapturedAt int64  `json:"captured_at"`
+	}{Prompt: prompt, CapturedAt: time.Now().Unix()}
+	data, err := json.Marshal(doc)
+	if err != nil {
+		return nil
+	}
+
+	// Atomic write: last prompt wins if several are queued before a Stop.
+	tmp := zcodePromptPath(sessionKey) + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o600); err != nil {
+		return nil
+	}
+	_ = os.Rename(tmp, zcodePromptPath(sessionKey))
+
+	zcodeSweepStalePrompts(dir)
+	return nil
+}
+
+// takeCapturedZCodePrompt returns and removes the prompt captured for a
+// session, or "" when none exists.
+func takeCapturedZCodePrompt(sessionKey string) string {
+	key := zcodeSidecarKey(sessionKey)
+	if key == "" {
+		return ""
+	}
+	path := zcodePromptPath(key)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	_ = os.Remove(path)
+
+	var doc struct {
+		Prompt string `json:"prompt"`
+	}
+	if err := json.Unmarshal(data, &doc); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(doc.Prompt)
+}
+
+// zcodeSweepStalePrompts best-effort deletes captures that were never
+// consumed (session abandoned before a Stop hook ran).
+func zcodeSweepStalePrompts(dir string) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	cutoff := time.Now().Add(-7 * 24 * time.Hour)
+	for _, e := range entries {
+		if e.IsDir() || filepath.Ext(e.Name()) != ".json" {
+			continue
+		}
+		if info, err := e.Info(); err == nil && info.ModTime().Before(cutoff) {
+			_ = os.Remove(filepath.Join(dir, e.Name()))
+		}
+	}
+}
+
+// zcodeRMBSessionID normalizes ZCode's native session ids to the bare-UUID
+// form every other agent stores (issue #62). ZCode uses sess_<uuid> for
+// interactive sessions and sess_subagent_agent_<uuid> for subagent children.
+//
+// The function is total: valid UUID out for ANY non-empty input. Bare UUIDs
+// pass through canonicalized; a sess_ prefix is stripped only when the
+// remainder is a valid UUID (a pure strip is NOT total — the subagent form
+// does not reduce to a UUID); anything else derives a deterministic uuid5,
+// so the same native id always maps to the same stored session.
+func zcodeRMBSessionID(raw string) (string, error) {
+	sessionID := strings.TrimSpace(raw)
+	if sessionID == "" {
+		return "", fmt.Errorf("zcode payload missing session_id")
+	}
+	if parsed, err := uuid.Parse(sessionID); err == nil {
+		return strings.ToLower(parsed.String()), nil
+	}
+	if rest, ok := strings.CutPrefix(strings.ToLower(sessionID), "sess_"); ok {
+		if parsed, err := uuid.Parse(rest); err == nil {
+			return strings.ToLower(parsed.String()), nil
+		}
+	}
+	derived := uuid.NewSHA1(zcodeSessionNamespace, []byte("zcode:"+sessionID))
+	return strings.ToLower(derived.String()), nil
 }

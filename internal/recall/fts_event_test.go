@@ -1,7 +1,6 @@
 package recall_test
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -45,7 +44,7 @@ func TestFTSEventLinks(t *testing.T) {
 	insert("self", "rmb://events/2026-07-16-soft-delete-one-tag-solutions-dup", "events", false,
 		"duplicate slug probe", "self event must be excluded")
 
-	matches, err := recall.FTSEventLinks(context.Background(), database,
+	matches, err := recall.FTSEventLinks(t.Context(), database,
 		"soft delete tag solutions", "rmb://events/2026-07-16-soft-delete-one-tag-solutions-dup", 5)
 	if err != nil {
 		t.Fatal(err)
@@ -72,7 +71,7 @@ func TestFTSEventLinks(t *testing.T) {
 	}
 
 	// OR semantics: a single shared token still links (bm25 ranks it).
-	one, err := recall.FTSEventLinks(context.Background(), database, "hs99", "self-x", 5)
+	one, err := recall.FTSEventLinks(t.Context(), database, "hs99", "self-x", 5)
 	if err != nil {
 		t.Fatal(err)
 	}

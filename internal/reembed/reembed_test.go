@@ -1,7 +1,6 @@
 package reembed_test
 
 import (
-	"context"
 	"path/filepath"
 	"testing"
 
@@ -36,7 +35,7 @@ func TestClearAll(t *testing.T) {
 	}
 	defer database.Close()
 
-	ctx := context.Background()
+	ctx := t.Context()
 	if _, err := database.ExecContext(ctx, `
 		INSERT INTO sessions (id, session_key, created_at, updated_at)
 		VALUES ('s1', 'test-session', 1, 1)`); err != nil {

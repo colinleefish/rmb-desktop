@@ -1,7 +1,6 @@
 package browse_test
 
 import (
-	"context"
 	"database/sql"
 	"testing"
 	"time"
@@ -48,7 +47,7 @@ func TestPipelineHealth(t *testing.T) {
 	insert("s-t1-run", "running", "idle", "idle")
 
 	svc := browse.NewService(database, nil)
-	health, err := svc.PipelineHealth(context.Background(), true)
+	health, err := svc.PipelineHealth(t.Context(), true)
 	if err != nil {
 		t.Fatal(err)
 	}

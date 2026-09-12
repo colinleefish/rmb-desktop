@@ -60,8 +60,14 @@
       "issue": 15,
       "severity": "medium",
       "module": "internal/update",
-      "state": "reported",
+      "state": "passing",
       "reported": "2026-08-29",
+      "investigation": "docs/bugs/B03-investigation.md",
+      "branch": "fix/B03-tray-update-baseline",
+      "regression": {
+        "file": "internal/appshell/updater_b03_test.go",
+        "cmd": "go test ./internal/appshell -run TestB03_updateCheckVersionUsesInstalledSidecar -count=1"
+      },
       "layers": [
         {
           "label": "L1 static",
@@ -71,14 +77,15 @@
         {
           "label": "L2 runtime",
           "cmd": "c=$(jq -r '.bugs[] | select(.id == \"B03\") | .regression.cmd // empty' bug_list.json); test -n \"$c\" && bash -c \"$c\"",
-          "repair": "No regression yet — B03 still needs a phase-2 investigation (root cause is hypothesized in the issue title, not verified)."
+          "repair": "Regression red: updateCheckVersion must prefer installed sidecar stamp (and daemon fallback) over shell version.Version."
         },
         {
           "label": "L3 system",
           "cmd": "make check",
           "repair": "Full pipeline red: run make check locally, fix the failing stage."
         }
-      ]
+      ],
+      "evidence": "commit d83070f, verified 2026-09-12"
     },
     {
       "id": "B04",

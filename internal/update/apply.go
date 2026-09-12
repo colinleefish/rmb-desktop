@@ -105,7 +105,11 @@ func Apply(ctx context.Context, rel *Release, installDir string, onStage func(st
 	}
 
 	onStage("Installing")
-	return swapAll(extractDir, installDir)
+	if err := swapAll(extractDir, installDir); err != nil {
+		return err
+	}
+	_ = WriteSidecarStamp(installDir, rel.Manifest.Version)
+	return nil
 }
 
 func download(ctx context.Context, url, dst, wantSHA string) error {

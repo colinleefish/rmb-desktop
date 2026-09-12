@@ -1,6 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Navigate, useLocation, useParams, useSearchParams } from "react-router-dom";
-import { CorrectionTargetURIs } from "../components/CorrectionTargetURIs";
 import { MemoryCorrections } from "../components/MemoryCorrections";
 import { PageTabs } from "../components/PageTabs";
 import { memoryTitle, MemoryListRow } from "../components/MemoryListRow";
@@ -8,15 +7,14 @@ import { RecallStatsLabel } from "../components/RecallStatsLabel";
 import { Modal } from "../components/Modal";
 import { DEFAULT_PAGE_SIZE, Pagination } from "../components/Pagination";
 import { EmptyState, ErrorNote, ListSkeleton } from "../components/EmptyState";
-import { listCorrections, pageMemories } from "../lib/api";
-import { useOverviewCounts } from "../lib/overviewCounts";
+import { pageMemories } from "../lib/api";
 import {
   MEMORY_CATEGORIES,
   isMemoryCategory,
   type MemoryCategory,
 } from "../lib/memoryCategories";
 import { formatDateTime, formatDateTimeMonoClass } from "../lib/format";
-import type { CorrectionRow, MemoryRow } from "../lib/types";
+import type { MemoryRow } from "../lib/types";
 import { useI18n } from "../i18n";
 import { MemoryMarkdown } from "../components/MemoryMarkdown";
 import { getMemoriesSectionMeta } from "../lib/shellRoutes";
@@ -257,46 +255,6 @@ function ProfileMemoryPage() {
   );
 }
 
-function CorrectionsList() {
-  const { t } = useI18n();
-  const [rows, setRows] = useState<CorrectionRow[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    setLoading(true);
-    listCorrections()
-      .then(setRows)
-      .catch((err: Error) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, []);
-
-  if (loading) return <ListSkeleton rows={3} />;
-  if (error) return <ErrorNote>{error}</ErrorNote>;
-  if (!rows.length) return <EmptyState title={t.memories.corrections.empty} />;
-
-  return (
-    <div className="divide-y divide-rmb-line rounded-md border border-rmb-line">
-      {rows.map((row) => (
-        <div
-          key={row.uri}
-          className="grid min-h-14 grid-cols-[minmax(0,1fr)_11.5rem] items-center gap-4 px-3 py-2"
-        >
-          <div className="min-w-0">
-            <p className="text-sm text-rmb-dark">{row.statement}</p>
-            <div className="mt-0.5">
-              <CorrectionTargetURIs uris={row.target_uris} />
-            </div>
-          </div>
-          <span className={`text-right text-xs text-rmb-faint ${formatDateTimeMonoClass}`}>
-            {formatDateTime(row.created_at)}
-          </span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function MemoriesTabHeader({ title, subtitle }: { title: string; subtitle: string }) {
   return (
     <header className="space-y-1">
@@ -309,8 +267,6 @@ function MemoriesTabHeader({ title, subtitle }: { title: string; subtitle: strin
 function MemoriesChrome({ children }: { children: ReactNode }) {
   const { t } = useI18n();
   const location = useLocation();
-  const counts = useOverviewCounts();
-  const correctionCount = counts?.corrections;
   const tabMeta = getMemoriesSectionMeta(location.pathname, t);
 
   const q = location.search;
@@ -320,11 +276,6 @@ function MemoriesChrome({ children }: { children: ReactNode }) {
       to: { pathname: `/memories/${category}`, search: q },
       label: t.memories.categories[category].nav,
     })),
-    {
-      to: { pathname: "/memories/corrections", search: q },
-      label: t.nav.corrections,
-      badge: correctionCount,
-    },
   ];
 
   return (
@@ -343,13 +294,6 @@ export function MemoriesPage() {
     return (
       <MemoriesChrome>
         <MemoryListView showCategory />
-      </MemoriesChrome>
-    );
-  }
-  if (categoryParam === "corrections") {
-    return (
-      <MemoriesChrome>
-        <CorrectionsList />
       </MemoriesChrome>
     );
   }

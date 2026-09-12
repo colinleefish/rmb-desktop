@@ -14,10 +14,10 @@
 | `internal/appshell` | B | B | B | A | C | tray + sidecar supervision; release-signed; B04 flake root-caused to the test's fixed 5s log-poll window (#70, 2026-09-06) — deterministic delay-injection regression (`RMB_TEST_DAEMON_WRITE_DELAY`, test-only) on `fix/B04-flaky-daemon-log-poll`; `*os.File` guard intact; tolerant detection pending phase 3, then re-grade Tests; bootstrap test expectations now GOOS-conditional (#68, caught by first Linux CI run) |
 | `internal/config` | C | B | C | B | C | **secrets still plaintext in config.yaml — P3.5 open (F06)** |
 | `cmd/*` | B | A | B | A | B | thin entrypoints |
-| `webui/` | C | C | B | B | C | dev loop documented in `webui/README.md`: `pnpm run dev:mock` (in-memory dataset, no daemon) / `pnpm run dev` (RMB_API_TARGET proxy); mock-router contract selftest 49 asserts (F10 L2); **`make check` runs `webui-verify` (oxlint + tsc/vite build, F11 #60)**; still no component/e2e tests; 604-line SettingsPage — refactor planned (F03–F05, plan/webui-refactor.md) |
+| `webui/` | C | C | B | B | C | F12 dropped the Memories Corrections tab (add/retract stay on memory detail). Mock selftest 49 asserts (F10); `make check` runs `webui-verify` (F11 #60); still no component/e2e tests; SettingsPage split is F05 |
 | `internal/db` | A | B | B | A | B | goose SQL migrations embedded; upgrade-scenario tests (00008) |
 | harness (Makefile/scripts/.harness) | A | A | A | A | A | F08 bug workflow + F09 PR CI + branch protection + **F11 webui-verify in `make check` (#60)**; three merge rules mechanically enforced; CI caught 4 test bugs in its first 3 runs (#68/#71/#72 + hermetic fixtures) |
-| `internal/update` | B | B | B | A | B | manifest fixtures now cover the running platform (#68-era fix in PR #67); #15 updater bug still open (B03) |
+| `internal/update` | B | B | B | A | B | manifest fixtures cover the running platform (#68-era fix in PR #67); B03/#15 passing (PR #77) |
 | `internal/hook`, `internal/setup` (agent integrations) | A | B | B | A | B | cursor/cc/codex/opencode/pi/workbuddy/zcode; ZCode payload shape verified against the installed client bundle (#61 fix, 2026-08-29): Stop carries no user prompt → UserPromptSubmit capture hook + sidecar pairing; #62 session-key normalization mirrors the opencode precedent with total-function tests; hook tests modernized in PR #69 |
 
 ## Reading the table

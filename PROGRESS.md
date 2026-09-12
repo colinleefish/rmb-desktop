@@ -2,22 +2,27 @@
 
 ## Current State
 
-Last commit: `feat/webui-ia-shell` (549adc1 + follow-up) — integrates **chore/pnpm** (3110269) + **F04 webui shell restructure** on top of main @ 706d07f (F10 merged). `make check` and `make webui-build`: green locally (2026-09-12). F04 `active`; verify via `make verify-feature F=F04` before merge.
+Last commit on **main**: `d83070f` — VERSION **0.2.10** shipped (F04 webui IA shell + pnpm). `make check` green on main when `webui-build` artifact present (2026-09-12).
 
-- **pnpm**: Makefile/CI use `pnpm install --frozen-lockfile`; `webui/pnpm-lock.yaml` replaces `package-lock.json`.
-- **F04**: Job-oriented shell (Overview · Sessions · Memories · Agents · Settings), Topbar recall bar, Agents hub (integrations + skills), memory category tabs, daemon heartbeat, corrections `target_uris` in API + UI. Contract: `.harness/contracts/F04.md`, design notes: `docs/design/webui-design.md`.
-- **Ship**: push `feat/webui-ia-shell` → PR → merge → bump VERSION (0.2.10) → `make release`.
+**Open PRs (merge order suggestion: #78 → #77 → #79, or parallel after CI green):**
+
+| PR | Branch | Closes |
+|----|--------|--------|
+| [#78](https://github.com/colinleefish/rmb-desktop/pull/78) | `chore/webui-verify-gate` | #60 (F11 webui-verify in `make check`) |
+| [#77](https://github.com/colinleefish/rmb-desktop/pull/77) | `fix/B03-tray-update-baseline` | #15 (B03 sidecar version baseline) |
+| [#79](https://github.com/colinleefish/rmb-desktop/pull/79) | `fix/B05-incumbent-materiality-race` | #72 (B05 L3 rollup URI lock) |
 
 ## In Progress
 
-- PR for F04 + pnpm awaiting CI (`pr-check`).
+- `chore/bug-track-hygiene` — backfill B01/B02 `passing` + `// B01`/`// B02` regression tags (fixes merged pre-F08).
+- `fix/B04-flaky-daemon-log-poll` — B04 (#70), existing worktree.
 
 ## Next Steps
 
-1. Merge PR; release 0.2.10
-2. B04 phase-3 fix (`fix/B04-flaky-daemon-log-poll`)
-3. B05 deterministic regression + fix
-4. F05 settings strangler per `plan/webui-refactor.md`
+1. Merge PRs #78–#79; close #60/#15/#72 on merge.
+2. Merge `chore/bug-track-hygiene` after bug_list backfill review.
+3. Comment/close #17 (Sessions logos — `AgentChip` on main since F04); optional #40 (release `ci` workflow superseded by `pr-check` + local `make release`).
+4. F05 settings strangler per `plan/webui-refactor.md`.
 
 ## Blockers
 

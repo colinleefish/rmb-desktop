@@ -67,6 +67,7 @@ func TestIsZCodePayload(t *testing.T) {
 	}
 }
 
+// B02
 // TestZcodeRMBSessionID covers the session-key normalization for issue #62
 // (INVESTIGATION §4 TC-5, TC-6): bare UUIDs pass through canonicalized, the
 // sess_ prefix is stripped when the remainder is a valid UUID, and any other
@@ -159,6 +160,7 @@ func TestZcodeRMBSessionID_Deterministic(t *testing.T) {
 	}
 }
 
+// B01
 // TestParseZCodePayload_PairsCapturedPrompt covers TC-1/TC-2 (issue #61):
 // the user prompt arrives via the capture-hook sidecar, the assistant reply
 // via the payload; the assistant-only Stop transcript is never consulted.

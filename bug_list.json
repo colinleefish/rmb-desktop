@@ -6,9 +6,15 @@
       "issue": 61,
       "severity": "high",
       "module": "internal/hook",
-      "state": "reported",
+      "state": "passing",
       "reported": "2026-08-29",
       "investigation": "docs/audit/2026-08-29-zcode-capture-bugs/INVESTIGATION.md",
+      "branch": "fix/zcode-61-user-prompt-capture",
+      "regression": {
+        "file": "internal/hook/zcode_test.go",
+        "cmd": "CGO_ENABLED=1 go test -tags sqlite_fts5 ./internal/hook/ -run TestParseZCodePayload_PairsCapturedPrompt -count=1"
+      },
+      "evidence": "backfill PR #65 (4aea8a9), issue #61 closed; L2 regression green on main, verified 2026-09-12",
       "layers": [
         {
           "label": "L1 static",
@@ -33,9 +39,15 @@
       "issue": 62,
       "severity": "medium",
       "module": "internal/hook",
-      "state": "reported",
+      "state": "passing",
       "reported": "2026-08-29",
       "investigation": "docs/audit/2026-08-29-zcode-capture-bugs/INVESTIGATION.md",
+      "branch": "fix/zcode-62-session-key-normalize",
+      "regression": {
+        "file": "internal/hook/zcode_test.go",
+        "cmd": "CGO_ENABLED=1 go test -tags sqlite_fts5 ./internal/hook/ -run TestZcodeRMBSessionID -count=1"
+      },
+      "evidence": "backfill PR #66 (35d85c7), issue #62 closed; L2 regression green on main, verified 2026-09-12",
       "layers": [
         {
           "label": "L1 static",

@@ -100,6 +100,7 @@ func TestWorkBuddyHookConfigured(t *testing.T) {
 }
 
 func TestPreviewWorkBuddyDetected(t *testing.T) {
+	fakeRMBHome(t)
 	def, _ := agentDefByID(AgentWorkBuddy)
 	state, err := previewWorkBuddy(def)
 	if err != nil {

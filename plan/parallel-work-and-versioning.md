@@ -50,8 +50,11 @@ git worktree add ../rmb-desktop-<slug> -b <prefix>/<slug> origin/main
 
 1. 合入前先 `git fetch origin`，把 main 合进特性分支并解决冲突；`go vet` + `make test` 全绿。
 2. 合并顺序：若分支 A 依赖未合并分支 B，先合 B 再合 A。
-3. 用 merge commit 合入 main，提交信息写 `Merge <branch>: <一句话>（agent session <id>）`。
-4. 合并后删本地分支 + 远端分支（`git push origin --delete <branch>`），worktree `git worktree remove`。
+3. **走 PR 合入 main（F09 起）**：push 分支 → `gh pr create` → CI `pr-check` 绿 → merge。
+   main 上的分支保护要求 `check` 状态绿 + 必须经 PR + 只允许 merge commit（squash/rebase 已禁用）——
+   把"不在 main 直接提交"、"绿了才合"、"no squash"三条规则从君子协定变成机械强制。
+   PR 提交信息仍写 `Merge <branch>: <一句话>（agent session <id>）` 格式的标题/说明。
+4. 合并后删本地分支 + 远端分支（`git push origin --delete <branch>` 或 PR 页勾选自动删除），worktree `git worktree remove`。
 5. 只有 main 上的 commit 才能进 release。
 
 ### 2.5 路径所有权（防冲突速查）

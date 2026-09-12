@@ -105,6 +105,32 @@
           "repair": "Full pipeline red: run make check locally, fix the failing stage."
         }
       ]
+    },
+    {
+      "id": "B05",
+      "title": "flaky: TestIncumbentMerge_CosinePath double-bumps incumbent — read-skew race in rollup materiality gate",
+      "issue": 72,
+      "severity": "high",
+      "module": "internal/worker/memory",
+      "state": "reported",
+      "reported": "2026-09-12",
+      "layers": [
+        {
+          "label": "L1 static",
+          "cmd": "jq -e --arg id \"B05\" '(.bugs[] | select(.id == $id) | .issue) == 72 and (.bugs[] | select(.id == $id) | .regression.file | test(\"_test\\\\.go$\"))' bug_list.json",
+          "repair": "B05 entry lost its issue linkage or regression file — check bug_list.json against bug_list.schema.json."
+        },
+        {
+          "label": "L2 runtime",
+          "cmd": "c=$(jq -r '.bugs[] | select(.id == \"B05\") | .regression.cmd // empty' bug_list.json); test -n \"$c\" && bash -c \"$c\"",
+          "repair": "Regression not green yet — read issue #72 (root cause + fix direction: move materiality read into the persist transaction or serialize per-URI)."
+        },
+        {
+          "label": "L3 system",
+          "cmd": "make check",
+          "repair": "Full pipeline red: run make check locally, fix the failing stage."
+        }
+      ]
     }
   ]
 }

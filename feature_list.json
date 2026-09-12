@@ -208,8 +208,8 @@
       "name": "pr-ci-gate",
       "behavior": "GitHub Actions PR CI with full local parity (.github/workflows/pr-check.yml: make setup → webui-build → check on ubuntu-latest, CGO + sqlite_fts5, setup-go cache:false dodging the #40 toolchain race, go-build + npm caches, concurrency cancel, 15min timeout; triggers: all PRs + push to main) + branch protection on main (require check green, require PRs, merge-commit only) mechanically enforcing three existing harness rules",
       "verification": "a real PR runs pr-check green (run URL in evidence); branch protection API returns required_status_checks",
-      "state": "active",
-      "evidence": "",
+      "state": "passing",
+      "evidence": "commit 24e94e1, verified 2026-09-12",
       "issue": 64,
       "layers": [
         {

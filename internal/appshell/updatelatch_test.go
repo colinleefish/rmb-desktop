@@ -36,6 +36,28 @@ func b04DelayedMarkScript(t *testing.T) string {
 	return script
 }
 
+// b04MarkPollDeadline is how long TestSpawnedDaemonStdioIsLogFdNotPipe waits for the
+// fake daemon's daemon-mark write. The incident (B04) used a fixed 5s window that
+// false-failed under load; delay injection (RMB_TEST_DAEMON_WRITE_DELAY) needs
+// base+2×delay, and the normal path adds load headroom without slowing the happy path.
+func b04MarkPollDeadline(t *testing.T) time.Time {
+	t.Helper()
+	const base = 5 * time.Second
+	var delay time.Duration
+	if raw := os.Getenv("RMB_TEST_DAEMON_WRITE_DELAY"); raw != "" {
+		d, err := time.ParseDuration(raw)
+		if err != nil || d < 0 {
+			t.Fatalf("RMB_TEST_DAEMON_WRITE_DELAY: invalid duration %q", raw)
+		}
+		delay = d
+	}
+	window := base + 2*delay
+	if delay == 0 {
+		window += 25 * time.Second
+	}
+	return time.Now().Add(window)
+}
+
 // TestUpdateStopThenRestartRespawnsDaemon is the regression test for the
 // 2026-08-16 v0.2.4 incident: installUpdate stopped the daemon via
 // Shutdown(), whose shuttingDown latch is never cleared — so the
@@ -149,7 +171,7 @@ func TestSpawnedDaemonStdioIsLogFdNotPipe(t *testing.T) {
 	if err != nil {
 		t.Fatalf("log path: %v", err)
 	}
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := b04MarkPollDeadline(t)
 	for time.Now().Before(deadline) {
 		data, err := os.ReadFile(path)
 		if err == nil && strings.Contains(string(data), "daemon-mark") {

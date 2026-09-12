@@ -202,28 +202,6 @@ export function sessionSourceLabel(source: string | null | undefined): string {
   }
 }
 
-export function sessionSourceShortLabel(source: string | null | undefined): string {
-  switch ((source ?? "").toLowerCase()) {
-    case "cursor":
-      return "Cursor";
-    case "cc":
-    case "claude":
-      return "Claude Code";
-    case "codex":
-      return "Codex";
-    case "pi":
-      return "Pi";
-    case "opencode":
-      return "Open";
-    case "workbuddy":
-      return "WB";
-    case "zcode":
-      return "ZCode";
-    default:
-      return sessionSourceLabel(source);
-  }
-}
-
 export function turnRoleLabel(role: string | undefined): string {
   switch ((role ?? "").toLowerCase()) {
     case "user":

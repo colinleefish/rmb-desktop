@@ -17,3 +17,4 @@ One line per resolved decision. Pointer = where the full rationale lives. Append
 | 2026-08-24 | Plans move to `plan/done/` when complete (tauri-to-go-shell first) | repo convention |
 | 2026-08-28 | ZCode added as a 7th supported agent integration; config lives at `~/.zcode/cli/config.json` (`hooks.events.Stop`, forces `hooks.enabled: true`), recall block at `~/.zcode/AGENTS.md` | feature_list.json F07 |
 | 2026-08-29 | #62 ZCode session keys: normalize at parse time only (`zcodeRMBSessionID`); NO backfill migration — owner is the sole ZCode user, 3 legacy `sess_…` rows accepted as orphaned | `internal/hook/zcode.go`, `docs/audit/2026-08-29-zcode-capture-bugs/INVESTIGATION.md` §5.1 |
+| 2026-09-12 | Pre-F08 merged bugs (#61/#62 → B01/B02): administrative backfill to `passing` when the GitHub issue is closed and the L2 regression passes on main; skip the `diagnosed` gate (regression is already green) | `chore/bug-track-hygiene`, `bug_list.json` |

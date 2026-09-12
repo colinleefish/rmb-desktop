@@ -105,6 +105,39 @@
           "repair": "Full pipeline red: run make check locally, fix the failing stage."
         }
       ]
+    },
+    {
+      "id": "B05",
+      "title": "bug(httpserver): TestSearch_sinceUntil_filtering hard-codes until=2026-08-02 — fails deterministically once now-40d crosses that date",
+      "issue": 73,
+      "severity": "medium",
+      "module": "internal/httpserver",
+      "state": "passing",
+      "reported": "2026-09-12",
+      "layers": [
+        {
+          "label": "L1 static",
+          "cmd": "jq -e --arg id \"B05\" '(.bugs[] | select(.id == $id) | .issue) == 73 and (.bugs[] | select(.id == $id) | .regression.file | test(\"_test\\\\.go$\"))' bug_list.json",
+          "repair": "B05 entry lost its issue linkage or regression file — check bug_list.json against bug_list.schema.json."
+        },
+        {
+          "label": "L2 runtime",
+          "cmd": "c=$(jq -r '.bugs[] | select(.id == \"B05\") | .regression.cmd // empty' bug_list.json); test -n \"$c\" && bash -c \"$c\"",
+          "repair": "Regression must reproduce: CGO_ENABLED=1 go test -tags sqlite_fts5 ./internal/httpserver/ -run TestSearch_sinceUntil_filtering must FAIL on unfixed code (date bomb) and PASS after the fix derives the cutoff from the test clock."
+        },
+        {
+          "label": "L3 system",
+          "cmd": "make check",
+          "repair": "Full pipeline red: run make check locally, fix the failing stage."
+        }
+      ],
+      "investigation": "docs/bugs/B05-investigation.md",
+      "regression": {
+        "file": "internal/httpserver/recall_test.go",
+        "cmd": "CGO_ENABLED=1 go test -tags sqlite_fts5 ./internal/httpserver/ -run TestSearch_sinceUntil_filtering -count=1"
+      },
+      "branch": "fix/B05-search-until-datebomb",
+      "evidence": "commit af6b33b, verified 2026-09-12"
     }
   ]
 }

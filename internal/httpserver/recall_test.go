@@ -13,6 +13,7 @@ import (
 	"github.com/colinleefish/rmb-desktop/internal/httpserver"
 )
 
+// B05: regression guard — hard-coded until cutoff used to self-destruct once now-40d crossed it.
 func TestSearch_sinceUntil_filtering(t *testing.T) {
 	database, err := db.Open(filepath.Join(t.TempDir(), "rmb.db"))
 	if err != nil {
@@ -76,7 +77,10 @@ func TestSearch_sinceUntil_filtering(t *testing.T) {
 	if uris := get(base + "&since=7d"); len(uris) != 1 || uris[0] != "rmb://entities/new" {
 		t.Fatalf("since=7d: got %v", uris)
 	}
-	if uris := get(base + "&until=2026-08-02"); len(uris) != 1 || uris[0] != "rmb://entities/old" {
+	// Derive the cutoff from the test clock: old@-40d must fall before it, new@now
+	// after it. A literal here self-destructed on 2026-09-12 (B05, issue #73).
+	until := time.Now().UTC().AddDate(0, 0, -30).Format("2006-01-02")
+	if uris := get(base + "&until=" + until); len(uris) != 1 || uris[0] != "rmb://entities/old" {
 		t.Fatalf("until: got %v", uris)
 	}
 	// Bad since value → 400.

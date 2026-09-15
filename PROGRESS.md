@@ -2,16 +2,17 @@
 
 ## Current State
 
-**main** integrating **`0.2.11-dev.1`** (`release/0.2.11-dev.1` PR #84). Includes #77–#80 plus #81 (B04) and #82 (#16 brand logos).
+**release/0.2.11** — pin `MACOSX_DEPLOYMENT_TARGET=13.0` so Go builds on macOS 26 no longer embed `minos 26.0` (broke Sequoia 15). VERSION → `0.2.11`.
 
 ## In Progress
 
-- Merge PR #84; tag `v0.2.11-dev.1`
+- Ship `v0.2.11` (DMG + sidecars + R2 feed)
 
 ## Next Steps
 
-1. Optional dev build: `make release VERSION=0.2.11-dev.1`
-2. F05 settings strangler per `plan/webui-refactor.md`
+1. Merge `release/0.2.11` → main; `make release VERSION=0.2.11` (+ `PUBLISH_R2=1`)
+2. Confirm DMG `otool` minos ≤ 13.0 and `curl https://releases.re-mem-ber.me/latest.json` = 0.2.11
+3. F05 settings strangler per `plan/webui-refactor.md`
 
 ## Blockers
 

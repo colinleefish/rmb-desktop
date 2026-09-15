@@ -20,6 +20,8 @@ export GOOS=windows
 export GOARCH=amd64
 export CC=x86_64-w64-mingw32-gcc
 export CXX=x86_64-w64-mingw32-g++
+# Drop any host Darwin CGO flags inherited from `make` (e.g. -mmacosx-version-min).
+unset CGO_LDFLAGS || true
 export CGO_CFLAGS="-I$TMPINC"
 
 mkdir -p "$ROOT/bin"

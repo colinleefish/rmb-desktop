@@ -9,11 +9,15 @@ GO_LDFLAGS := -X github.com/colinleefish/rmb-desktop/internal/version.Version=$(
 # Go on a newer macOS (e.g. 26 Tahoe) embeds LC_BUILD_VERSION.minos = host OS
 # unless pinned. Sequoia (15) then refuses to launch. Go 1.27's Darwin floor is
 # Ventura 13 — keep Info.plist LSMinimumSystemVersion in sync.
+#
+# Do NOT export CGO_* globally: mingw cross-builds inherit them and die on
+# -mmacosx-version-min. Scope Darwin CGO flags to native recipes only.
 MACOSX_DEPLOYMENT_TARGET ?= 13.0
 export MACOSX_DEPLOYMENT_TARGET
 ifeq ($(shell uname -s),Darwin)
-export CGO_CFLAGS += -mmacosx-version-min=$(MACOSX_DEPLOYMENT_TARGET)
-export CGO_LDFLAGS += -mmacosx-version-min=$(MACOSX_DEPLOYMENT_TARGET)
+DARWIN_CGO_ENV := CGO_CFLAGS="-mmacosx-version-min=$(MACOSX_DEPLOYMENT_TARGET)" CGO_LDFLAGS="-mmacosx-version-min=$(MACOSX_DEPLOYMENT_TARGET)"
+else
+DARWIN_CGO_ENV :=
 endif
 
 ICON_SRC := icons/pyramid-dark-accent.svg
@@ -27,8 +31,8 @@ setup:
 
 check: webui-verify webui-embed-check
 	go vet -tags "$(GO_TAGS)" ./...
-	CGO_ENABLED=1 go build -tags "$(GO_TAGS)" ./...
-	CGO_ENABLED=1 go test -tags "$(GO_TAGS)" ./...
+	$(DARWIN_CGO_ENV) CGO_ENABLED=1 go build -tags "$(GO_TAGS)" ./...
+	$(DARWIN_CGO_ENV) CGO_ENABLED=1 go test -tags "$(GO_TAGS)" ./...
 	$(MAKE) eval
 	$(MAKE) check-arch
 
@@ -37,7 +41,7 @@ check-arch:
 	bash scripts/check-arch.sh
 
 test: webui-embed-check
-	CGO_ENABLED=1 go test -tags "$(GO_TAGS)" ./...
+	$(DARWIN_CGO_ENV) CGO_ENABLED=1 go test -tags "$(GO_TAGS)" ./...
 
 # e2e = offline recall regression gate over the committed golden fixture.
 e2e: eval
@@ -72,14 +76,14 @@ bug-state:
 # Offline recall regression gate (issue #22). Deterministic hash-embedder eval
 # over the committed golden fixture; fails the build if recall metrics regress.
 eval:
-	CGO_ENABLED=1 go run -tags "$(GO_TAGS)" ./cmd/rmb-eval run \
+	$(DARWIN_CGO_ENV) CGO_ENABLED=1 go run -tags "$(GO_TAGS)" ./cmd/rmb-eval run \
 		-fixture internal/recall/eval/testdata/golden_fixture.json \
 		-golden internal/recall/eval/golden.yaml
 
 build: webui-embed-check
-	CGO_ENABLED=1 go build -tags "$(GO_TAGS)" -ldflags "$(GO_LDFLAGS)" -o bin/rmbd ./cmd/rmbd
-	CGO_ENABLED=1 go build -tags "$(GO_TAGS)" -ldflags "$(GO_LDFLAGS)" -o bin/rmb ./cmd/rmb
-	CGO_ENABLED=1 go build -tags "$(GO_TAGS)" -ldflags "$(GO_LDFLAGS)" -o bin/rmb-app ./cmd/rmb-app
+	$(DARWIN_CGO_ENV) CGO_ENABLED=1 go build -tags "$(GO_TAGS)" -ldflags "$(GO_LDFLAGS)" -o bin/rmbd ./cmd/rmbd
+	$(DARWIN_CGO_ENV) CGO_ENABLED=1 go build -tags "$(GO_TAGS)" -ldflags "$(GO_LDFLAGS)" -o bin/rmb ./cmd/rmb
+	$(DARWIN_CGO_ENV) CGO_ENABLED=1 go build -tags "$(GO_TAGS)" -ldflags "$(GO_LDFLAGS)" -o bin/rmb-app ./cmd/rmb-app
 
 build-all: webui-build build
 
@@ -115,7 +119,7 @@ icons-sync:
 	cp $(ICON_SRC) webui/public/logo.svg
 
 run-rmbd:
-	CGO_ENABLED=1 go run -tags "$(GO_TAGS)" ./cmd/rmbd serve
+	$(DARWIN_CGO_ENV) CGO_ENABLED=1 go run -tags "$(GO_TAGS)" ./cmd/rmbd serve
 
 tidy:
 	go mod tidy

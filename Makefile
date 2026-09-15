@@ -2,9 +2,19 @@
 
 GO_TAGS := sqlite_fts5
 EMBED_INDEX := internal/http/static/web/index.html
-VERSION ?= 0.2.11-dev.1
+VERSION ?= 0.2.11
 COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 GO_LDFLAGS := -X github.com/colinleefish/rmb-desktop/internal/version.Version=$(VERSION) -X github.com/colinleefish/rmb-desktop/internal/version.Commit=$(COMMIT)
+
+# Go on a newer macOS (e.g. 26 Tahoe) embeds LC_BUILD_VERSION.minos = host OS
+# unless pinned. Sequoia (15) then refuses to launch. Go 1.27's Darwin floor is
+# Ventura 13 — keep Info.plist LSMinimumSystemVersion in sync.
+MACOSX_DEPLOYMENT_TARGET ?= 13.0
+export MACOSX_DEPLOYMENT_TARGET
+ifeq ($(shell uname -s),Darwin)
+export CGO_CFLAGS += -mmacosx-version-min=$(MACOSX_DEPLOYMENT_TARGET)
+export CGO_LDFLAGS += -mmacosx-version-min=$(MACOSX_DEPLOYMENT_TARGET)
+endif
 
 ICON_SRC := icons/pyramid-dark-accent.svg
 TRAY_ICON_SRC := icons/pyramid-tray.svg

@@ -66,5 +66,30 @@ codesign --force --identifier "me.remember.rmb" --options runtime \
   $TS_ARGS --sign "$CODESIGN_ID" "$APP_DIR"
 codesign --verify --verbose=1 "$APP_DIR"
 
+# Refuse to ship a binary whose Mach-O minos exceeds the deployment target.
+# Building on macOS 26 without MACOSX_DEPLOYMENT_TARGET embeds minos 26.0,
+# which Sequoia (15) and older cannot launch (silent kernel reject).
+MAX_MINOS="${MACOSX_DEPLOYMENT_TARGET:-13.0}"
+for bin in "RMB Desktop" rmb rmbd; do
+  minos="$(otool -l "$MACOS_DIR/$bin" | awk '/minos/{print $2; exit}')"
+  if [[ -z "$minos" ]]; then
+    echo "build-macos-app: missing LC_BUILD_VERSION.minos on $bin" >&2
+    exit 1
+  fi
+  # Numeric compare major.minor (enough for 13.0 vs 26.0).
+  awk -v a="$minos" -v b="$MAX_MINOS" 'BEGIN{
+    split(a,x,"."); split(b,y,".");
+    am=x[1]+0; an=(x[2]==""?0:x[2]+0);
+    bm=y[1]+0; bn=(y[2]==""?0:y[2]+0);
+    if (am>bm || (am==bm && an>bn)) exit 1;
+    exit 0
+  }' || {
+    echo "build-macos-app: $bin has minos $minos > MACOSX_DEPLOYMENT_TARGET=$MAX_MINOS" >&2
+    echo "  export MACOSX_DEPLOYMENT_TARGET=$MAX_MINOS before make build" >&2
+    exit 1
+  }
+  echo "  minos ok: $bin = $minos (≤ $MAX_MINOS)"
+done
+
 echo "build-macos-app: $APP_DIR"
-plutil -p "$APP_DIR/Contents/Info.plist" | grep -E "CFBundleShortVersionString|CFBundleVersion|CFBundleExecutable"
+plutil -p "$APP_DIR/Contents/Info.plist" | grep -E "CFBundleShortVersionString|CFBundleVersion|CFBundleExecutable|LSMinimumSystemVersion"

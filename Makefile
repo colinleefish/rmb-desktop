@@ -1,4 +1,4 @@
-.PHONY: setup check test eval e2e dev vcr verify-feature verify-bug bug-state build build-all run-rmbd run-hook tidy app-dev app-build app-build-windows app-install webui-dev webui-build webui-verify webui-embed-check icons-sync build-windows-sidecars notarize release release-upload release-publish
+.PHONY: setup check test eval e2e dev vcr verify-feature verify-bug bug-state build build-intel build-all run-rmbd run-hook tidy app-dev app-build app-build-intel app-build-windows app-install webui-dev webui-build webui-verify webui-embed-check icons-sync build-windows-sidecars notarize release release-upload release-publish
 
 GO_TAGS := sqlite_fts5
 EMBED_INDEX := internal/http/static/web/index.html
@@ -86,6 +86,16 @@ build: webui-embed-check
 	$(DARWIN_CGO_ENV) CGO_ENABLED=1 go build -tags "$(GO_TAGS)" -ldflags "$(GO_LDFLAGS)" -o bin/rmb-app ./cmd/rmb-app
 
 build-all: webui-build build
+
+# Intel (x86_64) cross-build for older Intel MacBooks (F13). Same CGO pins as
+# the native recipes plus -arch x86_64 so clang emits amd64 Mach-O even though
+# the build host is arm64. Kept separate from DARWIN_CGO_ENV: exporting both
+# would double-define CGO_CFLAGS/CGO_LDFLAGS and the last one silently wins.
+INTEL_CGO_ENV := CGO_ENABLED=1 GOARCH=amd64 CGO_CFLAGS="-arch x86_64 -mmacosx-version-min=$(MACOSX_DEPLOYMENT_TARGET)" CGO_LDFLAGS="-arch x86_64 -mmacosx-version-min=$(MACOSX_DEPLOYMENT_TARGET)"
+build-intel: webui-embed-check
+	$(INTEL_CGO_ENV) go build -tags "$(GO_TAGS)" -ldflags "$(GO_LDFLAGS)" -o bin/intel/rmbd ./cmd/rmbd
+	$(INTEL_CGO_ENV) go build -tags "$(GO_TAGS)" -ldflags "$(GO_LDFLAGS)" -o bin/intel/rmb ./cmd/rmb
+	$(INTEL_CGO_ENV) go build -tags "$(GO_TAGS)" -ldflags "$(GO_LDFLAGS)" -o bin/intel/rmb-app ./cmd/rmb-app
 
 webui-embed-check:
 	@test -f $(EMBED_INDEX) || (echo "Missing $(EMBED_INDEX). Run: make webui-build  (or make build-all)" >&2; exit 1)
@@ -178,6 +188,18 @@ app-build: webui-build build
 notarize:
 	xcrun notarytool submit "$(DMG_BUNDLE)" --keychain-profile "$(NOTARY_PROFILE)" --wait
 	xcrun stapler staple "$(DMG_BUNDLE)"
+
+# Intel one-off DMG (F13): NOT part of `make release` (no amd64 sidecars in the
+# updater manifest yet). Stages under dist/intel/ so the arm64 bundle in dist/
+# is never clobbered. Without SIGN_KEYCHAIN_PASS the bundle is ad-hoc signed —
+# fine for USB/local transfer, Gatekeeper-blocked when downloaded.
+APP_BUNDLE_INTEL := dist/intel/RMB Desktop.app
+INTEL_SIGN_IDENTITY := $(if $(SIGN_KEYCHAIN_PASS),$(SIGN_IDENTITY))
+app-build-intel: webui-build build-intel
+	@if [ -z "$(SIGN_KEYCHAIN_PASS)" ]; then echo "warning: SIGN_KEYCHAIN_PASS empty — Intel bundle will be ad-hoc signed" >&2; \
+	else security unlock-keychain -p "$(SIGN_KEYCHAIN_PASS)" "$(SIGN_KEYCHAIN)"; fi
+	RMB_BIN_DIR=bin/intel RMB_APP_DIR="$(APP_BUNDLE_INTEL)" bash scripts/build-macos-app.sh "$(VERSION)" "$(COMMIT)" "$(INTEL_SIGN_IDENTITY)"
+	RMB_APP_DIR="$(APP_BUNDLE_INTEL)" bash scripts/build-dmg.sh "$(VERSION)" amd64
 
 app-install: app-build
 	osascript -e 'quit app "RMB Desktop"' 2>/dev/null || true; sleep 2

@@ -3,9 +3,11 @@
 # Replaces tauri's bundler: hand-rolled Info.plist + binaries + icns + codesign.
 #
 # Usage: build-macos-app.sh <version> <commit> [sign-identity]
-#   Expects bin/{rmb-app,rmb,rmbd} built by `make build`.
+#   Expects bin/{rmb-app,rmb,rmbd} built by `make build` (override the source
+#   dir with RMB_BIN_DIR, e.g. bin/intel from `make build-intel`).
 #   The in-bundle executable is named "RMB Desktop" (parity with the Tauri
 #   bundle) so existing launch-at-login items keep pointing at the right file.
+#   Override the bundle destination with RMB_APP_DIR (default dist/RMB Desktop.app).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -13,13 +15,14 @@ VERSION="${1:?usage: build-macos-app.sh <version> <commit> [sign-identity]}"
 COMMIT="${2:?usage: build-macos-app.sh <version> <commit> [sign-identity]}"
 SIGN_IDENTITY="${3:-}"
 
-APP_DIR="$ROOT/dist/RMB Desktop.app"
+BIN_DIR="${RMB_BIN_DIR:-$ROOT/bin}"
+APP_DIR="${RMB_APP_DIR:-$ROOT/dist/RMB Desktop.app}"
 MACOS_DIR="$APP_DIR/Contents/MacOS"
 RES_DIR="$APP_DIR/Contents/Resources"
 
 for f in rmb-app rmb rmbd; do
-  if [[ ! -f "$ROOT/bin/$f" ]]; then
-    echo "build-macos-app: missing bin/$f (run: make build)" >&2
+  if [[ ! -f "$BIN_DIR/$f" ]]; then
+    echo "build-macos-app: missing $BIN_DIR/$f (run: make build / build-intel with RMB_BIN_DIR set)" >&2
     exit 1
   fi
 done
@@ -32,9 +35,9 @@ echo "==> assemble $APP_DIR"
 rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR" "$RES_DIR"
 
-cp "$ROOT/bin/rmb-app" "$MACOS_DIR/RMB Desktop"
-cp "$ROOT/bin/rmb"     "$MACOS_DIR/rmb"
-cp "$ROOT/bin/rmbd"    "$MACOS_DIR/rmbd"
+cp "$BIN_DIR/rmb-app" "$MACOS_DIR/RMB Desktop"
+cp "$BIN_DIR/rmb"     "$MACOS_DIR/rmb"
+cp "$BIN_DIR/rmbd"    "$MACOS_DIR/rmbd"
 chmod +x "$MACOS_DIR/RMB Desktop" "$MACOS_DIR/rmb" "$MACOS_DIR/rmbd"
 
 cp "$ROOT/icons/app.icns" "$RES_DIR/icon.icns"

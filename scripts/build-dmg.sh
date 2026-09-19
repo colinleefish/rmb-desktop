@@ -2,13 +2,16 @@
 # Create the release DMG from an assembled .app (Phase 3 of
 # plan/tauri-to-go-shell.md). Replaces tauri's dmg bundler.
 #
-# Usage: build-dmg.sh <version>   (expects dist/RMB Desktop.app to exist)
+# Usage: build-dmg.sh <version> [arch=aarch64]   (expects dist/RMB Desktop.app
+#   to exist; override the source bundle with RMB_APP_DIR, e.g. the Intel
+#   bundle at dist/intel/RMB Desktop.app from `make app-build-intel`)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-VERSION="${1:?usage: build-dmg.sh <version>}"
-APP="$ROOT/dist/RMB Desktop.app"
-DMG="$ROOT/dist/RMB Desktop_${VERSION}_aarch64.dmg"
+VERSION="${1:?usage: build-dmg.sh <version> [arch=aarch64]}"
+ARCH="${2:-aarch64}"
+APP="${RMB_APP_DIR:-$ROOT/dist/RMB Desktop.app}"
+DMG="$ROOT/dist/RMB Desktop_${VERSION}_${ARCH}.dmg"
 
 if [[ ! -d "$APP" ]]; then
   echo "build-dmg: missing $APP (run: scripts/build-macos-app.sh)" >&2

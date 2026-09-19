@@ -305,6 +305,31 @@
         }
       ],
       "evidence": "commit f7e66a7, verified 2026-09-12"
+    },
+    {
+      "id": "F13",
+      "name": "intel-dmg-build",
+      "behavior": "Cross-build a darwin/amd64 (Intel MacBook) DMG: make build-intel emits bin/intel/{rmb,rmbd,rmb-app} as x86_64 Mach-O with minos ≤ MACOSX_DEPLOYMENT_TARGET; make app-build-intel assembles the .app (dist/intel/) and dist/RMB Desktop_<VERSION>_amd64.dmg without touching the arm64 pipeline outputs",
+      "verification": "make verify-feature F=F13; artifact checked via file/otool inside the staged .app plus hdiutil on the DMG",
+      "state": "passing",
+      "evidence": "commit dcbdf72, verified 2026-09-19",
+      "layers": [
+        {
+          "label": "L1 static",
+          "cmd": "bash -n scripts/build-macos-app.sh && bash -n scripts/build-dmg.sh && grep -q build-intel Makefile && grep -q RMB_APP_DIR scripts/build-dmg.sh && grep -q RMB_BIN_DIR scripts/build-macos-app.sh",
+          "repair": "Scripts or Makefile missing the intel path: re-apply the F13 changes (build-intel/app-build-intel targets, RMB_BIN_DIR/RMB_APP_DIR env, arch argument to build-dmg.sh)."
+        },
+        {
+          "label": "L2 runtime",
+          "cmd": "file \"dist/intel/RMB Desktop.app/Contents/MacOS/rmbd\" | grep -q x86_64 && file \"dist/intel/RMB Desktop.app/Contents/MacOS/RMB Desktop\" | grep -q x86_64 && ls dist/*_amd64.dmg >/dev/null && hdiutil verify dist/RMB\\ Desktop_*_amd64.dmg >/dev/null && echo intel-artifacts-ok",
+          "repair": "Run: make app-build-intel VERSION=<version> — then re-run; if binaries come out arm64, check the INTEL_CGO_ENV -arch x86_64 flags in the Makefile target."
+        },
+        {
+          "label": "L3 system",
+          "cmd": "make check",
+          "repair": "Full pipeline red: run make check locally, fix the failing stage (vet/build/test/eval/check-arch)."
+        }
+      ]
     }
   ]
 }

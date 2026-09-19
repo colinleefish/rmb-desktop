@@ -32,6 +32,11 @@ Credentials live in `~/.rmb/release.env` (see `scripts/release.env.example`). Pr
 4. `make notarize` — Apple notarization + staple (skip with `SKIP_NOTARIZE=1`)
 5. `scripts/release.sh X` — verify staple, upload DMG + sidecar bundles + signed manifest to GitHub, then `PUBLISH_R2=1` pushes `latest.json`/`versions.json` + bundles to `releases.re-mem-ber.me` (China primary feed)
 
+The pipeline above is arm64-only. For older Intel MacBooks: `make app-build-intel VERSION=X`
+cross-builds `dist/RMB Desktop_X_amd64.dmg` (staged under `dist/intel/`, ad-hoc signed unless
+`SIGN_KEYCHAIN_PASS` is given). It is a local one-off — not in the signed release matrix, and
+the updater manifest has no `macos.amd64` sidecars yet, so Intel installs don't self-update.
+
 ## Version bumps
 
 Before releasing, update `VERSION` in:
